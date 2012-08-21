@@ -1,3 +1,4 @@
+<%@page import="java.net.URI"%>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
 "http://www.w3.org/TR/html4/strict.dtd">
 
@@ -22,6 +23,10 @@ from there by the tracking reader. Its functions are:</p>
 
 <p>The outer page simulates generation of data presumably obtained from
     JavaScript, and includes the next page.</p>
+
+<esi:include src="/ts-rcv?countername=<%=(new URI(request.getRequestURI())).getPath()%>"/>
+
+<esi:include src="/ts-rcv?ot_PageCluster=<jsp:getProperty name="d" property="pageCluster"/>"/>
 
 <esi:include src="/ts-rcv?ot_browinw=<%=d.nextInt(1200)%>&ot_browinh=<%=d.nextInt(1200)%>"/>
 

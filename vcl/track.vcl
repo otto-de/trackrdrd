@@ -23,7 +23,7 @@ sub vcl_recv {
 			set req.http.X-VID = regsub(req.http.Cookie,
 						"^.*\bVisitorID\s*=(\S+)\b.*$",
 						"\1");
-                        std.log("track " + req.xid + " ot_Vid=" +
+                        std.log("track " + req.xid + " ot_vid=" +
                                 req.http.X-VID + "&me_vid=" + req.http.X-VID +
 				"&ot_NewVid=false&me_vid=false");
                 }

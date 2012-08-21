@@ -42,6 +42,9 @@ public class Data {
     
     private static final String engines[] = {"Google", "Bing", "Yahoo"};
     
+    private static final String types[] = {"order", "category", "search",
+                                           "product", "user", "service"};
+    
     private Random rand = new Random();
 
     public Data() {
@@ -89,5 +92,9 @@ public class Data {
     
     public String getSearchEngine() {
         return engines[rand.nextInt(engines.length)];
+    }
+    
+    public String getPageCluster() {
+        return types[rand.nextInt(types.length)];
     }
 }
