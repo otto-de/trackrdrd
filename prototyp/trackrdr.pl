@@ -107,6 +107,9 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use strict;
 use warnings;
+use LWP::UserAgent;
+use LWP::ConnCache;
+use HTTP::Status qw(HTTP_NO_CONTENT HTTP_INTERNAL_SERVER_ERROR);
 use POSIX qw(setsid);
 use Getopt::Std;
 use Pod::Usage;
@@ -119,7 +122,7 @@ sub HELP_MESSAGE {
 }
 
 my %opts;
-getopts("dn:p:r:", \%opts);
+getopts("dn:p:r:u:", \%opts);
 
 # 0 to run forever
 my $MAX_RESTARTS = $opts{r} || 0;
@@ -129,6 +132,8 @@ my @SHMTAGS = qw(ReqStart VCL_Log ReqEnd);
 my $VARNISH_PRE = $opts{p} || '/var/opt/varnish';
 my $VARNISHLOG_CMD = "$VARNISH_PRE/bin/varnishlog -u -i ".join(',', @SHMTAGS);
 $VARNISHLOG_CMD = "$VARNISHLOG_CMD -n $opts{n}" if $opts{n};
+
+my $PROC_URL = $opts{u} || 'http://localhost/ts-processor/httpProcess';
 
 # be prepared to start with SMF
 
@@ -162,6 +167,11 @@ sub fork_varnishlog {
 }
 
 sub run_varnishlog {
+
+    my $ua = new LWP::UserAgent(
+        agent		=> "Track Reader Prototype $main::VERSION",
+        conn_cache	=> LWP::ConnCache->new(),
+        );
 
     while (1) {
         print "varnishlog=$VARNISHLOG_CMD\n" if $DEBUG;
@@ -202,8 +212,14 @@ sub run_varnishlog {
                     && $record{$tid}{xid}
                     && $record{$tid}{xid} eq $in[0]) {
                     if ($record{$tid}{data}) {
-                        # XXX: HTTP call goes here
-                        print 'DATA: ', join('&', @{$record{$tid}{data}}), "\n";
+                        my $data = join('&', @{$record{$tid}{data}});
+                        my $resp = $ua->post($PROC_URL, Content => $data);
+                        if ($resp->code != HTTP_NO_CONTENT) {
+                            warn "Processor error: ", $resp->status_line(),
+                                 "\n";
+                        }
+                        print 'DATA: ', join('&', @{$record{$tid}{data}}), "\n"
+                            if $DEBUG;
                     }
                     delete $record{$tid};
                 }

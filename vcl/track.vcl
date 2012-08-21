@@ -29,7 +29,7 @@ sub vcl_recv {
                 }
 		else {
 			std.log("track " + req.xid +
-				" ot_NewVid=true&me_newvid=true");
+				" ot_vid=&me_vid=&ot_NewVid=true&me_newvid=true");
 		}
 		/* IPv6 ?? */
 		set req.http.X-Anon-IP = regsub(client.ip, "\d+$", "XXX");

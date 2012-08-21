@@ -11,3 +11,5 @@ rdrtestapp/	Web Applikation als Test-Treiber für den Log-Reader --
 		werden können.
 
 vcl/		VCL (Varnish-Konfig), die Tracking unterstützt
+
+prototyp/	Perl-Prototyp des Track-Readers

@@ -2,3 +2,4 @@ nb-configuration.xml
 *~
 /rdrtestapp/target/
 
+/mock-processor/target/
