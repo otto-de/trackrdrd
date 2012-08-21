@@ -23,15 +23,15 @@ from there by the tracking reader. Its functions are:</p>
 <p>The outer page simulates generation of data presumably obtained from
     JavaScript, and includes the next page.</p>
 
-<esi:include src="/tr/rcv?ot_browinw=<%=d.nextInt(1200)%>&ot_browinh=<%=d.nextInt(1200)%>"/>
+<esi:include src="/ts-rcv?ot_browinw=<%=d.nextInt(1200)%>&ot_browinh=<%=d.nextInt(1200)%>"/>
 
-<esi:include src="/tr/rcv?ot_dispres=<%=d.nextInt(1920)%>x<%=d.nextInt(1080)%>"/>
+<esi:include src="/ts-rcv?ot_dispres=<%=d.nextInt(1920)%>x<%=d.nextInt(1080)%>"/>
 
-<esi:include src="/tr/rcv?ot_dispcol=<jsp:getProperty name="d" property="colorDepth"/>"/>
+<esi:include src="/ts-rcv?ot_dispcol=<jsp:getProperty name="d" property="colorDepth"/>"/>
 
-<esi:include src="/tr/rcv?ot_flash=<%=d.nextInt(12)%>&ot_java=<jsp:getProperty name="d" property="boolean"/>"/>
+<esi:include src="/ts-rcv?ot_flash=<%=d.nextInt(12)%>&ot_java=<jsp:getProperty name="d" property="boolean"/>"/>
 
-<esi:include src="/tr/rcv?ot_js=1.<%=d.nextInt(9)%>&ot_cookies=<jsp:getProperty name="d" property="boolean"/>"/>
+<esi:include src="/ts-rcv?ot_js=1.<%=d.nextInt(9)%>&ot_cookies=<jsp:getProperty name="d" property="boolean"/>"/>
  
 <esi:include src="include1.jsp"/>
 

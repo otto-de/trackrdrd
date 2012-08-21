@@ -2,10 +2,8 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>de.otto.lhotse.track</groupId>
-  <artifactId>rdrtestapp</artifactId>
   <packaging>war</packaging>
   <version>0.1-SNAPSHOT</version>
-  <name>rdrtestapp Maven Webapp</name>
   <url>http://maven.apache.org</url>
   <dependencies>
     <dependency>
@@ -40,4 +38,7 @@
     </plugins>
     <finalName>rdrtestapp</finalName>
   </build>
+    <artifactId>ts-mockvert</artifactId>
+    <name>Tracking Mock Vertical</name>
+    <description>Mock-Vertikale, die zufällige Daten in Tracking-Tags erzeugt, um Tracking (insbesondere den Tracking Log-Reader) zu testen</description>
 </project>

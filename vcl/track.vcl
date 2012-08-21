@@ -50,7 +50,7 @@ sub vcl_recv {
 				req.http.Accept-Language);
 		}
 	}
-	if (req.url ~ "^/tr") {
+	if (req.url ~ "^/ts-rcv") {
 		if (req.url ~ "\?") {
 			std.log("track " + req.xid + " " +
                         	regsub(req.url, "^.+\?(.+)$", "\1"));
