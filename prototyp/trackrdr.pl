@@ -113,7 +113,7 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.1-SNAPSHOT";
+$main::VERSION = "0.1";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
