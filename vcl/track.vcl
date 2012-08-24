@@ -6,6 +6,9 @@ backend testapp {
 }
 
 sub vcl_recv {
+	if (!req.http.X-Origin) {
+		set req.http.X-Origin = server.identity + req.xid;
+	}
 	if (req.esi_level == 0) {
 		std.log("track " + req.xid + " ot_tcv=0.1-SNAPSHOT");
 		std.log("track " + req.xid + " mandantenID=1008");
@@ -60,6 +63,9 @@ sub vcl_recv {
 }
 
 sub vcl_fetch {
+	if (req.http.X-Origin) {
+		set beresp.http.X-Origin = req.http.X-Origin;
+	}
 	set beresp.do_esi = true;
 }
 
