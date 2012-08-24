@@ -5,7 +5,6 @@
 ##
 ## opens varnishlog and parses the relevant tags
 ## sends complete data records to the processor
-## XXX: currently writes data records to stdout
 ##
 ## For copyright and licensing notices, see the pod section COPYRIGHT
 ## below
@@ -15,7 +14,6 @@
 
 trackrdr.pl - read tracking data from the Varnish SHM-log and send
 data sets to the processor
-XXX: Currently writes data sets to stdout
 
 =head1 SYNOPSIS
 
@@ -24,10 +22,9 @@ XXX: Currently writes data sets to stdout
 
 =head1 DESCRIPTION
 
-C<varnish_2_splunk.pl> starts an instance of C<varnishlog>, parses its
+C<trackrdr.pl> starts an instance of C<varnishlog>, parses its
 output for tags relevant to tracking, and sends complete data records
-to the processor via HTTP. XXX: Currently, data records are written to
-stdout.
+to the processor via HTTP.
 
 =head1 OPTIONS
 
@@ -109,8 +106,9 @@ use strict;
 use warnings;
 use LWP::UserAgent;
 use LWP::ConnCache;
-use HTTP::Status qw(HTTP_NO_CONTENT HTTP_INTERNAL_SERVER_ERROR);
+use HTTP::Status qw(RC_NO_CONTENT RC_INTERNAL_SERVER_ERROR);
 use POSIX qw(setsid);
+use FileHandle;
 use Getopt::Std;
 use Pod::Usage;
 
@@ -122,15 +120,16 @@ sub HELP_MESSAGE {
 }
 
 my %opts;
-getopts("dn:p:r:u:", \%opts);
+getopts("dn:p:r:u:f:", \%opts);
 
 # 0 to run forever
 my $MAX_RESTARTS = $opts{r} || 0;
 my $DEBUG = $opts{d} || 0;
+my $LOGFILE = $opts{f};
 
 my @SHMTAGS = qw(ReqStart VCL_Log ReqEnd);
 my $VARNISH_PRE = $opts{p} || '/var/opt/varnish';
-my $VARNISHLOG_CMD = "$VARNISH_PRE/bin/varnishlog -u -i ".join(',', @SHMTAGS);
+my $VARNISHLOG_CMD = "$VARNISH_PRE/bin/varnishlog -i ".join(',', @SHMTAGS);
 $VARNISHLOG_CMD = "$VARNISHLOG_CMD -n $opts{n}" if $opts{n};
 
 my $PROC_URL = $opts{u} || 'http://localhost/ts-processor/httpProcess';
@@ -173,36 +172,61 @@ sub run_varnishlog {
         conn_cache	=> LWP::ConnCache->new(),
         );
 
+    my $records = 0;
+
     while (1) {
-        print "varnishlog=$VARNISHLOG_CMD\n" if $DEBUG;
+        warn "varnishlog=$VARNISHLOG_CMD\n" if $DEBUG;
 	my $log;
-	unless (open($log, '-|', $VARNISHLOG_CMD)) {
-	    my $err = $!;
-	    $! = SMF_EXIT_ERR_FATAL;
-	    die ("runnning varnishlog failed: $err\n");
+	if ($LOGFILE) {
+	    warn "logfile=$LOGFILE\n" if $DEBUG;
+	    unless (open($log, $LOGFILE)) {
+                my $err = $!;
+                $! = SMF_EXIT_ERR_FATAL;
+                die ("open $LOGFILE failed: $err\n");
+            }
+	}
+	else {
+	    warn "varnishlog=$VARNISHLOG_CMD\n" if $DEBUG;
+	    unless (open($log, '-|', $VARNISHLOG_CMD)) {
+	        my $err = $!;
+	        $! = SMF_EXIT_ERR_FATAL;
+	        die ("runnning varnishlog failed: $err\n");
+	    }
 	}
 
-        my (%record);
+        my (%record, %dubious_tid);
 	while(<$log>) {
             chomp;
 	    my ($tid, $tag, $cb, @in) = split;
 
-            print "tid=$tid tag=$tag\n" if $DEBUG;
+            warn "tid=$tid tag=$tag\n" if $DEBUG;
 
             if ($tag eq 'ReqStart') {
                 $record{$tid}{xid} = $in[-1];
-                print "XID=$record{$tid}{xid}\n" if $DEBUG;
+                warn "XID=$record{$tid}{xid}\n" if $DEBUG;
+		if ($dubious_tid{$tid}) {
+		    delete $dubious_tid{$tid};
+		    warn "Dubious tid $tid undubious at ReqStart\n";
+		}
                 next;
             }
             if ($tag eq 'VCL_Log') {
                 next unless $in[0] eq 'track';
-                if ($in[1] ne $record{$tid}{xid}) {
-                    warn "$tid: xid mismatch, expected $record{$tid}{xid}, ",
-                         "got $in[1]\n";
+		if (!$record{$tid}) {
+		    warn "$tag: unexpected tid $tid [$_]\n";
+		    $record{$tid}{xid} = $in[1];
+		    $dubious_tid{$tid} = 1;
+		}
+		elsif (!$record{$tid}{xid}) {
+		    warn "$tag: no xid known for tid $tid [$_]\n";
+		}
+                elsif ($in[1] ne $record{$tid}{xid}) {
+                    warn "$tag: xid mismatch, expected $record{$tid}{xid}, ",
+                         "got $in[1] [$_]\n";
                 }
                 else {
                     push @{$record{$tid}{data}}, $in[-1];
-                    print "XID=$record{$tid}{xid} data=$in[-1]\n"
+                    warn "XID=$record{$tid}{xid} data=$in[-1]\n"
                         if $DEBUG;
                 }
                 next;
@@ -213,30 +237,49 @@ sub run_varnishlog {
                     && $record{$tid}{xid} eq $in[0]) {
                     if ($record{$tid}{data}) {
                         my $data = join('&', @{$record{$tid}{data}});
+			$records++;
+			warn "$records complete records found\n" if $DEBUG;
                         my $resp = $ua->post($PROC_URL, Content => $data);
-                        if ($resp->code != HTTP_NO_CONTENT) {
+                        if ($resp->code != RC_NO_CONTENT) {
                             warn "Processor error: ", $resp->status_line(),
                                  "\n";
                         }
-                        print 'DATA: ', join('&', @{$record{$tid}{data}}), "\n"
+                        warn 'DATA: ', join('&', @{$record{$tid}{data}}), "\n"
                             if $DEBUG;
                     }
                     delete $record{$tid};
+		    if ($dubious_tid{$tid}) {
+			delete $dubious_tid{$tid};
+			warn "Dubious tid $tid undubious at ReqEnd\n";
+		    }
                 }
                 else {
-                    if ($record{$tid}{xid} ne $in[0]) {
-                        warn "$tag: req XID mismatch $in[1]\n";
+		    if (!$record{$tid}) {
+			warn "$tag: unexpected tid $tid [$_]\n";
+		    }
+		    elsif (!$record{$tid}{xid}) {
+			warn "$tag: no req XID known for tid $tid [$_]\n";
+		    }
+                    elsif ($record{$tid}{xid} ne $in[0]) {
+                        warn "$tag: req XID mismatch $in[0] [$_]\n";
                     }
                     else {
-                        warn "$tag: record incomplete:\n";
+                        warn "$tag: record incomplete: [$_]\n";
                     }
                     foreach my $key (keys %{$record{$tid}}) {
-                        print "\t$key=$record{$tid}{$key}\n";
+                        warn "\t$key=$record{$tid}{$key}\n";
                     }
                 }
             }
+	    warn "\n", scalar(keys %dubious_tid), " dubious tids\n";
 	}
 	close($log);
+	if ($LOGFILE) {
+	    STDERR->flush();
+	    STDOUT->flush();
+	    kill('TERM', $parent_pid);
+	    exit(SMF_EXIT_OK);
+        }
 	print "NOTICE: varnishlog restart at ", localtime(time), "\n";
     }
     # should never get here
@@ -370,4 +413,6 @@ while(! $term) {
     }
     while (wait != -1) {};
 }
+STDOUT->flush();
+STDERR->flush();
 exit (SMF_EXIT_OK);
