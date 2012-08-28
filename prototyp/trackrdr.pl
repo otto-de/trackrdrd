@@ -17,8 +17,9 @@ data sets to the processor
 
 =head1 SYNOPSIS
 
- $ trackrdr.pl [-n logfile] [-p varnish_prefix] [-r max_restarts] [-d]
-               [--help] [--version]
+ $ trackrdr.pl [[-n varnish_logfile] | [-f varnishlog_outputfile]]
+               [-v varnish_prefix] [-r max_restarts] [-u processor_url] [-d]
+               [-l logfile] [-p pidfile] [--help] [--version]
 
 =head1 DESCRIPTION
 
@@ -33,25 +34,51 @@ following.
 
 =over
 
-=item -n logfile
+=item B<-n varnish_logfile>
 
 The "varnish name" indicating the mmap'd log file used by C<varnishd>
 and C<varnishlog>, used for the C<-n> option to start
 C<varnishlog>. By default, C<varnishlog> is started without an C<-n>
 option (so the default for C<varnishlog> holds).
 
-=item -p varnish_prefix
+=item B<-f varnishlog_outputfile>
+
+Path of a file created by redirecting standard output of
+C<varnishlog>, useful for debugging purposes. The options B<-n> and
+B<-f> are mutually exclusive. By default, the default choice for B<-n>
+is assumed (read the SHM log at the default location for
+C<varnishlog>).
+
+=item B<-v varnish_prefix>
 
 Installation directory for varnish, default: C</var/opt/varnish>
 
-=item -r max_restarts
+=item B<-r max_restarts>
 
 Maximum number of restarts for the child process, or 0 for unlimited,
 default 0
 
-=item -d
+=item B<-d>
 
 Switches on debug mode, off by default
+
+=item B<-u processor_url>
+
+URL of the processor application, to which data records are submitted.
+Default: C<http://localhost/ts-processor/httpProcess>
+
+=item B<-l logfile>
+
+Log file for status, warning, debug and error messages. By default,
+status and debug messages are written to C<STDOUT>, and warnings and
+error messages are written to C<STDERR>.
+
+=item B<-p pidfile>
+
+File in which the process ID of the parent process is stored. To stop
+the script, it suffices to send a C<TERM> signal to that process
+(e.g. with the C<kill> command); the parent process stops all of its
+child processes before exiting. Default: C</var/run/trackrdr.pid>
 
 =item --help
 
@@ -75,7 +102,12 @@ Normal operation
 
 =item 95 (C<SMF_EXIT_ERR_FATAL>)
 
-Fatal error (for example, fork failed or C<varnishlog> did not start)
+Fatal error (for example, fork failed)
+
+=item 96 (C<SMF_EXIT_ERR_CONFIG>)
+
+Configuration error (for example, C<varnishlog> did not start, log or
+pid files cannot be opened)
 
 =back
 
@@ -113,29 +145,31 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.1";
+$main::VERSION = "0.2";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
 }
 
 my %opts;
-getopts("dn:p:r:u:f:", \%opts);
+getopts("dn:v:r:u:f:l:p:", \%opts);
 
 # 0 to run forever
 my $MAX_RESTARTS = $opts{r} || 0;
 my $DEBUG = $opts{d} || 0;
-my $LOGFILE = $opts{f};
+my $LOGFILE = $opts{l};
+my $VLOGFILE = $opts{f};
 
 my @SHMTAGS = qw(ReqStart VCL_Log ReqEnd);
-my $VARNISH_PRE = $opts{p} || '/var/opt/varnish';
+my $VARNISH_PRE = $opts{v} || '/var/opt/varnish';
 my $VARNISHLOG_CMD = "$VARNISH_PRE/bin/varnishlog -i ".join(',', @SHMTAGS);
 $VARNISHLOG_CMD = "$VARNISHLOG_CMD -n $opts{n}" if $opts{n};
 
 my $PROC_URL = $opts{u} || 'http://localhost/ts-processor/httpProcess';
 
-# be prepared to start with SMF
+my $PIDFILE = $opts{p} || '/var/run/trackrdr.pid';
 
+# be prepared to start with SMF
 use constant {
     SMF_EXIT_OK =>          0,
     
@@ -145,6 +179,28 @@ use constant {
     SMF_EXIT_ERR_PERM =>    100,
 };
 
+my $PIDFH = new FileHandle "> $PIDFILE";
+unless (defined $PIDFH) {
+    my $err = $!;
+    $! = SMF_EXIT_ERR_CONFIG;
+    die "Cannot open pidfile $PIDFILE: $err\n";
+}
+
+if ($LOGFILE) {
+    unless (open STDOUT, ">$LOGFILE") {
+        my $err = $!;
+        $! = SMF_EXIT_ERR_CONFIG;
+        die "Cannot redirect stdout to $LOGFILE: $err\n";
+    }
+    unless (open STDERR, ">&STDOUT") {
+        my $err = $!;
+        $! = SMF_EXIT_ERR_CONFIG;
+        die "Cannot redirect stderr to $LOGFILE: $err\n";
+    }
+
+    $SIG{__DIE__}  = sub { die "FATAL: ", @_; };
+}
+    
 our %pids;
 our $parent_pid;
 our $initial_pid = $$;
@@ -175,21 +231,21 @@ sub run_varnishlog {
     my $records = 0;
 
     while (1) {
-        warn "varnishlog=$VARNISHLOG_CMD\n" if $DEBUG;
+        print "varnishlog=$VARNISHLOG_CMD\n" if $DEBUG;
 	my $log;
-	if ($LOGFILE) {
-	    warn "logfile=$LOGFILE\n" if $DEBUG;
-	    unless (open($log, $LOGFILE)) {
+	if ($VLOGFILE) {
+	    print "logfile=$VLOGFILE\n" if $DEBUG;
+	    unless (open($log, $VLOGFILE)) {
                 my $err = $!;
-                $! = SMF_EXIT_ERR_FATAL;
-                die ("open $LOGFILE failed: $err\n");
+                $! = SMF_EXIT_ERR_CONFIG;
+                die ("open $VLOGFILE failed: $err\n");
             }
 	}
 	else {
 	    warn "varnishlog=$VARNISHLOG_CMD\n" if $DEBUG;
 	    unless (open($log, '-|', $VARNISHLOG_CMD)) {
 	        my $err = $!;
-	        $! = SMF_EXIT_ERR_FATAL;
+	        $! = SMF_EXIT_ERR_CONFIG;
 	        die ("runnning varnishlog failed: $err\n");
 	    }
 	}
@@ -274,7 +330,7 @@ sub run_varnishlog {
 	    warn "\n", scalar(keys %dubious_tid), " dubious tids\n";
 	}
 	close($log);
-	if ($LOGFILE) {
+	if ($VLOGFILE) {
 	    STDERR->flush();
 	    STDOUT->flush();
 	    kill('TERM', $parent_pid);
@@ -353,6 +409,8 @@ sub parent_init {
 	die ("fork failed: $err\n");
     } elsif ($f == 0) {
 	$parent_pid = $$;
+        print $PIDFH $$;
+        $PIDFH->close();
 	return;
     } else {
 	$parent_pid = $f;
