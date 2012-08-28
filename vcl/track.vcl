@@ -9,7 +9,7 @@ sub vcl_recv {
 	if (!req.http.X-Origin) {
 		set req.http.X-Origin = server.identity + req.xid;
 	}
-	if (req.esi_level == 0) {
+	if (req.url !~ "^/ts-processor" && req.esi_level == 0) {
 		std.log("track " + req.xid + " ot_tcv=0.1-SNAPSHOT");
 		std.log("track " + req.xid + " mandantenID=1008");
 		set req.http.X-Correlation-ID =
@@ -41,8 +41,9 @@ sub vcl_recv {
 
 		if (req.http.User-Agent ~ ".") {
 			std.log("track " + req.xid + " ot_agent=" +
-				req.http.User-Agent + "&me_agent=" +
-				req.http.User-Agent);
+				regsuball(req.http.User-Agent, " ", "%20") +
+                                "&me_agent=" +
+				regsuball(req.http.User-Agent, " ", "%20"));
 		}
 		if (req.http.Referer ~ ".") {
 			std.log("track " + req.xid + " me_referrer=" +
