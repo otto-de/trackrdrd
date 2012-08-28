@@ -19,7 +19,8 @@ data sets to the processor
 
  $ trackrdr.pl [[-n varnish_logfile] | [-f varnishlog_outputfile]]
                [-v varnish_prefix] [-r max_restarts] [-u processor_url] [-d]
-               [-l logfile] [-p pidfile] [--help] [--version]
+               [-l logfile] [-p pidfile] [-s status_interval]
+               [--help] [--version]
 
 =head1 DESCRIPTION
 
@@ -79,6 +80,12 @@ File in which the process ID of the parent process is stored. To stop
 the script, it suffices to send a C<TERM> signal to that process
 (e.g. with the C<kill> command); the parent process stops all of its
 child processes before exiting. Default: C</var/run/trackrdr.pid>
+
+=item B<-s status_interval>
+
+The minimum number of seconds between status output to the log,
+reporting interbal statistics (such as completed records read,
+currently open records, etc.).
 
 =item --help
 
@@ -152,7 +159,7 @@ sub HELP_MESSAGE {
 }
 
 my %opts;
-getopts("dn:v:r:u:f:l:p:", \%opts);
+getopts("dn:v:r:u:f:l:p:s:", \%opts);
 
 # 0 to run forever
 my $MAX_RESTARTS = $opts{r} || 0;
@@ -169,6 +176,8 @@ my $PROC_URL = $opts{u} || 'http://localhost/ts-processor/httpProcess';
 
 my $PIDFILE = $opts{p} || '/var/run/trackrdr.pid';
 
+my $SLEEP = $opts{s} || 30;
+
 # be prepared to start with SMF
 use constant {
     SMF_EXIT_OK =>          0,
@@ -179,6 +188,15 @@ use constant {
     SMF_EXIT_ERR_PERM =>    100,
 };
 
+use constant {
+    DEBUG	=> 0,
+    NOTICE	=> 1,
+    WARN	=> 2,
+    FATAL	=> 3,
+};
+
+my @logtag = ("DEBUG", "NOTICE", "WARN", "FATAL");
+
 my $PIDFH = new FileHandle "> $PIDFILE";
 unless (defined $PIDFH) {
     my $err = $!;
@@ -186,21 +204,39 @@ unless (defined $PIDFH) {
     die "Cannot open pidfile $PIDFILE: $err\n";
 }
 
+my $LOGFH;
 if ($LOGFILE) {
-    unless (open STDOUT, ">$LOGFILE") {
+    $LOGFH = new FileHandle ">$LOGFILE";
+    unless (defined $LOGFH) {
         my $err = $!;
         $! = SMF_EXIT_ERR_CONFIG;
-        die "Cannot redirect stdout to $LOGFILE: $err\n";
+        die "Cannot open $LOGFILE: $err\n";
     }
-    unless (open STDERR, ">&STDOUT") {
-        my $err = $!;
-        $! = SMF_EXIT_ERR_CONFIG;
-        die "Cannot redirect stderr to $LOGFILE: $err\n";
-    }
-
-    $SIG{__DIE__}  = sub { die "FATAL: ", @_; };
 }
-    
+else {
+    $LOGFH = *STDOUT;
+}
+
+sub logg {
+    my ($level, @args) = @_;
+
+    return if ($level == DEBUG and !$DEBUG);
+    print $LOGFH "[", scalar(localtime), "] $logtag[$level]: @args\n";
+}
+
+sub logflush {
+    if ($LOGFH) {
+        $LOGFH->flush();
+    }
+    else {
+        STDOUT->flush();
+        STDERR->flush();
+    }
+}
+
+$SIG{__WARN__} = sub { logg (WARN,  @_); };
+$SIG{__DIE__}  = sub { logg (FATAL, @_); die "@_\n"; };
+
 our %pids;
 our $parent_pid;
 our $initial_pid = $$;
@@ -212,7 +248,7 @@ sub fork_varnishlog {
     if (! defined($f)) {
 	my $err = $!;
 	$! = SMF_EXIT_ERR_FATAL;
-	die ("fork failed: $err\n");
+	die ("fork failed: $err");
     } elsif ($f == 0) {
 	child_handlers();
 	exit(run_varnishlog());
@@ -231,42 +267,44 @@ sub run_varnishlog {
     my $records = 0;
 
     while (1) {
-        print "varnishlog=$VARNISHLOG_CMD\n" if $DEBUG;
+        logg(DEBUG, "varnishlog=$VARNISHLOG_CMD");
 	my $log;
 	if ($VLOGFILE) {
-	    print "logfile=$VLOGFILE\n" if $DEBUG;
+	    logg(DEBUG, "logfile=$VLOGFILE");
 	    unless (open($log, $VLOGFILE)) {
                 my $err = $!;
                 $! = SMF_EXIT_ERR_CONFIG;
                 die ("open $VLOGFILE failed: $err\n");
             }
+            logg(NOTICE, "Starting to read $VLOGFILE");
 	}
 	else {
-	    warn "varnishlog=$VARNISHLOG_CMD\n" if $DEBUG;
+	    logg(DEBUG, "varnishlog=$VARNISHLOG_CMD");
 	    unless (open($log, '-|', $VARNISHLOG_CMD)) {
 	        my $err = $!;
 	        $! = SMF_EXIT_ERR_CONFIG;
 	        die ("runnning varnishlog failed: $err\n");
 	    }
+            logg(NOTICE, "Starting read pipe from $VARNISHLOG_CMD");
 	}
 
         my (%record, %dubious_tid);
+        my $laststatus = time();
 	while(<$log>) {
             chomp;
 	    my ($tid, $tag, $cb, @in) = split;
 
-            warn "tid=$tid tag=$tag\n" if $DEBUG;
+            logg(DEBUG, "tid=$tid tag=$tag");
 
             if ($tag eq 'ReqStart') {
                 $record{$tid}{xid} = $in[-1];
-                warn "XID=$record{$tid}{xid}\n" if $DEBUG;
+                logg(DEBUG, "XID=$record{$tid}{xid}");
 		if ($dubious_tid{$tid}) {
 		    delete $dubious_tid{$tid};
-		    warn "Dubious tid $tid undubious at ReqStart\n";
+		    warn "Dubious tid $tid undubious at ReqStart";
 		}
-                next;
             }
-            if ($tag eq 'VCL_Log') {
+            elsif ($tag eq 'VCL_Log') {
                 next unless $in[0] eq 'track';
 		if (!$record{$tid}) {
 		    warn "$tag: unexpected tid $tid [$_]\n";
@@ -282,61 +320,66 @@ sub run_varnishlog {
                 }
                 else {
                     push @{$record{$tid}{data}}, $in[-1];
-                    warn "XID=$record{$tid}{xid} data=$in[-1]\n"
-                        if $DEBUG;
+                    logg(DEBUG, "XID=$record{$tid}{xid} data=$in[-1]");
                 }
-                next;
             }
-            if ($tag eq 'ReqEnd') {
+            elsif ($tag eq 'ReqEnd') {
                 if ($record{$tid}
                     && $record{$tid}{xid}
                     && $record{$tid}{xid} eq $in[0]) {
                     if ($record{$tid}{data}) {
                         my $data = join('&', @{$record{$tid}{data}});
 			$records++;
-			warn "$records complete records found\n" if $DEBUG;
+			logg(DEBUG, "$records complete records found");
                         my $resp = $ua->post($PROC_URL, Content => $data);
                         if ($resp->code != RC_NO_CONTENT) {
-                            warn "Processor error: ", $resp->status_line(),
-                                 "\n";
+                            logg(WARN, "Processor error: ",
+                                 $resp->status_line());
                         }
-                        warn 'DATA: ', join('&', @{$record{$tid}{data}}), "\n"
-                            if $DEBUG;
+                        logg(DEBUG,
+                             'DATA: ', join('&', @{$record{$tid}{data}}));
                     }
                     delete $record{$tid};
 		    if ($dubious_tid{$tid}) {
 			delete $dubious_tid{$tid};
-			warn "Dubious tid $tid undubious at ReqEnd\n";
+			logg(WARN, "Dubious tid $tid undubious at ReqEnd\n");
 		    }
                 }
                 else {
 		    if (!$record{$tid}) {
-			warn "$tag: unexpected tid $tid [$_]\n";
+			logg(WARN, "$tag: unexpected tid $tid [$_]\n");
 		    }
 		    elsif (!$record{$tid}{xid}) {
-			warn "$tag: no req XID known for tid $tid [$_]\n";
+			logg(WARN,
+                             "$tag: no req XID known for tid $tid [$_]\n");
 		    }
                     elsif ($record{$tid}{xid} ne $in[0]) {
-                        warn "$tag: req XID mismatch $in[0] [$_]\n";
+                        logg(WARN, "$tag: req XID mismatch $in[0] [$_]\n");
                     }
                     else {
-                        warn "$tag: record incomplete: [$_]\n";
+                        logg(WARN, "$tag: record incomplete: [$_]\n");
                     }
                     foreach my $key (keys %{$record{$tid}}) {
-                        warn "\t$key=$record{$tid}{$key}\n";
+                        logg(WARN, "\t$key=$record{$tid}{$key}\n");
                     }
                 }
             }
-	    warn "\n", scalar(keys %dubious_tid), " dubious tids\n";
+            if (time() >= $laststatus + $SLEEP) {
+                logg(NOTICE, "$records records submitted, ",
+                     scalar(keys %record), " records open, ",
+                     scalar(keys %dubious_tid), " records dubious");
+                logflush();
+                $laststatus = time();
+            }
 	}
 	close($log);
 	if ($VLOGFILE) {
-	    STDERR->flush();
-	    STDOUT->flush();
 	    kill('TERM', $parent_pid);
+            logg(NOTICE, "exiting");
+	    logflush();
 	    exit(SMF_EXIT_OK);
         }
-	print "NOTICE: varnishlog restart at ", localtime(time), "\n";
+	logg(NOTICE, "varnishlog restart");
     }
     # should never get here
     SMF_EXIT_ERR_FATAL;
@@ -411,6 +454,7 @@ sub parent_init {
 	$parent_pid = $$;
         print $PIDFH $$;
         $PIDFH->close();
+        logg(NOTICE, "Parent (watchdog) process starting");
 	return;
     } else {
 	$parent_pid = $f;
@@ -452,12 +496,12 @@ while(! $term) {
 	undef $pids{$pid};
 	next if ($reopen || $term);
 
-	print "NOTICE: varnishlog perl reader for pid $pid died\n",
-              "\trestart ".++$restarts." at ".localtime(time)."\n";
+	logg(NOTICE, "varnishlog perl reader for pid $pid died: ",
+             "restart ", ++$restarts);
 
 	if ($MAX_RESTARTS &&
 	    ($restarts > $MAX_RESTARTS)) {
-	    warn ("too many restarts: $restarts\n");
+	    logg(FATAL, "too many restarts: $restarts");
 	    parent_term;
 	}
 
@@ -471,6 +515,6 @@ while(! $term) {
     }
     while (wait != -1) {};
 }
-STDOUT->flush();
-STDERR->flush();
+logg(NOTICE, "exiting");
+logflush();
 exit (SMF_EXIT_OK);
