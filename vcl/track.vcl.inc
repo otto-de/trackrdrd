@@ -1,0 +1,31 @@
+import std;
+import urlcode;
+
+sub vcl_recv_track {
+	if (req.url !~ "^/ts-processor" && req.esi_level == 0) {
+                std.log("track " + req.xid + " url=" + urlcode.encode(req.url));
+		if (req.http.Cookie) {
+			std.log("track " + req.xid + " cookie="
+                                + urlcode.encode(req.http.Cookie));
+		}
+		if (req.http.User-Agent ~ ".") {
+			std.log("track " + req.xid + " ua="
+                                + urlcode.encode(req.http.User-Agent));
+		}
+	}
+	if (req.url ~ "^/ts-rcv") {
+		if (req.url ~ "\?") {
+			std.log("track " + req.xid + " " +
+                        	regsub(req.url, "^.+\?(.+)$", "\1"));
+		}
+		error 204 "track";
+	}
+}
+
+sub vcl_track_response {
+	if (obj.status == 204 && obj.response == "track") {
+		synthetic {""};
+		return(deliver);
+	}
+}
+
