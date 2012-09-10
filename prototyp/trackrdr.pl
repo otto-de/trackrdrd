@@ -87,11 +87,15 @@ The minimum number of seconds between status output to the log,
 reporting interbal statistics (such as completed records read,
 currently open records, etc.).
 
-=item --help
+=item B<-o processor_logfile>
+
+Log file to contain the contents of all POST requests to the processor, for debugging purposes. By default no processor log file is written.
+
+=item B<--help>
 
 Print usage and exit
 
-=item --version
+=item B<--version>
 
 Print version and exit
 
@@ -152,23 +156,25 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.2";
+$main::VERSION = "0.3";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
 }
 
 my %opts;
-getopts("dn:v:r:u:f:l:p:s:", \%opts);
+getopts("dn:v:r:u:f:l:p:s:o:", \%opts);
 
 # 0 to run forever
 my $MAX_RESTARTS = $opts{r} || 0;
 my $DEBUG = $opts{d} || 0;
 my $LOGFILE = $opts{l};
 my $VLOGFILE = $opts{f};
+my $PROCLOGFILE = $opts{o};
 
 my @SHMTAGS = qw(ReqStart VCL_Log ReqEnd);
 my $VARNISH_PRE = $opts{v} || '/var/opt/varnish';
+# my $VARNISHLOG_CMD = "/usr/bin/stdbuf -o100M $VARNISH_PRE/bin/varnishlog -i ".join(',', @SHMTAGS);
 my $VARNISHLOG_CMD = "$VARNISH_PRE/bin/varnishlog -i ".join(',', @SHMTAGS);
 $VARNISHLOG_CMD = "$VARNISHLOG_CMD -n $opts{n}" if $opts{n};
 
@@ -217,6 +223,17 @@ else {
     $LOGFH = *STDOUT;
 }
 
+my $PROCLOGFH;
+if ($PROCLOGFILE) {
+    $PROCLOGFH = new FileHandle ">$PROCLOGFILE";
+    unless (defined $PROCLOGFH) {
+        my $err = $!;
+        $! = SMF_EXIT_ERR_CONFIG;
+        die "Cannot open $PROCLOGFILE: $err\n";
+    }
+    $PROCLOGFH->autoflush();
+}
+
 sub logg {
     my ($level, @args) = @_;
 
@@ -231,6 +248,9 @@ sub logflush {
     else {
         STDOUT->flush();
         STDERR->flush();
+    }
+    if ($PROCLOGFH) {
+	$PROCLOGFH->flush();
     }
 }
 
@@ -292,6 +312,7 @@ sub run_varnishlog {
         my $laststatus = time();
 	while(<$log>) {
             chomp;
+	    next unless $_;
 	    my ($tid, $tag, $cb, @in) = split;
 
             logg(DEBUG, "tid=$tid tag=$tag");
@@ -331,6 +352,10 @@ sub run_varnishlog {
                         my $data = join('&', @{$record{$tid}{data}});
 			$records++;
 			logg(DEBUG, "$records complete records found");
+			if ($PROCLOGFH) {
+			    print $PROCLOGFH
+				'[', scalar(localtime), "] $data\n";
+			}
                         my $resp = $ua->post($PROC_URL, Content => $data);
                         if ($resp->code != RC_NO_CONTENT) {
                             logg(WARN, "Processor error: ",
@@ -382,7 +407,7 @@ sub run_varnishlog {
 	logg(NOTICE, "varnishlog restart");
     }
     # should never get here
-    SMF_EXIT_ERR_FATAL;
+    exit(SMF_EXIT_ERR_FATAL);
 }
 
 ## child forwards SIGPIPE to parent
