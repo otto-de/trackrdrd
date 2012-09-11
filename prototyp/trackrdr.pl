@@ -147,6 +147,8 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use strict;
 use warnings;
+use threads;
+use threads::shared;
 use LWP::UserAgent;
 use LWP::ConnCache;
 use HTTP::Status qw(RC_NO_CONTENT RC_INTERNAL_SERVER_ERROR);
@@ -156,7 +158,7 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.3";
+$main::VERSION = "0.4";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
@@ -263,6 +265,24 @@ our $initial_pid = $$;
 our $reopen;
 our $term;
 
+our $records :shared;
+our $quit :shared;
+our $open :shared;
+our $dubious :shared;
+
+sub statusThread {
+    my ($interval) = @_;
+
+    logg(NOTICE, "Monitoring thread starting: tid =", threads->tid());
+    while(!$quit) {
+	sleep($interval);
+	logg(NOTICE, "$records records submitted,",
+	     "$open records open, $dubious records dubious");
+	logflush();
+    }
+    logg(NOTICE, "Monitor thread exiting");
+}
+
 sub fork_varnishlog {
     my $f = fork;
     if (! defined($f)) {
@@ -284,7 +304,8 @@ sub run_varnishlog {
         conn_cache	=> LWP::ConnCache->new(),
         );
 
-    my $records = 0;
+    $records = 0;
+    $quit = 0;
 
     while (1) {
         logg(DEBUG, "varnishlog=$VARNISHLOG_CMD");
@@ -309,7 +330,14 @@ sub run_varnishlog {
 	}
 
         my (%record, %dubious_tid);
-        my $laststatus = time();
+	$open = 0;
+	$dubious = 0;
+        #my $laststatus = time();
+	my $monitor = threads->create(\&statusThread, $SLEEP, $records, $open,
+				      $dubious, $quit);
+	unless (defined $monitor) {
+	    logg(WARN, "Monitor thread failed to start");
+	}
 	while(<$log>) {
             chomp;
 	    next unless $_;
@@ -389,13 +417,15 @@ sub run_varnishlog {
                     }
                 }
             }
-            if (time() >= $laststatus + $SLEEP) {
-                logg(NOTICE, "$records records submitted, ",
-                     scalar(keys %record), " records open, ",
-                     scalar(keys %dubious_tid), " records dubious");
-                logflush();
-                $laststatus = time();
-            }
+	    $open = scalar(keys %record);
+	    $dubious = scalar(keys %dubious_tid);
+#            if (time() >= $laststatus + $SLEEP) {
+#                logg(NOTICE, "$records records submitted, ",
+#                     scalar(keys %record), " records open, ",
+#                     scalar(keys %dubious_tid), " records dubious");
+#                logflush();
+#                $laststatus = time();
+#            }
 	}
 	close($log);
 	if ($VLOGFILE) {
@@ -404,6 +434,8 @@ sub run_varnishlog {
 	    logflush();
 	    exit(SMF_EXIT_OK);
         }
+	$quit = 1;
+	$monitor->join();
 	logg(NOTICE, "varnishlog restart");
     }
     # should never get here
