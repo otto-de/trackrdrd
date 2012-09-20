@@ -2,7 +2,13 @@ import std;
 import urlcode;
 
 sub vcl_recv_track {
-	if (req.url !~ "^/ts-processor" && req.esi_level == 0) {
+        # Track URLs, Cookie and User-Agent headers
+        # Exceptions: ESI-Includes, the TS processor, status calls,
+        #             and static resources
+	if (req.esi_level == 0 &&
+            req.url !~
+   "^/(?:ts-processor|[^/]+/internal/status)|\.(?:gif|jpe?g|swf|png|css|js)$"
+           ) {
                 std.log("track " + req.xid + " url=" + urlcode.encode(req.url));
 		if (req.http.Cookie) {
 			std.log("track " + req.xid + " cookie="
