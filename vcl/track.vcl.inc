@@ -14,10 +14,14 @@ sub vcl_recv_track {
 			std.log("track " + req.xid + " cookie="
                                 + urlcode.encode(req.http.Cookie));
 		}
-		if (req.http.User-Agent ~ ".") {
+		if (req.http.User-Agent) {
 			std.log("track " + req.xid + " ua="
                                 + urlcode.encode(req.http.User-Agent));
 		}
+                if (req.http.X-Origin) {
+                        std.log("track " + req.xid + " X-Origin="
+                                + urlcode.encode(req.http.X-Origin));
+                }
 	}
 	if (req.url ~ "^/ts-rcv") {
 		if (req.url ~ "\?") {
