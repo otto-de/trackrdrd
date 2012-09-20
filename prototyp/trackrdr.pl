@@ -212,7 +212,7 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.5.2";
+$main::VERSION = "0.5.3";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
@@ -602,6 +602,7 @@ sub run_varnishlog {
                     && $record{$tid}{xid}
                     && $record{$tid}{xid} eq $in[0]) {
                     if ($record{$tid}{data}) {
+                        push @{$record{$tid}{data}}, "XID=$record{$tid}{xid}";
                         my $data = join('&', @{$record{$tid}{data}});
 			$records++;
 			logg(DEBUG, "$records complete records found");
