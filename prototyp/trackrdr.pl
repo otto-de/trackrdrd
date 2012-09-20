@@ -202,6 +202,7 @@ use threads;
 use threads::shared;
 use LWP::UserAgent;
 use LWP::ConnCache;
+use HTTP::Request;
 use HTTP::Status qw(RC_NO_CONTENT RC_INTERNAL_SERVER_ERROR);
 use Net::STOMP::Client;
 use Net::STOMP::Client::Error;
@@ -211,7 +212,7 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.5.1";
+$main::VERSION = "0.5.2";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
@@ -356,6 +357,7 @@ use constant {
 };
 
 my @logtag = ("DEBUG", "NOTICE", "WARN", "ERROR", "FATAL");
+use constant { ctPost => 'application/x-www-form-urlencoded' };
 
 my $PIDFH = new FileHandle ">".$config{'pid.file'};
 unless (defined $PIDFH) {
@@ -454,7 +456,13 @@ sub submitHTTP {
     my ($connect, $data) = @_;
 
     my $ua = $connect->{ua};
-    my $resp = $ua->post($connect->{url}, Content => $data);
+    my $req = HTTP::Request->new(POST => $connect->{url},
+                                 ['Content_Type'	=> ctPost,
+                                  'Content_Length'	=> length($data),
+                                 ],
+                                 $data);
+    logg(DEBUG, "Prepared request: ", $req->as_string);
+    my $resp = $ua->request($req);
     if ($resp->code != RC_NO_CONTENT) {
         logg(ERROR, "Processor error: ", $resp->status_line());
     }
@@ -597,13 +605,6 @@ sub run_varnishlog {
                         my $data = join('&', @{$record{$tid}{data}});
 			$records++;
 			logg(DEBUG, "$records complete records found");
-			#if ($PROCLOGFH) {
-			#    print $PROCLOGFH
-			#	'[', scalar(localtime), "] $data\n";
-			#}
-                        #submitHTTP({url => $config{'http.url'}, ua => $ua},
-                        #          $data);
-                        #submitMQ({queue => 'track', mq => $mq}, $data);
                         &{$connect{submit}}(\%connect, $data);
                         logg(DEBUG,
                              'DATA: ', join('&', @{$record{$tid}{data}}));
