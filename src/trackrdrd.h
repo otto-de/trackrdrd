@@ -29,8 +29,32 @@
  *
  */
 
+#include <stdio.h>
+
+/* log.c */
+typedef void log_log_t(int level, const char *msg, ...);
+typedef void log_setlevel_t(int level);
+typedef void log_close_t(void);
+
+struct logconf {
+    log_log_t		*log;
+    log_setlevel_t	*setlevel;
+    log_close_t		*close;
+    FILE		*out;
+    int			level;
+} logconf;
+
+int LOG_Open(const char *progname, const char *dest);
+/* XXX: __VA_ARGS__ can't be empty ... */
+#define LOG_Log0(level, msg) logconf.log(level, msg)
+#define LOG_Log(level, msg, ...) logconf.log(level, msg, __VA_ARGS__)
+#define LOG_SetLevel(level) logconf.setlevel(level)
+#define LOG_Close() logconf.close()
+
+/* parse.c */
 int Parse_XID(const char *str, int len, unsigned *xid);
 int Parse_ReqStart(const char *ptr, int len, unsigned *xid);
 int Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid);
 int Parse_VCL_Log(const char *ptr, int len, unsigned *xid,
     char **data, int *datalen);
+

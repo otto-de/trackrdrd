@@ -38,15 +38,12 @@
 #include "config.h"
 
 #include <errno.h>
-#include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <syslog.h>
-
-#include "trackrdrd.h"
 
 #include "compat/daemon.h"
 
@@ -56,6 +53,8 @@
 #include "libvarnish.h"
 #include "vsl.h"
 #include "varnishapi.h"
+
+#include "trackrdrd.h"
 
 #define TRACK_TAGS "ReqStart,VCL_log,ReqEnd"
 #define TRACKLOG_PREFIX "track "
@@ -97,8 +96,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
 
         err = Parse_ReqStart(ptr, len, &xid);
         AZ(err);
-
-        syslog(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
+        LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
 #if 0
         /* assert(!(hash(XID) exists)); */
         /* init hash(XID); */
@@ -123,10 +121,10 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         err = Parse_VCL_Log(&ptr[TRACKLOG_PREFIX_LEN], len-TRACKLOG_PREFIX_LEN,
                             &xid, &data, &datalen);
         AZ(err);
-        syslog(LOG_DEBUG, "%s: XID=%d, data=[%.*s]", VSL_tags[tag],
-               xid, datalen, data);
-        
+        LOG_Log(LOG_DEBUG, "%s: XID=%d, data=[%.*s]", VSL_tags[tag],
+            xid, datalen, data);
 #if 0
+        
         /* assert((hash(XID) exists) && hash(XID).tid == fd
                   && !hash(XID).done); */
         entry = HSH_Find(hashtable, xid);
@@ -152,7 +150,8 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
                   && !hash(XID).done); */
         err = Parse_ReqEnd(ptr, len, &xid);
         AZ(err);
-        syslog(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
+        LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
+        
 #if 0        
         entry = HSH_Find(hashtable, xid);
         CHECK_OBJ_NOTNULL(entry, HASHENTRY_MAGIC);
@@ -190,19 +189,15 @@ int
 main(int argc, char * const *argv)
 {
 	int c;
-	int D_flag = 0;
-	const char *P_arg = NULL;
+	int D_flag = 0, d_flag = 0;
+	const char *P_arg = NULL, *l_arg = NULL;
 	struct vpf_fh *pfh = NULL;
 	struct VSM_data *vd;
 
 	vd = VSM_New();
 	VSL_Setup(vd);
 
-        openlog(PACKAGE_NAME, LOG_PID | LOG_CONS | LOG_NDELAY | LOG_NOWAIT,
-            LOG_USER);
-        atexit(closelog);
-
-	while ((c = getopt(argc, argv, "DP:Vn:")) != -1) {
+	while ((c = getopt(argc, argv, "DP:Vn:hl:d")) != -1) {
 		switch (c) {
 		case 'D':
                     D_flag = 1;
@@ -216,6 +211,13 @@ main(int argc, char * const *argv)
                 case 'n':
                     if (VSL_Arg(vd, c, optarg) <= 0)
                         exit(1);
+                case 'l':
+                    l_arg = optarg;
+                    break;
+                case 'd':
+                    d_flag = 1;
+                    break;
+                case 'h':
 		default:
                     usage();
 		}
@@ -224,13 +226,14 @@ main(int argc, char * const *argv)
 	if ((argc - optind) > 0)
 		usage();
 
-	if (VSL_Open(vd, 1))
-		exit(1);
-
-	if (P_arg && (pfh = VPF_Open(P_arg, 0644, NULL)) == NULL) {
-		perror(P_arg);
-		exit(1);
-	}
+        if (LOG_Open(PACKAGE_NAME, l_arg) != 0) {
+            perror(l_arg);
+            exit(1);
+        }
+        if (d_flag)
+            LOG_SetLevel(LOG_DEBUG);
+        LOG_Log0(LOG_INFO, "starting");
+        
         /*
 	if (D_flag && varnish_daemon(0, 0) == -1) {
 		perror("daemon()");
@@ -239,14 +242,23 @@ main(int argc, char * const *argv)
 		exit(1);
 	}
         */
+
+        /* XXX: Parent/child setup
+           Write the pid in the parent, open VSL in the child
+        */
+	if (P_arg && (pfh = VPF_Open(P_arg, 0644, NULL)) == NULL) {
+		perror(P_arg);
+		exit(1);
+	}
 	if (pfh != NULL)
 		VPF_Write(pfh);
 
+        /* XXX: child opens and reads VSL */
+	if (VSL_Open(vd, 1))
+		exit(1);
+
         /* Only read the VSL tags relevant to tracking */
-        if (VSL_Arg(vd, 'i', TRACK_TAGS) <= 0) {
-            fprintf(stderr, "VSL_Arg(i)\n");
-            exit(1);
-        }
+        assert(VSL_Arg(vd, 'i', TRACK_TAGS) > 0);
         
 	while (VSL_Dispatch(vd, OSL_Track, stdout) >= 0) {            
 		if (fflush(stdout) != 0) {
@@ -255,7 +267,10 @@ main(int argc, char * const *argv)
 		}
 	}
 
+        /* XXX: Parent removes PID */
 	if (pfh != NULL)
 		VPF_Remove(pfh);
+
+        LOG_Log0(LOG_INFO, "exiting");
 	exit(0);
 }

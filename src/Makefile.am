@@ -4,7 +4,8 @@ bin_PROGRAMS = trackrdrd
 
 trackrdrd_SOURCES = \
 	trackrdrd.c \
-	parse.c
+	parse.c \
+	log.c
 #	$(VARNISHSRC)/lib/libvarnish/assert.c \
 #	$(VARNISHSRC)/lib/libvarnish/flopen.c \
 #	$(VARNISHSRC)/lib/libvarnish/version.c \
