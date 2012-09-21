@@ -1,6 +1,6 @@
 AC_PREREQ(2.59)
-AC_COPYRIGHT([Copyright (c) 2011 Varnish Software AS])
-AC_INIT([trackrdrd], [master])
+AC_COPYRIGHT([Copyright (c) 2012 Otto Gmbh & Co KG])
+AC_INIT([trackrdrd], [0.1])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(src/trackrdrd.c)
 AM_CONFIG_HEADER(config.h)
