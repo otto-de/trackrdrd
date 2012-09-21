@@ -5,10 +5,6 @@
  * Use only with permission
  *
  * Author: Geoffrey Simmons <geoffrey.simmons@uplex.de>
- * Portions adopted from varnishlog.c from the Varnish project
- *	Author: Poul-Henning Kamp <phk@phk.freebsd.dk>
- * 	Copyright (c) 2006 Verdens Gang AS
- * 	Copyright (c) 2006-2011 Varnish Software AS
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

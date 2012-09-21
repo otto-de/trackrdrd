@@ -29,21 +29,8 @@
  *
  */
 
-#include <stdint.h>
-
-#include "vsl.h"
-
-#define TRACK_TAGS "ReqStart,VCL_log,ReqEnd"
-#define TRACKLOG_PREFIX "track "
-#define TRACKLOG_PREFIX_LEN (sizeof(TRACKLOG_PREFIX)-1)
-
 int Parse_XID(const char *str, int len, unsigned *xid);
 int Parse_ReqStart(const char *ptr, int len, unsigned *xid);
 int Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid);
 int Parse_VCL_Log(const char *ptr, int len, unsigned *xid,
     char **data, int *datalen);
-
-void OSL_Log(const char *ptr, unsigned len);
-int OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
-    unsigned spec, const char *ptr, uint64_t bitmap);
-
