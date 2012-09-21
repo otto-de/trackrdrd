@@ -44,6 +44,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <syslog.h>
+
+#include "trackrdrd.h"
 
 #include "compat/daemon.h"
 
@@ -53,6 +56,7 @@
 #include "libvarnish.h"
 #include "vsl.h"
 #include "varnishapi.h"
+
 
 static int	b_flag, c_flag;
 
@@ -179,33 +183,6 @@ h_order(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
 	return (0);
 }
 
-static void
-do_order(struct VSM_data *vd)
-{
-	int i;
-
-	if (!b_flag) {
-		VSL_Select(vd, SLT_SessionOpen);
-		VSL_Select(vd, SLT_SessionClose);
-		VSL_Select(vd, SLT_ReqEnd);
-	}
-	if (!c_flag) {
-		VSL_Select(vd, SLT_BackendOpen);
-		VSL_Select(vd, SLT_BackendClose);
-		VSL_Select(vd, SLT_BackendReuse);
-	}
-	while (1) {
-		i = VSL_Dispatch(vd, h_order, vd);
-		if (i == 0) {
-			clean_order(vd);
-			AZ(fflush(stdout));
-		}
-		else if (i < 0)
-			break;
-	}
-	clean_order(vd);
-}
-
 /*--------------------------------------------------------------------*/
 
 static volatile sig_atomic_t reopen;
@@ -270,15 +247,6 @@ do_write(const struct VSM_data *vd, const char *w_arg, int a_flag)
 }
 
 /*--------------------------------------------------------------------*/
-void OSL_Log(const char *ptr, unsigned len);
-int OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
-    unsigned spec, const char *ptr, uint64_t bitmap);
-
-void
-OSL_Log(const char *ptr, unsigned len)
-{
-    printf("%*s\n", len, ptr);
-}
 
 int
 OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
@@ -289,6 +257,10 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     hashentry *entry;
 #endif    
     int err;
+    int datalen;
+    char *data;
+
+    syslog(LOG_DEBUG, "%s: %.*s", VSL_tags[tag], len, ptr);
 
 #if 0
     /* if spec != 'c', we may have errors reading from SHM */
@@ -298,15 +270,17 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     
     switch (tag) {
     case SLT_ReqStart:
-        OSL_Log(ptr, len);
-#if 0        
+
         /* May not be able to have the assert()s, if we can't guarantee
            that data arrive correctly and in the right order.
            In which case we'll have to have lots of error checking,
            and ERROR & WARN messages. */
+
         err = Parse_ReqStart(ptr, len, &xid);
         AZ(err);
 
+        syslog(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
+#if 0
         /* assert(!(hash(XID) exists)); */
         /* init hash(XID); */
         /* HSH_Insert() should return err if hash(XID) exists */
@@ -322,19 +296,18 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         break;
 
     case SLT_VCL_Log:
-        OSL_Log(ptr, len);
-#if 0        
-        int datalen;
-        char *data;
-        
         /* Skip VCL_Log entries without the "track " prefix. */
-        if (strncmp(ptr, "track ", len) != 0)
+        if (strncmp(ptr, TRACKLOG_PREFIX, TRACKLOG_PREFIX_LEN) != 0)
             break;
         
         /* assert(regex captures XID and data); */
-        err = Parse_VCL_Log(&ptr[6], len-6, &xid, data, &datalen);
+        err = Parse_VCL_Log(&ptr[TRACKLOG_PREFIX_LEN], len-TRACKLOG_PREFIX_LEN,
+                            &xid, &data, &datalen);
         AZ(err);
+        syslog(LOG_DEBUG, "%s: XID=%d, datalen=%d, data=%.*s", VSL_tags[tag],
+               xid, datalen, datalen, data);
         
+#if 0
         /* assert((hash(XID) exists) && hash(XID).tid == fd
                   && !hash(XID).done); */
         entry = HSH_Find(hashtable, xid);
@@ -356,12 +329,12 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         break;
 
     case SLT_ReqEnd:
-        OSL_Log(ptr, len);
-#if 0        
         /* assert(regex.match() && (hash(XID) exists) && hash(XID).tid == fd
                   && !hash(XID).done); */
         err = Parse_ReqEnd(ptr, len, &xid);
-        assert(err == 0);
+        AZ(err);
+        syslog(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
+#if 0        
         entry = HSH_Find(hashtable, xid);
         CHECK_OBJ_NOTNULL(entry, HASHENTRY_MAGIC);
         assert(entry->xid == xid);
@@ -406,6 +379,10 @@ main(int argc, char * const *argv)
 
 	vd = VSM_New();
 	VSL_Setup(vd);
+
+        openlog(PACKAGE_NAME, LOG_PID | LOG_CONS | LOG_NDELAY | LOG_NOWAIT,
+            LOG_USER);
+        atexit(closelog);
 
 	while ((c = getopt(argc, argv, VSL_ARGS "aDP:uVw:oO")) != -1) {
 		switch (c) {
@@ -480,10 +457,11 @@ main(int argc, char * const *argv)
 	if (u_flag)
 		setbuf(stdout, NULL);
 
-	if (!O_flag)
-		do_order(vd);
-
-	/*while (VSL_Dispatch(vd, VSL_H_Print, stdout) >= 0) {*/
+        if (VSL_Arg(vd, 'i', TRACK_TAGS) <= 0) {
+            fprintf(stderr, "VSL_Arg(i)\n");
+            exit(1);
+        }
+        
 	while (VSL_Dispatch(vd, OSL_Track, stdout) >= 0) {            
 		if (fflush(stdout) != 0) {
 			perror("stdout");
