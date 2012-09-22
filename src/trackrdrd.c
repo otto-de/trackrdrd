@@ -197,7 +197,7 @@ main(int argc, char * const *argv)
 	vd = VSM_New();
 	VSL_Setup(vd);
 
-	while ((c = getopt(argc, argv, "DP:Vn:hl:d")) != -1) {
+	while ((c = getopt(argc, argv, "DP:Vn:hl:df:")) != -1) {
 		switch (c) {
 		case 'D':
                     D_flag = 1;
@@ -216,6 +216,10 @@ main(int argc, char * const *argv)
                     break;
                 case 'd':
                     d_flag = 1;
+                    break;
+                case 'f':
+                    if (VSL_Arg(vd, 'r', optarg) <= 0)
+                        exit(1);
                     break;
                 case 'h':
 		default:
