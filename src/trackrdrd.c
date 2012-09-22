@@ -55,6 +55,7 @@
 #include "varnishapi.h"
 
 #include "trackrdrd.h"
+#include "revision.h"
 
 #define TRACK_TAGS "ReqStart,VCL_log,ReqEnd"
 #define TRACKLOG_PREFIX "track "
@@ -206,7 +207,7 @@ main(int argc, char * const *argv)
                     P_arg = optarg;
                     break;
 		case 'V':
-                    printf(PACKAGE_STRING "\n");
+                    printf(PACKAGE_STRING " revision " REVISION "\n");
                     exit(0);
                 case 'n':
                     if (VSL_Arg(vd, c, optarg) <= 0)
