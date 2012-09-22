@@ -17,3 +17,6 @@ trackrdrd_LDADD = \
 	$(VARNISHSRC)/lib/libvarnishapi/libvarnishapi.la \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
 	${PTHREAD_LIBS}
+
+check:
+	test/regress.sh
