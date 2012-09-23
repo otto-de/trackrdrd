@@ -2,7 +2,7 @@ INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC)
 
 bin_PROGRAMS = trackrdrd
 
-nodist_trackrdrd_SOURCES = revision.h
+nodist_trackrdrd_SOURCES = revision.h usage.h
 
 trackrdrd_SOURCES = \
 	trackrdrd.h \
@@ -20,10 +20,11 @@ check:
 	test/regress.sh
 
 
+BUILT_SOURCES = revision.h usage.h
+MAINTAINERCLEANFILES = revision.h usage.h
+
 # Derive a revision name from the git commit
 # Adopted from Varnish include/Makefile.am
-BUILT_SOURCES = revision.h
-MAINTAINERCLEANFILES = revision.h 
 revision.h: FORCE
 	@if [ -d "$(top_srcdir)/../.git" ]; then \
 		V="$$(git show -s --pretty=format:%h)" \
@@ -51,4 +52,24 @@ revision.h: FORCE
 		) >  revision.h ; \
 		fi \
 	fi
+
+usage.h: $(top_srcdir)/synopsis.txt $(top_srcdir)/options.txt
+	( \
+	  echo '/*' ;\
+	  echo ' * NB:  This file is machine generated, DO NOT EDIT!' ;\
+	  echo ' *' ;\
+	  echo ' * Run make to regenerate' ;\
+	  echo ' *'  ;\
+	  echo ' */' ;\
+	  echo '' ;\
+	  echo 'const char *synopsis = ' \
+	) > usage.h 
+	sed -e 's/.*/\"&\\n\"/' $(top_srcdir)/synopsis.txt >> usage.h
+	( \
+	  echo ';' ;\
+	  echo 'const char *options = ' \
+	) >> usage.h
+	sed -e 's/.*/\"&\\n\"/' $(top_srcdir)/options.txt >> usage.h
+	echo ';' >> usage.h
+
 FORCE:
