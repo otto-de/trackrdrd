@@ -56,6 +56,7 @@
 
 #include "trackrdrd.h"
 #include "revision.h"
+#include "usage.h"
 
 #define TRACK_TAGS "ReqStart,VCL_log,ReqEnd"
 #define TRACKLOG_PREFIX "track "
@@ -179,11 +180,10 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
 /*--------------------------------------------------------------------*/
 
 static void
-usage(void)
+usage(int status)
 {
-	fprintf(stderr, "usage: varnishlog "
-	    "%s [-aDV] [-o [tag regex]] [-n varnish_name] [-P file] [-w file]\n", VSL_USAGE);
-	exit(1);
+    fprintf(stderr, "Usage:\n%s\n%s\n", synopsis, options);
+    exit(status);
 }
 
 int
@@ -191,7 +191,7 @@ main(int argc, char * const *argv)
 {
 	int c;
 	int D_flag = 0, d_flag = 0;
-	const char *P_arg = NULL, *l_arg = NULL;
+	const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL;
 	struct vpf_fh *pfh = NULL;
 	struct VSM_data *vd;
 
@@ -208,10 +208,10 @@ main(int argc, char * const *argv)
                     break;
 		case 'V':
                     printf(PACKAGE_STRING " revision " REVISION "\n");
-                    exit(0);
+                    exit(EXIT_SUCCESS);
                 case 'n':
-                    if (VSL_Arg(vd, c, optarg) <= 0)
-                        exit(1);
+                    n_arg = optarg;
+                    break;
                 case 'l':
                     l_arg = optarg;
                     break;
@@ -219,21 +219,29 @@ main(int argc, char * const *argv)
                     d_flag = 1;
                     break;
                 case 'f':
-                    if (VSL_Arg(vd, 'r', optarg) <= 0)
-                        exit(1);
+                    f_arg = optarg;
                     break;
                 case 'h':
+                    usage(EXIT_SUCCESS);
 		default:
-                    usage();
+                    usage(EXIT_FAILURE);
 		}
 	}
 
 	if ((argc - optind) > 0)
-		usage();
+            usage(EXIT_FAILURE);
 
+        if (f_arg && n_arg)
+            usage(EXIT_FAILURE);
+
+        if (f_arg && VSL_Arg(vd, 'r', f_arg) <= 0)
+            exit(EXIT_FAILURE);
+        else if (n_arg && VSL_Arg(vd, 'n', n_arg) <= 0)
+            exit(EXIT_FAILURE);
+        
         if (LOG_Open(PACKAGE_NAME, l_arg) != 0) {
             perror(l_arg);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         if (d_flag)
             LOG_SetLevel(LOG_DEBUG);
@@ -253,14 +261,14 @@ main(int argc, char * const *argv)
         */
 	if (P_arg && (pfh = VPF_Open(P_arg, 0644, NULL)) == NULL) {
 		perror(P_arg);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	if (pfh != NULL)
 		VPF_Write(pfh);
 
         /* XXX: child opens and reads VSL */
 	if (VSL_Open(vd, 1))
-		exit(1);
+		exit(EXIT_FAILURE);
 
         /* Only read the VSL tags relevant to tracking */
         assert(VSL_Arg(vd, 'i', TRACK_TAGS) > 0);
@@ -277,5 +285,5 @@ main(int argc, char * const *argv)
 		VPF_Remove(pfh);
 
         LOG_Log0(LOG_INFO, "exiting");
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
