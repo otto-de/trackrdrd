@@ -1,0 +1,27 @@
+    -n varnish_logfile
+        The 'varnish name' indicating the mmap'd log file used by
+        varnishd. By default, the host name is assumed (as with
+        varnishd).
+
+    -l log_file
+        Log file for status, warning, debug and error messages. If '-'
+        is specified, then log messages are written to stdout. By
+        default, syslog(3) is used for logging. Log levels correspond
+        to the 'priorities' defined by syslog(3).
+
+    -f varnishlog_bindump
+        A binary dump of the Varnish SHM log produced by 'varnishlog
+        -w'. If this option is specified, trackrdrd reads from the
+        dump instead of a live SHM log (useful for debugging and
+        replaying traffic). The options -f and -n are mutually
+        exclusive; -n is the default.
+
+    -d
+       Sets the log level to LOG_DEBUG. The default log level is
+       LOG_INFO.
+
+    -V
+       Print version and exit
+
+    -h
+       Print usage and exit
