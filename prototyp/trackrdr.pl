@@ -211,7 +211,7 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.5";
+$main::VERSION = "0.5.1";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
@@ -345,7 +345,7 @@ if ($config{debug}) {
 my @SHMTAGS = qw(ReqStart VCL_Log ReqEnd);
 my $VARNISHLOG_CMD
     = $config{'varnish.prefix'}."/bin/varnishlog -i ".join(',', @SHMTAGS);
-$VARNISHLOG_CMD .= '-n '.$config{'varnish.name'} if $config{'varnish.name'};
+$VARNISHLOG_CMD .= ' -n '.$config{'varnish.name'} if $config{'varnish.name'};
 
 use constant {
     DEBUG	=> 0,
