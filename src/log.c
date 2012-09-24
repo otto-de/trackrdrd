@@ -35,17 +35,37 @@
 #include <stdarg.h>
 #include <strings.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "trackrdrd.h"
 
 #include "libvarnish.h"
 
 static const char *level2name[LOG_DEBUG];
+static const int facilitynum[8] =
+    { LOG_LOCAL0, LOG_LOCAL1, LOG_LOCAL2, LOG_LOCAL3, LOG_LOCAL4, LOG_LOCAL5,
+      LOG_LOCAL6, LOG_LOCAL7 };
 
 static void
 syslog_setlevel(int level)
 {
     setlogmask(LOG_UPTO(level));
+}
+
+static int
+syslog_getFacility(const char *facility) {
+    int localnum;
+    
+    if (strcasecmp(facility, "USER") == 0)
+        return LOG_USER;
+    if (strlen(facility) != 6
+        || strncasecmp(facility, "LOCAL", 5) != 0
+        || !isdigit(facility[5]))
+        return(-1);
+    localnum = atoi(&facility[5]);
+    if (localnum > 7)
+        return(-1);
+    return(facilitynum[localnum]);
 }
 
 /* XXX: is this safe? */
@@ -88,15 +108,23 @@ stdio_close(void)
     fclose(logconf.out);
 }
 
-int LOG_Open(const char *progname, const char *dest)
+int LOG_Open(const char *progname, const char *dest, const char *facility)
 {
     if (dest == NULL) {
         /* syslog */
+        int fac = LOG_LOCAL0;
+        
+        if (facility != NULL) {
+            fac = syslog_getFacility(facility);
+            if (fac < 0) {
+                fprintf(stderr, "Invalid facility: %s\n", facility);
+                return(-1);
+            }
+        }
         logconf.log = syslog;
         logconf.setlevel = syslog_setlevel;
         logconf.close = closelog;
-        openlog(progname, LOG_PID | LOG_CONS | LOG_NDELAY | LOG_NOWAIT,
-            LOG_USER);
+        openlog(progname, LOG_PID | LOG_CONS | LOG_NDELAY | LOG_NOWAIT, fac);
         setlogmask(LOG_UPTO(LOG_INFO));
         atexit(closelog);
         return(0);
@@ -106,8 +134,10 @@ int LOG_Open(const char *progname, const char *dest)
         logconf.out = stdout;
     else {
         logconf.out = fopen(dest, "w");
-        if (logconf.out == NULL)
+        if (logconf.out == NULL) {
+            perror(dest);
             return(-1);
+        }
     }
     logconf.level = LOG_INFO;
     logconf.log = stdio_log;
