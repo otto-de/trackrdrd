@@ -9,6 +9,11 @@
         default, syslog(3) is used for logging. Log levels correspond
         to the 'priorities' defined by syslog(3).
 
+    -y syslog_facility
+        Set the syslog facility; legal values are 'user' or 'local0'
+        through 'local7', and the default is 'local0'. Options -y and
+        -l are mutually exclusive.
+
     -f varnishlog_bindump
         A binary dump of the Varnish SHM log produced by 'varnishlog
         -w'. If this option is specified, trackrdrd reads from the
