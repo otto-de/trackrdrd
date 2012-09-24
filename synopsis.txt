@@ -1,2 +1,3 @@
-  trackrdrd [-n varnish_name] [-l log_file] [-f varnishlog_bindump]
+  trackrdrd [[-n varnish_name] | [-f varnishlog_bindump]]
+            [[-l log_file] | [-y syslog_facility]]
             [-d] [-V] [-h]

@@ -76,10 +76,10 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     int datalen;
     char *data;
 
+    (void) priv;
     (void) bitmap;
 #if 1
     (void) spec;
-    (void) priv;
     (void) fd;
 #endif
 #if 0
@@ -191,14 +191,15 @@ main(int argc, char * const *argv)
 {
 	int c;
 	int D_flag = 0, d_flag = 0;
-	const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL;
+	const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
+            *y_arg = NULL;
 	struct vpf_fh *pfh = NULL;
 	struct VSM_data *vd;
 
 	vd = VSM_New();
 	VSL_Setup(vd);
 
-	while ((c = getopt(argc, argv, "DP:Vn:hl:df:")) != -1) {
+	while ((c = getopt(argc, argv, "DP:Vn:hl:df:y:")) != -1) {
 		switch (c) {
 		case 'D':
                     D_flag = 1;
@@ -221,6 +222,9 @@ main(int argc, char * const *argv)
                 case 'f':
                     f_arg = optarg;
                     break;
+                case 'y':
+                    y_arg = optarg;
+                    break;
                 case 'h':
                     usage(EXIT_SUCCESS);
 		default:
@@ -233,14 +237,15 @@ main(int argc, char * const *argv)
 
         if (f_arg && n_arg)
             usage(EXIT_FAILURE);
-
+        if (l_arg && y_arg)
+            usage(EXIT_FAILURE);
+        
         if (f_arg && VSL_Arg(vd, 'r', f_arg) <= 0)
             exit(EXIT_FAILURE);
         else if (n_arg && VSL_Arg(vd, 'n', n_arg) <= 0)
             exit(EXIT_FAILURE);
         
-        if (LOG_Open(PACKAGE_NAME, l_arg) != 0) {
-            perror(l_arg);
+        if (LOG_Open(PACKAGE_NAME, l_arg, y_arg) != 0) {
             exit(EXIT_FAILURE);
         }
         if (d_flag)
@@ -273,13 +278,9 @@ main(int argc, char * const *argv)
         /* Only read the VSL tags relevant to tracking */
         assert(VSL_Arg(vd, 'i', TRACK_TAGS) > 0);
         
-	while (VSL_Dispatch(vd, OSL_Track, stdout) >= 0) {            
-		if (fflush(stdout) != 0) {
-			perror("stdout");
-			break;
-		}
-	}
-
+	while (VSL_Dispatch(vd, OSL_Track, NULL) >= 0)
+            ;
+        
         /* XXX: Parent removes PID */
 	if (pfh != NULL)
 		VPF_Remove(pfh);
