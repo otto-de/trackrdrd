@@ -7,7 +7,7 @@ sub vcl_recv_track {
         #             and static resources
 	if (req.esi_level == 0 &&
             req.url !~
-   "^/(?:ts-processor|[^/]+/internal/status)|\.(?:gif|jpe?g|swf|png|css|js)$"
+   "^/(?:ts-processor|[^/]+(?:/api)?/internal/status)|\.(?:gif|jpe?g|swf|png|css|js)$"
            ) {
                 std.log("track " + req.xid + " url=" + urlcode.encode(req.url));
 		if (req.http.Cookie) {
@@ -22,6 +22,10 @@ sub vcl_recv_track {
                         std.log("track " + req.xid + " X-Origin="
                                 + urlcode.encode(req.http.X-Origin));
                 }
+		if (req.http.X-Forwarded-For) {
+			std.log("track " + req.xid + " X-Forwarded-For="
+				+ urlcode.encode(req.http.X-Forwarded-For));
+		}
 	}
 	if (req.url ~ "^/ts-rcv") {
 		if (req.url ~ "\?") {
