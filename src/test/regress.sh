@@ -11,8 +11,8 @@
 # logging to stdout in debug mode, and obtains a cksum from
 # stdout. The cksum must match an expected value.
 
-CKSUM=$(./trackrdrd -f test/varnish.binlog -l - -d | cksum)
-if [ "$CKSUM" != '915150825 166426' ]; then
+CKSUM=$(./trackrdrd -f test/varnish.binlog -l - -d -c test/test.conf | cksum)
+if [ "$CKSUM" != '3004877510 166790' ]; then
     echo "ERROR: Regression test incorrect cksum: $CKSUM"
     exit 1
 fi
