@@ -31,6 +31,27 @@
 
 #include <stdio.h>
 
+#define EMPTY(s) (s[0] == '\0')
+
+/* config.c */
+struct config {
+    char	pid_file[BUFSIZ];
+    char	varnish_name[BUFSIZ];
+    char	log_file[BUFSIZ];
+    char	varnish_bindump[BUFSIZ];
+    int		syslog_facility;
+    char	syslog_facility_name[BUFSIZ];
+    double	monitor_interval;
+    char	processor_log[BUFSIZ];
+    unsigned	maxopen_scale;
+    unsigned	maxdata_scale;
+} config;
+
+void CONF_Init(void);
+int CONF_Add(const char *lval, const char *rval);
+int CONF_ReadFile(const char *file);
+void CONF_Dump(void);
+
 /* log.c */
 typedef void log_log_t(int level, const char *msg, ...);
 typedef void log_setlevel_t(int level);
@@ -44,7 +65,7 @@ struct logconf {
     int			level;
 } logconf;
 
-int LOG_Open(const char *progname, const char *dest, const char *facility);
+int LOG_Open(const char *progname);
 /* XXX: __VA_ARGS__ can't be empty ... */
 #define LOG_Log0(level, msg) logconf.log(level, msg)
 #define LOG_Log(level, msg, ...) logconf.log(level, msg, __VA_ARGS__)

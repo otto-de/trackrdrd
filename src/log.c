@@ -52,22 +52,6 @@ syslog_setlevel(int level)
     setlogmask(LOG_UPTO(level));
 }
 
-static int
-syslog_getFacility(const char *facility) {
-    int localnum;
-    
-    if (strcasecmp(facility, "USER") == 0)
-        return LOG_USER;
-    if (strlen(facility) != 6
-        || strncasecmp(facility, "LOCAL", 5) != 0
-        || !isdigit(facility[5]))
-        return(-1);
-    localnum = atoi(&facility[5]);
-    if (localnum > 7)
-        return(-1);
-    return(facilitynum[localnum]);
-}
-
 /* XXX: is this safe? */
 static void
 stdio_initnames(void)
@@ -108,34 +92,26 @@ stdio_close(void)
     fclose(logconf.out);
 }
 
-int LOG_Open(const char *progname, const char *dest, const char *facility)
+int LOG_Open(const char *progname)
 {
-    if (dest == NULL) {
+    if (EMPTY(config.log_file)) {
         /* syslog */
-        int fac = LOG_LOCAL0;
-        
-        if (facility != NULL) {
-            fac = syslog_getFacility(facility);
-            if (fac < 0) {
-                fprintf(stderr, "Invalid facility: %s\n", facility);
-                return(-1);
-            }
-        }
         logconf.log = syslog;
         logconf.setlevel = syslog_setlevel;
         logconf.close = closelog;
-        openlog(progname, LOG_PID | LOG_CONS | LOG_NDELAY | LOG_NOWAIT, fac);
+        openlog(progname, LOG_PID | LOG_CONS | LOG_NDELAY | LOG_NOWAIT,
+                config.syslog_facility);
         setlogmask(LOG_UPTO(LOG_INFO));
         atexit(closelog);
         return(0);
     }
 
-    if (strcmp(dest, "-") == 0)
+    if (strcmp(config.log_file, "-") == 0)
         logconf.out = stdout;
     else {
-        logconf.out = fopen(dest, "w");
+        logconf.out = fopen(config.log_file, "a");
         if (logconf.out == NULL) {
-            perror(dest);
+            perror(config.log_file);
             return(-1);
         }
     }
