@@ -44,6 +44,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <syslog.h>
+#include <sys/fcntl.h>
 
 #include "compat/daemon.h"
 
@@ -61,6 +62,8 @@
 #define TRACK_TAGS "ReqStart,VCL_log,ReqEnd"
 #define TRACKLOG_PREFIX "track "
 #define TRACKLOG_PREFIX_LEN (sizeof(TRACKLOG_PREFIX)-1)
+
+#define DEFAULT_CONFIG "/etc/trackrdrd.conf"
 
 /*--------------------------------------------------------------------*/
 
@@ -190,20 +193,28 @@ int
 main(int argc, char * const *argv)
 {
 	int c;
-	int D_flag = 0, d_flag = 0;
+	int d_flag = 0;
 	const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
-            *y_arg = NULL;
+            *y_arg = NULL, *c_arg = NULL;
 	struct vpf_fh *pfh = NULL;
 	struct VSM_data *vd;
 
 	vd = VSM_New();
 	VSL_Setup(vd);
 
-	while ((c = getopt(argc, argv, "DP:Vn:hl:df:y:")) != -1) {
+        if (access(DEFAULT_CONFIG, F_OK) == 0) {
+            if (access(DEFAULT_CONFIG, R_OK) != 0) {
+                perror(DEFAULT_CONFIG);
+                exit(EXIT_FAILURE);
+            }
+            printf("Reading config from %s\n", DEFAULT_CONFIG);
+            if (CONF_ReadFile(DEFAULT_CONFIG) != 0)
+                exit(EXIT_FAILURE);
+        }
+
+        /* XXX: When we can demonize, add an option to run as non-demon */
+	while ((c = getopt(argc, argv, "P:Vn:hl:df:y:c:")) != -1) {
 		switch (c) {
-		case 'D':
-                    D_flag = 1;
-                    break;
 		case 'P':
                     P_arg = optarg;
                     break;
@@ -225,6 +236,9 @@ main(int argc, char * const *argv)
                 case 'y':
                     y_arg = optarg;
                     break;
+                case 'c':
+                    c_arg = optarg;
+                    break;
                 case 'h':
                     usage(EXIT_SUCCESS);
 		default:
@@ -235,41 +249,60 @@ main(int argc, char * const *argv)
 	if ((argc - optind) > 0)
             usage(EXIT_FAILURE);
 
+        if (c_arg) {
+            printf("Reading config from %s\n", c_arg);
+            if (CONF_ReadFile(c_arg) != 0)
+                exit(EXIT_FAILURE);
+        }
+        
         if (f_arg && n_arg)
             usage(EXIT_FAILURE);
         if (l_arg && y_arg)
             usage(EXIT_FAILURE);
         
+        if (P_arg)
+            strcpy(config.pid_file, P_arg);
+        if (n_arg)
+            strcpy(config.varnish_name, n_arg);
+        if (l_arg)
+            strcpy(config.log_file, l_arg);
+        if (y_arg)
+            CONF_Add("syslog.facility", y_arg);
+        
         if (f_arg && VSL_Arg(vd, 'r', f_arg) <= 0)
             exit(EXIT_FAILURE);
-        else if (n_arg && VSL_Arg(vd, 'n', n_arg) <= 0)
+        else if (!EMPTY(config.varnish_name)
+                 && VSL_Arg(vd, 'n', config.varnish_name) <= 0)
             exit(EXIT_FAILURE);
         
-        if (LOG_Open(PACKAGE_NAME, l_arg, y_arg) != 0) {
+        if (LOG_Open(PACKAGE_NAME) != 0) {
             exit(EXIT_FAILURE);
         }
         if (d_flag)
             LOG_SetLevel(LOG_DEBUG);
         LOG_Log0(LOG_INFO, "starting");
+
+        CONF_Dump();
         
+        /* XXX: Parent/child setup
+           Write the pid in the parent, open VSL in the child
+        */
+	if (!EMPTY(config.pid_file)
+            && (pfh = VPF_Open(config.pid_file, 0644, NULL)) == NULL) {
+		perror(config.pid_file);
+		exit(EXIT_FAILURE);
+	}
+	if (pfh != NULL)
+		VPF_Write(pfh);
+
         /*
-	if (D_flag && varnish_daemon(0, 0) == -1) {
+	if (!D_flag && varnish_daemon(0, 0) == -1) {
 		perror("daemon()");
 		if (pfh != NULL)
 			VPF_Remove(pfh);
 		exit(1);
 	}
         */
-
-        /* XXX: Parent/child setup
-           Write the pid in the parent, open VSL in the child
-        */
-	if (P_arg && (pfh = VPF_Open(P_arg, 0644, NULL)) == NULL) {
-		perror(P_arg);
-		exit(EXIT_FAILURE);
-	}
-	if (pfh != NULL)
-		VPF_Write(pfh);
 
         /* XXX: child opens and reads VSL */
 	if (VSL_Open(vd, 1))
