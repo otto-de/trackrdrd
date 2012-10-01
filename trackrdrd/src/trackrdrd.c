@@ -54,6 +54,7 @@
 #include "libvarnish.h"
 #include "vsl.h"
 #include "varnishapi.h"
+#include "miniobj.h"
 
 #include "trackrdrd.h"
 #include "revision.h"
@@ -67,54 +68,71 @@
 
 /*--------------------------------------------------------------------*/
 
+/* XXX: Temporary, for testing */
+static void
+submit(unsigned xid)
+{
+    dataentry *entry;
+    
+    entry = DATA_Find(xid);
+    CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+    assert(entry->state == DATA_DONE);
+    LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", entry->end, entry->data);
+    tbl.done--;
+    tbl.submitted++;
+    entry->state = DATA_EMPTY;
+}
+
+static void
+sigusr1(int sig)
+{
+    DATA_Dump();
+    signal(sig, sigusr1);
+}
+
 static int
 OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
           unsigned spec, const char *ptr, uint64_t bitmap)
 {
     unsigned xid;
-#if 0    
-    hashentry *entry;
-#endif    
-    int err;
-    int datalen;
+    dataentry *entry;
+    int err, datalen;
     char *data;
 
     (void) priv;
     (void) bitmap;
-#if 1
-    (void) spec;
-    (void) fd;
-#endif
-#if 0
-    /* if spec != 'c', we may have errors reading from SHM */
-    if (spec & VSL_S_CLIENT == 0)
-        WARN();
-#endif
+
+    /* spec != 'c' */
+    if ((spec & VSL_S_CLIENT) == 0)
+        LOG_Log(LOG_WARNING, "%s: Client bit ('c') not set", VSL_tags[tag]);
     
     switch (tag) {
     case SLT_ReqStart:
 
-        /* May not be able to have the assert()s, if we can't guarantee
-           that data arrive correctly and in the right order.
-           In which case we'll have to have lots of error checking,
-           and ERROR & WARN messages. */
-
         err = Parse_ReqStart(ptr, len, &xid);
         AZ(err);
         LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
-#if 0
-        /* assert(!(hash(XID) exists)); */
-        /* init hash(XID); */
-        /* HSH_Insert() should return err if hash(XID) exists */
-        err = HSH_Insert(hashtable, xid, &entry);
-        CHECK_OBJ_NOTNULL(entry, HASHENTRY_MAGIC);
-        /* Rather than assert, arrange for an error message.
-           We may have hashtable at MAX, etc. */
-        AZ(err);
 
-        /* hash(XID).tid = fd; */
+        tbl.seen++;
+        entry = DATA_Insert(xid);
+        if (entry == NULL) {
+            LOG_Log(LOG_ALERT,
+                "%s: Cannot insert data, XID=%d tid=%d DISCARDED",
+                VSL_tags[tag], xid, fd);
+            break;
+        }
+        CHECK_OBJ(entry, DATA_MAGIC);
+        
+        entry->state = DATA_OPEN;
+        entry->xid = xid;
         entry->tid = fd;
-#endif        
+        sprintf(entry->data, "XID=%d", xid);
+        entry->end = strlen(entry->data);
+        if (entry->end > tbl.data_hi)
+            tbl.data_hi = entry->end;
+        tbl.open++;
+        if (tbl.open + tbl.done > tbl.occ_hi)
+            tbl.occ_hi = tbl.open + tbl.done;
         break;
 
     case SLT_VCL_Log:
@@ -128,26 +146,31 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         AZ(err);
         LOG_Log(LOG_DEBUG, "%s: XID=%d, data=[%.*s]", VSL_tags[tag],
             xid, datalen, data);
-#if 0
         
         /* assert((hash(XID) exists) && hash(XID).tid == fd
                   && !hash(XID).done); */
-        entry = HSH_Find(hashtable, xid);
-        CHECK_OBJ_NOTNULL(entry, HASHENTRY_MAGIC);
+        entry = DATA_Find(xid);
+        CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         assert(entry->xid == xid);
         assert(entry->tid == fd);
-        assert(!entry->done);
-        /* Data overflow should be an error message, not assert. */
-        assert(entry->s + datalen + 1 <= MAX_DATA);
-        
-        /* append data to hash(XID).data; */
-        if (entry->s != 0) {
-            entry->data[entry->s] = '&';
-            entry->s++;
+        assert(entry->state == DATA_OPEN);
+
+        /* Data overflow */
+        /* XXX: Encapsulate (1 << (config.maxdata_scale+10)) */
+        if (entry->end + datalen + 1 > (1 << (config.maxdata_scale+10))) {
+            LOG_Log(LOG_ALERT,
+                "%s: Data too long, XID=%d, current length=%d, "
+                "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
+                datalen, data);
+            break;
         }
-        memcpy(&entry->data[entry->s], data, datalen);
-        entry->s += datalen;
-#endif        
+        
+        entry->data[entry->end] = '&';
+        entry->end++;
+        memcpy(&entry->data[entry->end], data, datalen);
+        entry->end += datalen;
+        if (entry->end > tbl.data_hi)
+            tbl.data_hi = entry->end;
         break;
 
     case SLT_ReqEnd:
@@ -157,24 +180,22 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         AZ(err);
         LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
         
-#if 0        
-        entry = HSH_Find(hashtable, xid);
-        CHECK_OBJ_NOTNULL(entry, HASHENTRY_MAGIC);
+        entry = DATA_Find(xid);
+        CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         assert(entry->xid == xid);
         assert(entry->tid == fd);
-        assert(!entry->done);
+        assert(entry->state == DATA_OPEN);
 
         /*hash(XID).done = TRUE;*/
-        entry->done = TRUE;
-        submit(XID);
-#endif        
+        entry->state = DATA_DONE;
+        tbl.done++;
+        tbl.open--;
+        submit(xid);
         break;
 
     default:
-#if 0        
-        /* Should never get here */
-        ERROR();
-#endif        
+        /* Unreachable */
+        AN(NULL);
         return(1);
     }
     return(0);
@@ -192,8 +213,7 @@ usage(int status)
 int
 main(int argc, char * const *argv)
 {
-	int c;
-	int d_flag = 0;
+        int c, d_flag = 0;
 	const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
             *y_arg = NULL, *c_arg = NULL;
 	struct vpf_fh *pfh = NULL;
@@ -278,6 +298,7 @@ main(int argc, char * const *argv)
         if (LOG_Open(PACKAGE_NAME) != 0) {
             exit(EXIT_FAILURE);
         }
+        
         if (d_flag)
             LOG_SetLevel(LOG_DEBUG);
         LOG_Log0(LOG_INFO, "starting");
@@ -304,9 +325,20 @@ main(int argc, char * const *argv)
 	}
         */
 
-        /* XXX: child opens and reads VSL */
+        /* XXX: child inits data table, opens and reads VSL */
+        if (DATA_Init() != 0) {
+            LOG_Log(LOG_ALERT, "Cannot init data table: %s", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+
+        /* XXX: Install this signal handler in the child */
+        if (signal(SIGUSR1, sigusr1) == SIG_ERR) {
+            perror("Signal handler USR1:");
+            exit(EXIT_FAILURE);
+        }
+        
 	if (VSL_Open(vd, 1))
-		exit(EXIT_FAILURE);
+            exit(EXIT_FAILURE);
 
         /* Only read the VSL tags relevant to tracking */
         assert(VSL_Arg(vd, 'i', TRACK_TAGS) > 0);

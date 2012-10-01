@@ -9,7 +9,8 @@ trackrdrd_SOURCES = \
 	trackrdrd.c \
 	parse.c \
 	log.c \
-	config.c
+	config.c \
+	data.c
 
 trackrdrd_LDADD = \
 	$(VARNISHSRC)/lib/libvarnishcompat/libvarnishcompat.la \
