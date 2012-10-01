@@ -31,9 +31,53 @@
 
 #include <stdio.h>
 
-#define EMPTY(s) (s[0] == '\0')
+/* data.c */
+typedef enum {
+    DATA_EMPTY = 0,
+    /* OPEN when the main thread is filling data, ReqEnd not yet seen. */
+    DATA_OPEN,
+    /* DONE when ReqEnd has been seen, data have not yet been submitted. */
+    DATA_DONE
+} data_state_e;
+
+typedef struct {
+    unsigned 		magic;
+#define DATA_MAGIC 0xb41cb1e1
+    data_state_e	state;
+    unsigned 		xid;
+    unsigned 		tid;	/* 'Thread ID', fd in the callback */
+    unsigned		end;	/* End of string index in data */
+    char		*data;
+} dataentry;
+
+typedef struct {
+    unsigned		magic;
+#define DATATABLE_MAGIC 0xd3ef3bd4
+    const unsigned	len;
+    unsigned		collisions;
+    unsigned		insert_probes;
+    unsigned		find_probes;
+    unsigned		seen;		/* Records (ReqStarts) seen */
+    unsigned		open;
+    unsigned		done;
+    unsigned		submitted;	/* Records submitted */
+    unsigned		occ_hi;		/* Occupancy high water mark */ 
+    unsigned		data_hi;	/* Data high water mark */
+    dataentry		*entry;
+    char		*buf;
+} datatable;
+
+datatable tbl;
+
+/* XXX: inline DATA_Insert and DATA_Find */
+int DATA_Init(void);
+dataentry *DATA_Insert(unsigned xid);
+dataentry *DATA_Find(unsigned xid);
+void DATA_Dump(void);
 
 /* config.c */
+#define EMPTY(s) (s[0] == '\0')
+
 struct config {
     char	pid_file[BUFSIZ];
     char	varnish_name[BUFSIZ];
