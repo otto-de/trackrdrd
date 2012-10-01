@@ -42,9 +42,6 @@
 #include "libvarnish.h"
 
 static const char *level2name[LOG_DEBUG];
-static const int facilitynum[8] =
-    { LOG_LOCAL0, LOG_LOCAL1, LOG_LOCAL2, LOG_LOCAL3, LOG_LOCAL4, LOG_LOCAL5,
-      LOG_LOCAL6, LOG_LOCAL7 };
 
 static void
 syslog_setlevel(int level)
@@ -78,6 +75,7 @@ stdio_log(int level, const char *msg, ...)
     (void) vfprintf(logconf.out, msg, ap);
     va_end(ap);
     fprintf(logconf.out, "\n");
+    fflush(logconf.out);
 }
 
 static void
