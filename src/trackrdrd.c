@@ -45,6 +45,7 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <sys/fcntl.h>
+#include <pthread.h>
 
 #include "compat/daemon.h"
 
@@ -218,6 +219,7 @@ main(int argc, char * const *argv)
             *y_arg = NULL, *c_arg = NULL;
 	struct vpf_fh *pfh = NULL;
 	struct VSM_data *vd;
+        pthread_t monitor;
 
 	vd = VSM_New();
 	VSL_Setup(vd);
@@ -310,7 +312,8 @@ main(int argc, char * const *argv)
         */
 	if (!EMPTY(config.pid_file)
             && (pfh = VPF_Open(config.pid_file, 0644, NULL)) == NULL) {
-		perror(config.pid_file);
+		LOG_Log(LOG_ERR, "Cannot write pid file %s: %s\n",
+                        config.pid_file, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	if (pfh != NULL)
@@ -333,7 +336,8 @@ main(int argc, char * const *argv)
 
         /* XXX: Install this signal handler in the child */
         if (signal(SIGUSR1, sigusr1) == SIG_ERR) {
-            perror("Signal handler USR1:");
+            LOG_Log(LOG_ERR, "Cannot install signal handler for USR1: %s\n",
+                    strerror(errno));
             exit(EXIT_FAILURE);
         }
         
@@ -342,7 +346,20 @@ main(int argc, char * const *argv)
 
         /* Only read the VSL tags relevant to tracking */
         assert(VSL_Arg(vd, 'i', TRACK_TAGS) > 0);
-        
+
+        /* Start the monitor thread */
+        if (config.monitor_interval > 0.0) {
+            if (pthread_create(&monitor, NULL, MON_StatusThread,
+                    (void *) &config.monitor_interval) != 0) {
+                LOG_Log(LOG_ERR, "Cannot start monitoring thread: %s\n",
+                    strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+        }
+        else
+            LOG_Log0(LOG_INFO, "Monitoring thread not running");
+
+        /* Main loop */
 	while (VSL_Dispatch(vd, OSL_Track, NULL) >= 0)
             ;
         
