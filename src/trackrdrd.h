@@ -116,6 +116,9 @@ int LOG_Open(const char *progname);
 #define LOG_SetLevel(level) logconf.setlevel(level)
 #define LOG_Close() logconf.close()
 
+/* monitor.c */
+void *MON_StatusThread(void *arg);
+
 /* parse.c */
 int Parse_XID(const char *str, int len, unsigned *xid);
 int Parse_ReqStart(const char *ptr, int len, unsigned *xid);
