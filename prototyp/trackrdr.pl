@@ -212,7 +212,7 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.5.3";
+$main::VERSION = "0.5.4";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
@@ -529,7 +529,6 @@ sub fork_varnishlog {
 sub run_varnishlog {
 
     $records = 0;
-    $quit = 0;
 
     # Prepare MQ or HTTP transport
     &{$connect{prep}}(\%connect);
@@ -558,6 +557,7 @@ sub run_varnishlog {
         my (%record, %dubious_tid);
 	$open = 0;
 	$dubious = 0;
+        $quit = 0;
 	my $monitor = threads->create(\&statusThread,
                                       $config{'monitor.interval'});
 	unless (defined $monitor) {
