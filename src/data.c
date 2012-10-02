@@ -123,17 +123,6 @@ data_Cleanup(void)
     free(tbl.buf);
 }
 
-static void
-data_logstats(void)
-{
-    LOG_Log(LOG_INFO,
-        "Data table: len=%d collisions=%d insert_probes=%d find_probes=%d "
-        "open=%d done=%d load=%.2f occ_hi=%d seen=%d submitted=%d data_hi=%d",
-        tbl.len, tbl.collisions, tbl.insert_probes, tbl.find_probes,
-        tbl.open, tbl.done, 100.0 * ((float) tbl.open + tbl.done) / tbl.len,
-        tbl.occ_hi, tbl.seen, tbl.submitted, tbl.data_hi);
-}
-
 int
 DATA_Init(void)
 {
@@ -214,5 +203,4 @@ DATA_Dump(void)
             i, entry.xid, entry.tid, statename[entry.state], entry.end,
             entry.data);
     }
-    data_logstats();
 }
