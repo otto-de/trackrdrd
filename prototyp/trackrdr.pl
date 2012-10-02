@@ -212,7 +212,7 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.5.4";
+$main::VERSION = "0.5.5";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
@@ -368,7 +368,7 @@ unless (defined $PIDFH) {
 
 my $LOGFH;
 if ($config{log}) {
-    $LOGFH = new FileHandle ">$config{log}";
+    $LOGFH = new FileHandle ">>$config{log}";
     unless (defined $LOGFH) {
         my $err = $!;
         $! = SMF_EXIT_ERR_CONFIG;
