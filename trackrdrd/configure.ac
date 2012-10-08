@@ -86,5 +86,6 @@ AC_ARG_ENABLE(werror,
 AC_CONFIG_FILES([
 	Makefile
 	src/Makefile
+        src/test/Makefile
 ])
 AC_OUTPUT
