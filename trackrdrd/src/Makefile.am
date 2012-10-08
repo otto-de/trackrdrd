@@ -19,10 +19,6 @@ trackrdrd_LDADD = \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
 	${PTHREAD_LIBS}
 
-check:
-	test/regress.sh
-
-
 BUILT_SOURCES = revision.h usage.h
 MAINTAINERCLEANFILES = revision.h usage.h
 
