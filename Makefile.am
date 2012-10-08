@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = src
+SUBDIRS = src src/test
 
 EXTRA_DIST = README.rst autogen.sh m4/*
 dist-hook:
