@@ -22,6 +22,7 @@ data sets to the processor
                [[-n varnish_logfile] | [-f varnishlog_outputfile]]
                [-v varnish_prefix] [-r max_restarts] [-d]
                [-l logfile] [-p pidfile] [-s status_interval]
+    	       [-b [stdbuf_path]:[stdbuf_bufsize]]
                [--help] [--version]
 
 =head1 DESCRIPTION
@@ -142,6 +143,20 @@ Config variable B<processor.log>. Log file to contain the contents of
 all POST requests to the processor, for debugging purposes. By default
 no processor log file is written.
 
+=item B<-b [stdbuf_path]:[stdbuf_bufsize]>
+
+Path and buffer size for the C<stdbuf(1)> utility from GNU
+coreutils. If this option is specified, then unbuffered output from
+C<varnishlog> is piped into C<stdbuf>, and the script reads the output
+from C<stdbuf>; this may be necessary if the output buffer from
+C<varnishlog> is too small. C<stdbuf_path> specifies the path for
+C<stdbuf> (default: C</usr/bin/stdbuf>), and C<stdbuf_bufsize> is
+passed to the C<-o> option of C<stdbuf> to specify the buffer size
+(default: 160MB). By default, C<stdbuf> is not used (output is piped
+directly from C<varnishlog>).
+
+B<NOTE>: C<stdbuf> requires GNU coreutils >= v7.5.
+
 =item B<--help>
 
 Print usage and exit
@@ -212,7 +227,7 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.5.5";
+$main::VERSION = "0.5.6";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
@@ -244,6 +259,8 @@ my %config = (
     'varnish.prefix'	=>	'/var/opt/varnish',
     'pid.file'		=>	'/var/run/trackrdr.pid',
     'monitor.interval'	=>	30,
+    'stdbuf.path'	=>	'',
+    'stdbuf.bufsize'	=>	'160M',
     );
 
 sub readConfig {
@@ -285,7 +302,7 @@ if (-e defaultConfig) {
 }
 
 my %opts;
-getopts("dn:v:r:u:f:l:p:s:o:c:m:t:q:", \%opts);
+getopts("dn:v:r:u:f:l:p:s:o:c:m:t:q:b:z:", \%opts);
 
 if ($opts{c}) {
     if (!-e $opts{c}) {
@@ -343,10 +360,33 @@ if ($config{debug}) {
     $config{debug} = $config{debug} =~ /^(true|on|yes|1)$/i;
 }
 
+if ($opts{b}) {
+    my ($path, $bufsize) = split /:/, $opts{b};
+    if ($path) {
+        $config{'stdbuf.path'} = $path;
+    }
+    else {
+        $config{'stdbuf.path'} = '/usr/bin/stdbuf';
+    }
+    $config{'stdbuf.bufsize'} = $bufsize if $bufsize;
+}
+
 my @SHMTAGS = qw(ReqStart VCL_Log ReqEnd);
 my $VARNISHLOG_CMD
     = $config{'varnish.prefix'}."/bin/varnishlog -i ".join(',', @SHMTAGS);
 $VARNISHLOG_CMD .= ' -n '.$config{'varnish.name'} if $config{'varnish.name'};
+
+if ($config{'stdbuf.path'}) {
+    $VARNISHLOG_CMD = $config{'stdbuf.path'}.' -o'.$config{'stdbuf.bufsize'}.
+                      " $VARNISHLOG_CMD -u";
+}
+elsif ($opts{z}) {
+    # undocumented option to use mbuffer
+    my ($blocksize, $bufsize) = split /:/, $opts{m};
+    $blocksize = 8192 unless $blocksize;
+    $bufsize = '160M' unless $bufsize;
+    $VARNISHLOG_CMD .= " -u | mbuffer -s $blocksize -m $bufsize -q";
+}
 
 use constant {
     DEBUG	=> 0,
@@ -433,7 +473,7 @@ our $dubious :shared;
 sub statusThread {
     my ($interval) = @_;
 
-    logg(NOTICE, "Monitoring thread starting: tid =", threads->tid());
+    logg(NOTICE, "Monitor thread starting: tid =", threads->tid());
     while(!$quit) {
 	sleep($interval);
 	logg(NOTICE, "$records records submitted, $open open, ",
@@ -549,12 +589,12 @@ sub run_varnishlog {
 	    unless (open($log, '-|', $VARNISHLOG_CMD)) {
 	        my $err = $!;
 	        $! = SMF_EXIT_ERR_CONFIG;
-	        die ("runnning varnishlog failed: $err\n");
+	        die ("$VARNISHLOG_CMD FAILED: $err\n");
 	    }
             logg(NOTICE, "Starting read pipe from $VARNISHLOG_CMD");
 	}
 
-        my (%record, %dubious_tid);
+        my (%record, %dubious);
 	$open = 0;
 	$dubious = 0;
         $quit = 0;
@@ -571,72 +611,88 @@ sub run_varnishlog {
             logg(DEBUG, "tid=$tid tag=$tag");
 
             if ($tag eq 'ReqStart') {
-                $record{$tid}{xid} = $in[-1];
-                logg(DEBUG, "XID=$record{$tid}{xid}");
-		if ($dubious_tid{$tid}) {
-		    delete $dubious_tid{$tid};
-		    warn "Dubious tid $tid undubious at ReqStart";
+                my $xid = $in[-1];
+                logg(DEBUG, "XID=$xid");
+		if ($dubious{tid}{$tid}) {
+		    delete $dubious{tid}{$tid};
+		    warn "Dubious tid $tid undubious at $tag\n";
 		}
+		if ($dubious{xid}{$xid}) {
+		    delete $dubious{xid}{$xid};
+		    warn "Dubious xid $xid undubious at $tag\n";
+		}
+                if ($record{$xid}) {
+                    warn "$tag: xid $xid already seen [$_]\n";
+                    $dubious{xid}{$xid} = 1;
+                    if ($record{$xid}{tid} and $tid != $record{$xid}{tid}) {
+                        warn "$tag: tid mismatch, was $record{$xid}{tid}\n";
+                        $dubious{tid}{$tid} = 1;
+                    }
+                }
+                $record{$xid}{tid} = $tid;
+                push @{$record{xid}{data}}, "XID=$xid";
             }
             elsif ($tag eq 'VCL_Log') {
                 next unless $in[0] eq 'track';
-		if (!$record{$tid}) {
-		    warn "$tag: unexpected tid $tid [$_]\n";
-		    $record{$tid}{xid} = $in[1];
-		    $dubious_tid{$tid} = 1;
-		}
-		elsif (!$record{$tid}{xid}) {
-		    warn "$tag: no xid known for tid $tid [$_]\n";
-		}
-                elsif ($in[1] ne $record{$tid}{xid}) {
-                    warn "$tag: xid mismatch, expected $record{$tid}{xid}, ",
-                         "got $in[1] [$_]\n";
+
+                my $xid = $in[1];
+                logg(DEBUG, "XID=$xid data=$in[-1]");
+                if (!$record{$xid}) {
+                    warn "$tag: unexpected xid $xid [$_]\n";
+                    $dubious{xid}{$xid} = 1;
                 }
-                else {
-                    push @{$record{$tid}{data}}, $in[-1];
-                    logg(DEBUG, "XID=$record{$tid}{xid} data=$in[-1]");
+                elsif (!$record{$xid}{tid}) {
+                    warn "$tag: unknown tid $tid [$_]\n";
+                    $record{$xid}{tid} = $tid;
+                    $dubious{tid}{$tid} = 1;
                 }
+		elsif ($tid != $record{$xid}{tid}) {
+		    warn "$tag: tid mismatch, was $tid [$_]\n";
+		    $dubious{tid}{$tid} = 1;
+		}
+                push @{$record{$xid}{data}}, $in[-1];
             }
             elsif ($tag eq 'ReqEnd') {
-                if ($record{$tid}
-                    && $record{$tid}{xid}
-                    && $record{$tid}{xid} eq $in[0]) {
-                    if ($record{$tid}{data}) {
-                        push @{$record{$tid}{data}}, "XID=$record{$tid}{xid}";
-                        my $data = join('&', @{$record{$tid}{data}});
-			$records++;
-			logg(DEBUG, "$records complete records found");
-                        &{$connect{submit}}(\%connect, $data);
-                        logg(DEBUG,
-                             'DATA: ', join('&', @{$record{$tid}{data}}));
-                    }
-                    delete $record{$tid};
-		    if ($dubious_tid{$tid}) {
-			delete $dubious_tid{$tid};
-			logg(WARN, "Dubious tid $tid undubious at ReqEnd\n");
-		    }
+                my $xid = $in[0];
+                logg(DEBUG, "XID=$xid");
+
+                if (!$record{$xid}) {
+                    warn "$tag: Unknown XID $xid [$_]\n";
+                    $dubious{xid}{$xid} = 1;
+                    $dubious{tid}{$tid} = 1;
+                    next;
                 }
-                else {
-		    if (!$record{$tid}) {
-			logg(WARN, "$tag: unexpected tid $tid [$_]\n");
-		    }
-		    elsif (!$record{$tid}{xid}) {
-			logg(WARN,
-                             "$tag: no req XID known for tid $tid [$_]\n");
-		    }
-                    elsif ($record{$tid}{xid} ne $in[0]) {
-                        logg(WARN, "$tag: req XID mismatch $in[0] [$_]\n");
-                    }
-                    else {
-                        logg(WARN, "$tag: record incomplete: [$_]\n");
-                    }
-                    foreach my $key (keys %{$record{$tid}}) {
-                        logg(WARN, "\t$key=$record{$tid}{$key}\n");
-                    }
+
+		if ($dubious{tid}{$tid}) {
+		    delete $dubious{tid}{$tid};
+		    warn "Dubious tid $tid undubious at $tag\n";
+		}
+		if ($dubious{xid}{$xid}) {
+		    delete $dubious{xid}{$xid};
+		    warn "Dubious xid $xid undubious at $tag\n";
+		}
+
+                if (!$record{$xid}{tid}) {
+                    warn "$tag: Unknown tid $tid [$_]\n";
+                    $dubious{tid}{$tid} = 1;
                 }
+                elsif ($tid != $record{$xid}{tid}) {
+                    warn "$tag: tid mismatch, was $record{$xid}{tid} [$_]\n";
+                    $dubious{tid}{$tid} = 1;
+                }
+
+                if ($record{$xid}{data}) {
+                    my $data = join('&', @{$record{$xid}{data}});
+                    logg(DEBUG, "DATA=[$data]");
+                    $records++;
+                    logg(DEBUG, "$records complete records found");
+                    &{$connect{submit}}(\%connect, $data);
+                }
+                delete $record{$xid};
             }
 	    $open = scalar(keys %record);
-	    $dubious = scalar(keys %dubious_tid);
+	    $dubious = scalar(keys %{$dubious{tid}})
+                       + scalar(keys %{$dubious{xid}});
 	}
 	close($log);
 	if ($config{'varnishlog.dump'}) {
@@ -722,7 +778,7 @@ sub parent_init {
 	$parent_pid = $$;
         print $PIDFH $$;
         $PIDFH->close();
-        logg(NOTICE, "Parent (watchdog) process starting");
+        logg(NOTICE, "Parent (watchdog) process starting (v$main::VERSION)");
 	return;
     } else {
 	$parent_pid = $f;
