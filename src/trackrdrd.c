@@ -290,6 +290,8 @@ main(int argc, char * const *argv)
             strcpy(config.log_file, l_arg);
         if (y_arg)
             CONF_Add("syslog.facility", y_arg);
+        if (f_arg)
+            strcpy(config.varnish_bindump, f_arg);
         
         if (f_arg && VSL_Arg(vd, 'r', f_arg) <= 0)
             exit(EXIT_FAILURE);
