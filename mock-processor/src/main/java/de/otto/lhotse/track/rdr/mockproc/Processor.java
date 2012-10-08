@@ -56,8 +56,8 @@ public class Processor extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         Map<String, String[]> params = request.getParameterMap();
-        if (! params.containsKey("url")) {
-            this.log("Key 'url' missing");
+        if (! params.containsKey("XID")) {
+            this.log("Key 'XID' missing");
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             return;
         }
