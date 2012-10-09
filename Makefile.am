@@ -3,8 +3,6 @@ ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = src src/test
 
 EXTRA_DIST = README.rst autogen.sh m4/*
-dist-hook:
-	git clean -f
 
 dist_man_MANS = trackrdrd.3
 MAINTAINERCLEANFILES = $(dist_man_MANS)
