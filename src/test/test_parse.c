@@ -55,7 +55,8 @@ static char
     unsigned xid = (unsigned int) lrand48();
     if (xid == 0)
         xid = 1;
-    printf("Parsing %d sequential XIDs from random start\n", MAX_RANDOM_XIDS);
+    printf("... parsing %d sequential XIDs from random start\n",
+        MAX_RANDOM_XIDS);
     
     for (int i = 0; i < MAX_RANDOM_XIDS; i++) {
         sprintf(s, "%d%c", xid, (char) random());
@@ -77,7 +78,7 @@ static char
     unsigned xid;
     int err;
     
-    printf("Testing XID corner cases\n");
+    printf("... testing XID corner cases\n");
 
     err = Parse_XID("0", 1, &xid);
     sprintf(errmsg, "0: %s", strerror(err));
@@ -112,7 +113,7 @@ static char
     unsigned xid;
     int err;
 
-    printf("Testing Parse_ReqStart\n");
+    printf("... testing Parse_ReqStart\n");
 
     #define REQSTART "127.0.0.1 40756 1253687608"
     err = Parse_ReqStart(REQSTART, strlen(REQSTART), &xid);
@@ -134,7 +135,7 @@ static char
     unsigned xid;
     int err;
 
-    printf("Testing Parse_ReqEnd\n");
+    printf("... testing Parse_ReqEnd\n");
 
     #define REQEND "1253687608 1348291555.658257008 1348291555.670388222 -0.012122154 NaN NaN"
 
@@ -158,7 +159,7 @@ static char
     int err, len;
     char *data;
 
-    printf("Testing Parse_VCL_Log\n");
+    printf("... testing Parse_VCL_Log\n");
 
     #define VCLLOG "1253687608 url=%2Frdrtestapp%2F"
     err = Parse_VCL_Log(VCLLOG, strlen(VCLLOG), &xid, &data, &len);
@@ -212,7 +213,7 @@ static char
     return NULL;
 }
 
-static char
+static const char
 *all_tests(void)
 {
     mu_run_test(test_random_xids);
@@ -223,17 +224,4 @@ static char
     return NULL;
 }
 
-int
-main(int argc, char **argv)
-{
-    (void) argc;
-    
-    printf("%s: running\n", argv[0]);
-    char *result = all_tests();
-    printf("%s: %d tests run\n", argv[0],  tests_run);
-    if (result != NULL) {
-        printf("%s\n", result);
-        exit(EXIT_FAILURE);
-    }
-    exit(EXIT_SUCCESS);
-}
+TEST_RUNNER
