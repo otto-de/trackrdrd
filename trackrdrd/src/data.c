@@ -158,6 +158,7 @@ DATA_Init(void)
     return(0);
 }
 
+/* XXX: set xid and DATA_OPEN in the entry */
 dataentry 
 *DATA_Insert(unsigned xid)
 {
