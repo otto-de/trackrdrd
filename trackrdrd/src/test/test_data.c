@@ -126,6 +126,28 @@ static const char
         sprintf(errmsg, "DATA_Find: %d, returned NULL", 1234567890 + i);
         mu_assert(errmsg, entry2 != NULL);
     }
+
+    entry2 = DATA_Find(1234567890 + tbl.len);
+    mu_assert("DATA_Find: expected NULL", entry2 == NULL);
+
+    for (int i = 0; i < tbl.len/2; i++) {
+        entry1 = DATA_Find(1234567890 + i);
+        entry1->state = DATA_EMPTY;
+        entry1->xid = 0;
+    }
+
+    for (int i = 0; i < tbl.len; i++) {
+        entry2 = DATA_Find(1234567890 + i);
+        if (i < tbl.len/2)
+            mu_assert("DATA_Find: expected NULL", entry2 == NULL);
+        else {
+            sprintf(errmsg, "DATA_Find: %d, returned NULL", 1234567890 + i);
+            mu_assert(errmsg, entry2 != NULL);
+            sprintf(errmsg, "DATA_Find: %d, got %d", 1234567890 + i,
+                    entry2->xid);
+            mu_assert(errmsg, entry2->xid == 1234567890 + i);
+        }
+    }
     
     return NULL;
 }
