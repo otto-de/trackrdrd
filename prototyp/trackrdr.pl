@@ -233,7 +233,7 @@ use Getopt::Std;
 use Pod::Usage;
 
 $Getopt::Std::STANDARD_HELP_VERSION = 1;
-$main::VERSION = "0.5.7";
+$main::VERSION = "0.5.8";
 
 sub HELP_MESSAGE {
     pod2usage(-exit => 0, -verbose => 1);
@@ -649,7 +649,7 @@ sub run_varnishlog {
                     }
                 }
                 $record{$xid}{tid} = $tid;
-                push @{$record{xid}{data}}, "XID=$xid";
+                push @{$record{$xid}{data}}, "XID=$xid";
             }
             elsif ($tag eq 'VCL_Log') {
                 next unless $in[0] eq 'track';
