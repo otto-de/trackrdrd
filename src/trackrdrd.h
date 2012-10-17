@@ -31,6 +31,13 @@
 
 #include <stdio.h>
 
+/* mq.c */
+const char *MQ_GlobalInit(void);
+const char *MQ_WorkerInit(void **priv);
+const char *MQ_Send(void *priv, const char *data, unsigned len);
+const char *MQ_WorkerShutdown(void **priv);
+const char *MQ_GlobalShutdown(void);
+
 /* data.c */
 typedef enum {
     DATA_EMPTY = 0,
@@ -89,6 +96,8 @@ struct config {
     char	processor_log[BUFSIZ];
     unsigned	maxopen_scale;
     unsigned	maxdata_scale;
+    char	mq_uri[BUFSIZ];
+    char	mq_qname[BUFSIZ];
 } config;
 
 void CONF_Init(void);

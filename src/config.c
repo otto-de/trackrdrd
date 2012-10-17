@@ -106,6 +106,8 @@ CONF_Add(const char *lval, const char *rval)
     confString("log.file", log_file);
     confString("varnish.bindump", varnish_bindump);
     confString("processor.log", processor_log);
+    confString("mq.uri", mq_uri);
+    confString("mq.qname", mq_qname);
 
     confUnsigned("maxopen.scale", maxopen_scale);
     confUnsigned("maxdata.scale", maxdata_scale);
@@ -171,6 +173,8 @@ CONF_Init(void)
     config.processor_log[0] = '\0';
     config.maxopen_scale = 0;
     config.maxdata_scale = 0;
+    config.mq_uri[0] = '\0';
+    config.mq_qname[0] = '\0';
 }
 
 int
@@ -225,6 +229,7 @@ CONF_ReadFile(const char *file) {
 
 #define confdump(str,val) \
     LOG_Log(LOG_DEBUG, "config: " str, (val))
+
 void
 CONF_Dump(void)
 {
@@ -238,4 +243,6 @@ CONF_Dump(void)
     confdump("processor.log = %s", config.processor_log);
     confdump("maxopen.scale = %d", config.maxopen_scale);
     confdump("maxdata.scale = %d", config.maxdata_scale);
+    confdump("mq.uri = %s", config.mq_uri);
+    confdump("mq.qname = %s", config.mq_qname);
 }
