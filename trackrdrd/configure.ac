@@ -12,11 +12,13 @@ AM_INIT_AUTOMAKE([foreign])
 
 AC_GNU_SOURCE
 AC_PROG_CC
+AC_PROG_CXX
 AC_PROG_CC_STDC
 if test "x$ac_cv_prog_cc_c99" = xno; then
 	AC_MSG_ERROR([Could not find a C99 compatible compiler])
 fi
 AC_PROG_CPP
+AC_PROG_CXXCPP
 
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
@@ -47,6 +49,8 @@ AC_CHECK_FILE([$VARNISHSRC/include/varnishapi.h],
 	[AC_MSG_FAILURE(["$VARNISHSRC" is not a Varnish source directory])]
 )
 
+PKG_CHECK_MODULES([AMQ], [activemq-cpp])
+
 # From Varnish configure.ac
 # Now that we're done using the compiler to look for functions and
 # libraries, set CFLAGS to what we want them to be for our own code
@@ -54,23 +58,34 @@ AC_CHECK_FILE([$VARNISHSRC/include/varnishapi.h],
 # This corresponds to FreeBSD's WARNS level 6
 DEVELOPER_CFLAGS="-Wall -Wstrict-prototypes -Wmissing-prototypes -Wpointer-arith -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wshadow -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wnested-externs -Wredundant-decls -Wformat"
 
+# Added for compiling C++ for ActiveMQ.
+# -Wstrict-prototypes, -Wmissing-prototypes & -Wnested-externs invalid for C++
+# activemq-cpp fails on -Wshadow
+DEVELOPER_CXXFLAGS="-Wall -Wpointer-arith -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wredundant-decls -Wformat"
+
 # Additional flags for GCC 4
 EXTRA_DEVELOPER_CFLAGS="-Wextra -Wno-missing-field-initializers -Wno-sign-compare"
 
 # --enable-developer-warnings
 AC_ARG_ENABLE(developer-warnings,
         AS_HELP_STRING([--enable-developer-warnings],[enable strict warnings (default is NO)]),
-        CFLAGS="${CFLAGS} ${DEVELOPER_CFLAGS}")
+        CFLAGS="${CFLAGS} ${DEVELOPER_CFLAGS}"
+        CXXFLAGS="${CXXFLAGS} ${DEVELOPER_CXXFLAGS}"
+        )
 
 # --enable-debugging-symbols
 AC_ARG_ENABLE(debugging-symbols,
         AS_HELP_STRING([--enable-debugging-symbols],[enable debugging symbols (default is NO)]),
-        CFLAGS="${CFLAGS} -O0 -g -fno-inline")
+        CFLAGS="${CFLAGS} -O0 -g -fno-inline"
+        CXXFLAGS="${CXXFLAGS} -O0 -g -fno-inline"
+        )
 
 # --enable-diagnostics
 AC_ARG_ENABLE(diagnostics,
         AS_HELP_STRING([--enable-diagnostics],[enable run-time diagnostics (default is NO)]),
-        CFLAGS="${CFLAGS} -DDIAGNOSTICS")
+        CFLAGS="${CFLAGS} -DDIAGNOSTICS"
+        CXXFLAGS="${CXXFLAGS} -DDIAGNOSTICS"
+        )
 
 # --enable-extra-developer-warnings
 AC_ARG_ENABLE(extra-developer-warnings,
@@ -81,7 +96,9 @@ AC_ARG_ENABLE(extra-developer-warnings,
 # --enable-werror
 AC_ARG_ENABLE(werror,
         AS_HELP_STRING([--enable-werror],[use -Werror (default is NO)]),
-        CFLAGS="${CFLAGS} -Werror")
+        CFLAGS="${CFLAGS} -Werror"
+        CXXFLAGS="${CXXFLAGS} -Werror"
+        )
 
 AC_CONFIG_FILES([
 	Makefile
