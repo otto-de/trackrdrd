@@ -1,4 +1,4 @@
-INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC)
+INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) @AMQ_CFLAGS@
 
 bin_PROGRAMS = trackrdrd
 
@@ -11,13 +11,17 @@ trackrdrd_SOURCES = \
 	log.c \
 	config.c \
 	data.c \
-	monitor.c
+	monitor.c \
+	mq.c \
+	activemq/amq.h \
+	activemq/amq.cpp
 
 trackrdrd_LDADD = \
 	$(VARNISHSRC)/lib/libvarnishcompat/libvarnishcompat.la \
 	$(VARNISHSRC)/lib/libvarnishapi/libvarnishapi.la \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	${PTHREAD_LIBS}
+	${PTHREAD_LIBS} \
+	@AMQ_LIBS@
 
 BUILT_SOURCES = revision.h usage.h
 MAINTAINERCLEANFILES = revision.h usage.h
