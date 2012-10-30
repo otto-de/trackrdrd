@@ -148,7 +148,7 @@ const char *
 AMQ_WorkerShutdown(AMQ_Worker **worker)
 {
     try {
-        delete worker;
+        delete *worker;
         return NULL;
     }
     CATCHALL
