@@ -99,9 +99,9 @@ static void
     pthread_exit((void *) &proddata);
 }
 
-#define consumer_exit(pcdata, reason)		\
-    do {					\
-        (pcdata)->fail = (reason);		\
+#define consumer_exit(pcdata, reason)	\
+    do {				\
+        (pcdata)->fail = (reason);	\
         pthread_exit((pcdata));		\
     } while(0)
 
@@ -109,7 +109,7 @@ static void
 *consumer(void *arg)
 {
     int id = *((int *) arg), deqs = 0;
-    prod_con_data_t *pcdata = &condata[id];
+    prod_con_data_t *pcdata = &condata[id-1];
     pcdata->sum = 0;
     pcdata->fail = SUCCESS;
     unsigned *xid;
