@@ -30,6 +30,38 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
+#include <pthread.h>
+
+#define MIN_TABLE_SCALE 10
+
+/* spmcq.c */
+
+/* Single producer multiple consumer bounded FIFO queue */
+typedef struct {
+        unsigned magic;
+#define SPMCQ_MAGIC 0xe9a5d0a8
+        const unsigned mask;
+        void **data;
+        volatile unsigned head;
+        volatile unsigned tail;
+} spmcq_t;
+
+spmcq_t spmcq;
+
+int SPMCQ_Init(void);
+bool SPMCQ_Enq(void *ptr);
+void *SPMCQ_Deq(void);
+
+/* Producer waits for this condition when the spmc queue is full.
+   Consumers signal this condition after dequeue. */
+pthread_cond_t spmcq_nonfull_cond;
+pthread_mutex_t spmcq_nonfull_lock;
+
+/* Consumers wait for this condition when the spmc queue is empty.
+   Producer signals this condition after enqueue. */
+pthread_cond_t spmcq_nonempty_cond;
+pthread_mutex_t spmcq_nonempty_lock;
 
 /* mq.c */
 const char *MQ_GlobalInit(void);
