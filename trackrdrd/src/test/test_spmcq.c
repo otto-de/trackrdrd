@@ -65,6 +65,7 @@ static char errmsg[BUFSIZ];
 
 static unsigned xids[1 << MIN_TABLE_SCALE];
 static prod_con_data_t proddata;
+static prod_con_data_t condata[NCON];
 
 static void
 *producer(void *arg)
@@ -100,17 +101,17 @@ static void
 
 #define consumer_exit(pcdata, reason)		\
     do {					\
-        (pcdata).fail = (reason);		\
-        pthread_exit(&(pcdata));		\
+        (pcdata)->fail = (reason);		\
+        pthread_exit((pcdata));		\
     } while(0)
 
 static void
 *consumer(void *arg)
 {
     int id = *((int *) arg), deqs = 0;
-    prod_con_data_t pcdata;
-    pcdata.sum = 0;
-    pcdata.fail = SUCCESS;
+    prod_con_data_t *pcdata = &condata[id];
+    pcdata->sum = 0;
+    pcdata->fail = SUCCESS;
     unsigned *xid;
 
     while (run) {
@@ -141,16 +142,16 @@ static void
 	    /* xid != NULL */
 	    debug_print("Consumer %d: dequeue %d (xid = %u)\n", id, ++deqs,
                 *xid);
-            pcdata.sum += *xid;
+            pcdata->sum += *xid;
         }
     }
     debug_print("Consumer %d: drain queue, run = %d\n", id, run);
     while ((xid = (unsigned *) SPMCQ_Deq()) != NULL) {
         debug_print("Consumer %d: dequeue %d (xid = %u)\n", id, ++deqs, *xid);
-        pcdata.sum += *xid;
+        pcdata->sum += *xid;
     }
     debug_print("Consumer %d: exit\n", id);
-    pthread_exit((void *) &pcdata);
+    pthread_exit((void *) pcdata);
 }
 
 /* N.B.: Always run this test first */
