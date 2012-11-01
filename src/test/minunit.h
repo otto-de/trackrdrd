@@ -44,6 +44,20 @@
 #define mu_assert(msg, test) do { if (!(test)) return msg; } while (0)
 #define mu_run_test(test) do { const char *msg = test(); tests_run++; \
                                if (msg) return msg; } while (0)
+/* phk-ish mu_assert */
+#define mu_assert_errno(c)						   \
+    do {                                                                   \
+        if (!(c)) {                                                        \
+            sprintf(errmsg, "%s failed in %s at %s:%d: errno %d (%s)",     \
+                #c, __func__, __FILE__, __LINE__, errno, strerror(errno)); \
+            mu_assert(errmsg, 0);                                          \
+        }                                                                  \
+    } while(0)
+
+/* short for MU Assert Zero / Non-Zero */
+#define MAZ(c)	do { mu_assert_errno((c) == 0); } while(0)
+#define MAN(c)	do { mu_assert_errno((c) != 0); } while(0)
+
 extern int tests_run;
 
 #define TEST_RUNNER                                    \

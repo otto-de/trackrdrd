@@ -40,7 +40,6 @@
 
 #include "trackrdrd.h"
 
-#define MIN_TABLE_SCALE 10
 #define MIN_DATA_SCALE 10
 
 #define INDEX(u) ((u) & (tbl.len - 1))
