@@ -111,6 +111,7 @@ CONF_Add(const char *lval, const char *rval)
 
     confUnsigned("maxopen.scale", maxopen_scale);
     confUnsigned("maxdata.scale", maxdata_scale);
+    confUnsigned("nworkers", nworkers);
 
     if (strcmp(lval, "syslog.facility") == 0) {
         if ((ret = conf_getFacility(rval)) < 0)
@@ -175,6 +176,7 @@ CONF_Init(void)
     config.maxdata_scale = 0;
     config.mq_uri[0] = '\0';
     config.mq_qname[0] = '\0';
+    config.nworkers = 1;
 }
 
 int
@@ -245,4 +247,5 @@ CONF_Dump(void)
     confdump("maxdata.scale = %d", config.maxdata_scale);
     confdump("mq.uri = %s", config.mq_uri);
     confdump("mq.qname = %s", config.mq_qname);
+    confdump("nworkers = %d", config.nworkers);
 }

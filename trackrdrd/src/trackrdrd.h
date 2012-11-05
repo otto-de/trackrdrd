@@ -35,6 +35,13 @@
 
 #define MIN_TABLE_SCALE 10
 
+/* worker.c */
+
+int WRK_Init(void);
+void WRK_Start(void);
+void WRK_Halt(void);
+void WRK_Shutdown(void);
+
 /* spmcq.c */
 
 /* Single producer multiple consumer bounded FIFO queue */
@@ -100,6 +107,8 @@ typedef struct {
     unsigned		open;
     unsigned		done;
     unsigned		submitted;	/* Records submitted */
+    unsigned		sent;		/* Records sent to MQ */
+    unsigned		failed;		/* MQ send fails */
     unsigned		occ_hi;		/* Occupancy high water mark */ 
     unsigned		data_hi;	/* Data high water mark */
     dataentry		*entry;
@@ -130,6 +139,7 @@ struct config {
     unsigned	maxdata_scale;
     char	mq_uri[BUFSIZ];
     char	mq_qname[BUFSIZ];
+    unsigned	nworkers;
 } config;
 
 void CONF_Init(void);
