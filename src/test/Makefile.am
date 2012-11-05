@@ -1,8 +1,9 @@
 INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) @AMQ_CFLAGS@
 
-TESTS = test_parse test_data test_mq test_spmcq test_spmcq_loop.sh regress.sh
+TESTS = test_parse test_data test_mq test_spmcq test_spmcq_loop.sh \
+	test_worker regress.sh
 
-check_PROGRAMS = test_parse test_data test_mq test_spmcq
+check_PROGRAMS = test_parse test_data test_mq test_spmcq test_worker
 
 test_parse_SOURCES = \
 	minunit.h \
@@ -41,3 +42,17 @@ test_spmcq_LDADD = \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
 	../spmcq.$(OBJEXT)
 
+test_worker_SOURCES = \
+	minunit.h \
+	test_worker.c \
+	../trackrdrd.h
+
+test_worker_LDADD = \
+	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
+	../worker.$(OBJEXT) \
+	../log.$(OBJEXT) \
+	../mq.$(OBJEXT) \
+	../spmcq.$(OBJEXT) \
+	../amq.$(OBJEXT) \
+	../data.$(OBJEXT) \
+	@AMQ_LIBS@

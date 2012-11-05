@@ -49,7 +49,7 @@ static char
     const char *err;
 
     printf("... testing MQ global initialization\n");
-    
+
     strcpy(config.mq_uri, "tcp://localhost:61616");
     err = MQ_GlobalInit();
     sprintf(errmsg, "MQ_GlobalInit: %s", err);
