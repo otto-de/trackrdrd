@@ -1,6 +1,6 @@
 #! /bin/bash
 
-N=1000
+N=500
 
 echo
 echo "TEST: $0"

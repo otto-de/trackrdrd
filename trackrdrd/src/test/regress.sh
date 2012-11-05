@@ -15,7 +15,7 @@ echo
 echo "TEST: $0"
 echo "... testing log output at debug level against a known checksum"
 CKSUM=$(../trackrdrd -f varnish.binlog -l - -d -c test.conf | cksum)
-if [ "$CKSUM" != '1387393550 229074' ]; then
+if [ "$CKSUM" != '1094437405 229102' ]; then
     echo "ERROR: Regression test incorrect cksum: $CKSUM"
     exit 1
 fi
