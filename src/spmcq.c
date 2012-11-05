@@ -53,7 +53,7 @@ static void
 spmcq_cleanup(void)
 {
     free(spmcq.data);
-    pthread_mutex_destroy(&spmcq_deq_lock);
+    AZ(pthread_mutex_destroy(&spmcq_deq_lock));
 }
 
 int
