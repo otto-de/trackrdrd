@@ -55,4 +55,5 @@ test_worker_LDADD = \
 	../spmcq.$(OBJEXT) \
 	../amq.$(OBJEXT) \
 	../data.$(OBJEXT) \
+	../monitor.$(OBJEXT) \
 	@AMQ_LIBS@

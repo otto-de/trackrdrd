@@ -69,7 +69,6 @@
 
 /*--------------------------------------------------------------------*/
 
-/* XXX: Temporary, for testing */
 static void
 submit(unsigned xid)
 {
@@ -79,9 +78,14 @@ submit(unsigned xid)
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     assert(entry->state == DATA_DONE);
     LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", entry->end, entry->data);
-    tbl.done--;
+    /* XXX: Termination */
+    while (SPMCQ_Enq((void *) entry) == NULL) {
+        LOG_Log(LOG_ALERT, "%s", "Internal queue full, waiting for dequeue");
+        AZ(pthread_mutex_lock(&spmcq_nonfull_lock));
+        AZ(pthread_cond_wait(&spmcq_nonfull_cond, &spmcq_nonempty_lock));
+    }
+    AZ(pthread_cond_broadcast(&spmcq_nonempty_cond));
     tbl.submitted++;
-    entry->state = DATA_EMPTY;
 }
 
 static void
@@ -89,6 +93,33 @@ sigusr1(int sig)
 {
     DATA_Dump();
     signal(sig, sigusr1);
+}
+
+static dataentry
+*insert(unsigned xid, enum VSL_tag_e tag, unsigned fd)
+{
+    dataentry *entry;
+    
+    entry = DATA_Insert(xid);
+    if (entry == NULL) {
+        LOG_Log(LOG_ALERT,
+            "%s: Cannot insert data, XID=%d tid=%d DISCARDED",
+            VSL_tags[tag], xid, fd);
+        return NULL;
+    }
+    CHECK_OBJ(entry, DATA_MAGIC);
+        
+    entry->state = DATA_OPEN;
+    entry->xid = xid;
+    entry->tid = fd;
+    sprintf(entry->data, "XID=%d", xid);
+    entry->end = strlen(entry->data);
+    if (entry->end > tbl.data_hi)
+        tbl.data_hi = entry->end;
+    tbl.open++;
+    MON_StatsUpdate(STATS_OCCUPANCY);
+    
+    return entry;
 }
 
 static int
@@ -115,25 +146,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
 
         tbl.seen++;
-        entry = DATA_Insert(xid);
-        if (entry == NULL) {
-            LOG_Log(LOG_ALERT,
-                "%s: Cannot insert data, XID=%d tid=%d DISCARDED",
-                VSL_tags[tag], xid, fd);
-            break;
-        }
-        CHECK_OBJ(entry, DATA_MAGIC);
-        
-        entry->state = DATA_OPEN;
-        entry->xid = xid;
-        entry->tid = fd;
-        sprintf(entry->data, "XID=%d", xid);
-        entry->end = strlen(entry->data);
-        if (entry->end > tbl.data_hi)
-            tbl.data_hi = entry->end;
-        tbl.open++;
-        if (tbl.open + tbl.done > tbl.occ_hi)
-            tbl.occ_hi = tbl.open + tbl.done;
+        (void) insert(xid, tag, fd);
         break;
 
     case SLT_VCL_Log:
@@ -151,10 +164,19 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         /* assert((hash(XID) exists) && hash(XID).tid == fd
                   && !hash(XID).done); */
         entry = DATA_Find(xid);
-        CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-        assert(entry->xid == xid);
-        assert(entry->tid == fd);
-        assert(entry->state == DATA_OPEN);
+        if (entry == NULL) {
+            LOG_Log(LOG_WARNING, "%s: XID %d not found, attempting insert",
+                VSL_tags[tag], xid);
+            entry = insert(xid, tag, fd);
+            if (entry == NULL)
+                break;
+        }
+        else {
+            CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+            assert(entry->xid == xid);
+            assert(entry->tid == fd);
+            assert(entry->state == DATA_OPEN);
+        }
 
         /* Data overflow */
         /* XXX: Encapsulate (1 << (config.maxdata_scale+10)) */
@@ -189,8 +211,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
 
         /*hash(XID).done = TRUE;*/
         entry->state = DATA_DONE;
-        tbl.done++;
-        tbl.open--;
+        MON_StatsUpdate(STATS_DONE);
         submit(xid);
         break;
 
@@ -214,9 +235,9 @@ usage(int status)
 int
 main(int argc, char * const *argv)
 {
-        int c, d_flag = 0;
+    int c, d_flag = 0, err;
 	const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
-            *y_arg = NULL, *c_arg = NULL;
+            *y_arg = NULL, *c_arg = NULL, *errmsg;
 	struct vpf_fh *pfh = NULL;
 	struct VSM_data *vd;
         pthread_t monitor;
@@ -361,14 +382,43 @@ main(int argc, char * const *argv)
         else
             LOG_Log0(LOG_INFO, "Monitoring thread not running");
 
+        errmsg = MQ_GlobalInit();
+        if (errmsg != NULL) {
+            LOG_Log(LOG_ERR, "Cannot initialize queueing: %s", errmsg);
+            exit(EXIT_FAILURE);
+        }
+
+        err = WRK_Init();
+        if (errmsg != NULL) {
+            LOG_Log(LOG_ERR, "Cannot prepare worker threads: %s",
+                strerror(err));
+            exit(EXIT_FAILURE);
+        }
+
+        if ((err = SPMCQ_Init()) != 0) {
+            LOG_Log(LOG_ERR, "Cannot initialize internal worker queue: %s",
+                strerror(err));
+            exit(EXIT_FAILURE);
+        }
+
+        MON_StatsInit();
+        
+        /* Start worker threads */
+        WRK_Start();
+        
         /* Main loop */
 	while (VSL_Dispatch(vd, OSL_Track, NULL) >= 0)
             ;
+
+        WRK_Halt();
+        WRK_Shutdown();
+        AZ(MQ_GlobalShutdown());
         
         /* XXX: Parent removes PID */
 	if (pfh != NULL)
 		VPF_Remove(pfh);
 
         LOG_Log0(LOG_INFO, "exiting");
+        LOG_Close();
 	exit(EXIT_SUCCESS);
 }

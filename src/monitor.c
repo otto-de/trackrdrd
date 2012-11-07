@@ -36,6 +36,7 @@
 #include <pthread.h>
 
 #include "trackrdrd.h"
+#include "vas.h"
 
 void
 *MON_StatusThread(void *arg)
@@ -65,9 +66,50 @@ void
         }
         LOG_Log(LOG_INFO,
             "Data table: len=%d collisions=%d insert_probes=%d find_probes=%d "
-            "open=%d done=%d load=%.2f occ_hi=%d seen=%d submitted=%d data_hi=%d",
+            "open=%d done=%d load=%.2f occ_hi=%d seen=%d submitted=%d "
+            "sent=%d failed=%d wait_qfull=%d data_hi=%d",
             tbl.len, tbl.collisions, tbl.insert_probes, tbl.find_probes,
             tbl.open, tbl.done, 100.0 * ((float) tbl.open + tbl.done) / tbl.len,
-            tbl.occ_hi, tbl.seen, tbl.submitted, tbl.data_hi);
+            tbl.occ_hi, tbl.seen, tbl.submitted, tbl.sent, tbl.failed,
+            tbl.wait_qfull, tbl.data_hi);
     }
+}
+
+void
+MON_StatsInit(void)
+{
+    AZ(pthread_mutex_init(&stats_update_lock, NULL));
+}
+
+void
+MON_StatsUpdate(stats_update_t update)
+{
+    AZ(pthread_mutex_lock(&stats_update_lock));
+    switch(update) {
+        
+    case STATS_SENT:
+        tbl.sent++;
+        tbl.done--;
+        break;
+        
+    case STATS_FAILED:
+        tbl.failed++;
+        tbl.done--;
+        break;
+        
+    case STATS_DONE:
+        tbl.done++;
+        tbl.open--;
+        break;
+
+    case STATS_OCCUPANCY:
+        if (tbl.open + tbl.done > tbl.occ_hi)
+            tbl.occ_hi = tbl.open + tbl.done;
+        break;
+        
+    default:
+        /* Unreachable */
+        AN(NULL);
+    }
+    AZ(pthread_mutex_unlock(&stats_update_lock));
 }
