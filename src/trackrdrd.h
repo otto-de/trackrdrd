@@ -109,6 +109,7 @@ typedef struct {
     unsigned		submitted;	/* Records submitted */
     unsigned		sent;		/* Records sent to MQ */
     unsigned		failed;		/* MQ send fails */
+    unsigned		wait_qfull;	/* Waits for SPMCQ */
     unsigned		occ_hi;		/* Occupancy high water mark */ 
     unsigned		data_hi;	/* Data high water mark */
     dataentry		*entry;
@@ -168,7 +169,23 @@ int LOG_Open(const char *progname);
 #define LOG_Close() logconf.close()
 
 /* monitor.c */
+typedef enum {
+    /* Record sent successfully to MQ */
+    STATS_SENT,
+    /* Failed to send record to MQ */
+    STATS_FAILED,
+    /* ReqStart seen, finished reading record from SHM log */
+    STATS_DONE,
+    /* Update occupancy high water mark */
+    STATS_OCCUPANCY,
+} stats_update_t;
+
 void *MON_StatusThread(void *arg);
+void MON_StatsInit(void);
+void MON_StatsUpdate(stats_update_t update);
+
+/* Mutex for multi-threaded stats updates. */
+pthread_mutex_t stats_update_lock;
 
 /* parse.c */
 int Parse_XID(const char *str, int len, unsigned *xid);
