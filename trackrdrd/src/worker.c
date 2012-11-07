@@ -37,6 +37,7 @@
 #include "trackrdrd.h"
 #include "vas.h"
 #include "miniobj.h"
+#include "vmb.h"
 
 typedef struct {
     unsigned magic;
@@ -68,11 +69,14 @@ wrk_send(void *amq_worker, dataentry *entry, unsigned id)
         LOG_Log(LOG_ALERT, "Worker %d: Failed to send data: %s", id, err);
         LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", id, entry->end,
             entry->data);
-        tbl.failed++;
+        MON_StatsUpdate(STATS_FAILED);
     }
     else
-        tbl.sent++;
-    entry->state = DATA_OPEN;
+        MON_StatsUpdate(STATS_SENT);
+    entry->state = DATA_EMPTY;
+    /* From Varnish vmb.h -- platform-independent write memory barrier */
+    VWMB();
+    AZ(pthread_cond_signal(&spmcq_nonfull_cond));
 }
 
 static void
