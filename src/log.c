@@ -41,7 +41,7 @@
 
 #include "libvarnish.h"
 
-static const char *level2name[LOG_DEBUG];
+static const char *level2name[LOG_DEBUG+1];
 
 static void
 syslog_setlevel(int level)
