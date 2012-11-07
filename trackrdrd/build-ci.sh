@@ -20,7 +20,7 @@ cd $WORKSPACE/trackrdrd
 ./autogen.sh
 [[ $? -ne 0 ]] && exit 1
 
-CFLAGS=-m64 CXXFLAGS=-m64 ./configure VARNISHSRC=$WORKSPACE/lhotse-varnish-cache
+CFLAGS=-m64 CXXFLAGS=-m64 LDFLAGS=-Wl,-rpath=/var/opt/varnish/lib/varnish:/var/opt/varnish/lib ./configure --prefix=/var/opt/varnish_tracking VARNISHSRC=$WORKSPACE/lhotse-varnish-cache
 [[ $? -ne 0 ]] && exit 1
 
 make clean
