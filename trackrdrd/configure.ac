@@ -107,6 +107,17 @@ AC_ARG_ENABLE(werror,
         CXXFLAGS="${CXXFLAGS} -Werror"
         )
 
+## Execute Doxygen macros
+DX_HTML_FEATURE(ON)
+DX_CHM_FEATURE(OFF)
+DX_CHI_FEATURE(OFF)
+DX_MAN_FEATURE(OFF)
+DX_RTF_FEATURE(OFF)
+DX_XML_FEATURE(OFF)
+DX_PDF_FEATURE(OFF)
+DX_PS_FEATURE(OFF)
+DX_INIT_DOXYGEN(trackrdrd, doxygen.cfg, doc)
+
 AC_CONFIG_FILES([
 	Makefile
 	src/Makefile
