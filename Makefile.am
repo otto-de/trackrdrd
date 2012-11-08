@@ -2,8 +2,6 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = src src/test
 
-EXTRA_DIST = README.rst autogen.sh m4/*
-
 dist_man_MANS = trackrdrd.3
 MAINTAINERCLEANFILES = $(dist_man_MANS)
 
@@ -16,3 +14,7 @@ else
 	@echo "========================================"
 	@false
 endif
+
+include doxygen-include.am
+
+EXTRA_DIST = README.rst autogen.sh m4/* $(DX_CONFIG) doc/html
