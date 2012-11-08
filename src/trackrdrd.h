@@ -37,6 +37,12 @@
 
 /* worker.c */
 
+/**
+ * Initializes resources for worker threads -- allocates memory,
+ * initializes mutexes and condition variables.
+ *
+ * @returns 0 on success, an errno value on failure
+ */
 int WRK_Init(void);
 void WRK_Start(void);
 void WRK_Halt(void);
