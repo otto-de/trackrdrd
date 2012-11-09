@@ -48,11 +48,3 @@ sub vcl_recv_track {
 		error 204 "track";
 	}
 }
-
-sub vcl_track_response {
-	if (obj.status == 204 && obj.response == "track") {
-		synthetic {""};
-		return(deliver);
-	}
-}
-
