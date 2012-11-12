@@ -147,6 +147,7 @@ struct config {
     char	mq_uri[BUFSIZ];
     char	mq_qname[BUFSIZ];
     unsigned	nworkers;
+    unsigned	restarts;
 } config;
 
 void CONF_Init(void);
