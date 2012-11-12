@@ -43,7 +43,20 @@ PKG_PROG_PKG_CONFIG
 
 # Checks for header files.
 AC_HEADER_STDC
-#AC_CHECK_HEADERS([sys/stdlib.h])
+
+## From Varnish configure.ac
+# white lie - we don't actually test it
+AC_MSG_CHECKING([whether daemon() works])
+case $target in
+*-*-darwin*)
+        # present but not functional
+        AC_MSG_RESULT([no])
+        ac_cv_func_daemon=no
+        ;;
+*)
+        AC_CHECK_FUNCS([daemon])
+        ;;
+esac
 
 # Varnish source tree
 AC_ARG_VAR([VARNISHSRC], [path to Varnish source tree (mandatory)])
@@ -107,6 +120,7 @@ AC_ARG_ENABLE(werror,
         CXXFLAGS="${CXXFLAGS} -Werror"
         )
 
+## From activemq-cpp configure.ac
 ## Execute Doxygen macros
 DX_HTML_FEATURE(ON)
 DX_CHM_FEATURE(OFF)
