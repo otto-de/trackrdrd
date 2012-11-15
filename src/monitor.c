@@ -103,6 +103,7 @@ MON_StatsUpdate(stats_update_t update)
         break;
 
     case STATS_OCCUPANCY:
+        tbl.open++;
         if (tbl.open + tbl.done > tbl.occ_hi)
             tbl.occ_hi = tbl.open + tbl.done;
         break;

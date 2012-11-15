@@ -122,6 +122,20 @@ static char
     sprintf(errmsg, "ReqStart %s: returned XID=%d", REQSTART, xid);
     mu_assert(errmsg, xid == 1253687608);
 
+    #define REQSTART2 "127.0.0.1 56431 18217014 "
+    err = Parse_ReqStart(REQSTART2, strlen(REQSTART2)-1, &xid);
+    sprintf(errmsg, "ReqStart %s: %s", REQSTART2, strerror(err));
+    mu_assert(errmsg, err == 0);
+    sprintf(errmsg, "ReqStart %s: returned XID=%d", REQSTART2, xid);
+    mu_assert(errmsg, xid == 18217014);
+
+    #define REQSTART3 "127.0.0.1 53890 18228551 "
+    err = Parse_ReqStart(REQSTART3, strlen(REQSTART3)-1, &xid);
+    sprintf(errmsg, "ReqStart %s: %s", REQSTART3, strerror(err));
+    mu_assert(errmsg, err == 0);
+    sprintf(errmsg, "ReqStart %s: returned XID=%d", REQSTART3, xid);
+    mu_assert(errmsg, xid == 18228551);
+    
     err = Parse_ReqStart("1253687608", 10, &xid);
     sprintf(errmsg, "ReqStart 1253687608: expected EINVAL, got %d", err);
     mu_assert(errmsg, err == EINVAL);

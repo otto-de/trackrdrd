@@ -56,7 +56,7 @@ int
 Parse_ReqStart(const char *ptr, int len, unsigned *xid)
 {
     int i;
-    for (i = len; ptr[i] != ' '; i--)
+    for (i = len-1; ptr[i] != ' '; i--)
         if (i == 0)
             return EINVAL;
     return Parse_XID(&ptr[i+1], len-i-1, xid);
