@@ -1,4 +1,4 @@
-import std;
+# VMOD std *must* be imported by the including VCL
 import urlcode;
 
 sub vcl_recv_track {
@@ -9,8 +9,10 @@ sub vcl_recv_track {
             req.url !~
    "^/(?:ts-processor|[^/]+(?:/api)?/internal/status)|\.(?:gif|jpe?g|swf|png|css|js|ico)$"
            ) {
-                std.log("track " + req.xid +
-                        " url=" + urlcode.encode(req.url));
+		if (! req.url ~ "^/ts-rcv") {
+                	std.log("track " + req.xid +
+                        	" url=" + urlcode.encode(req.url));
+		}
 		if (req.http.Cookie) {
 			std.log("track " + req.xid + " http_Cookie="
                                 + urlcode.encode(req.http.Cookie));
