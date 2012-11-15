@@ -126,7 +126,7 @@ static inline dataentry
     entry->end = strlen(entry->data);
     if (entry->end > tbl.data_hi)
         tbl.data_hi = entry->end;
-    tbl.open++;
+    tbl.seen++;
     MON_StatsUpdate(STATS_OCCUPANCY);
     
     return entry;
@@ -180,12 +180,11 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     case SLT_ReqStart:
 
         if (term) return(0);
-        
+
         err = Parse_ReqStart(ptr, len, &xid);
         AZ(err);
         LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
 
-        tbl.seen++;
         (void) insert(xid, tag, fd);
         break;
 
