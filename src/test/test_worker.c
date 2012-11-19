@@ -97,7 +97,7 @@ static char
         entry->end = strlen(entry->data);
         entry->state = DATA_DONE;
         sprintf(errmsg, "SPMCQ_Enq: queue full");
-        mu_assert(errmsg, SPMCQ_Enq(entry) != NULL);
+        mu_assert(errmsg, SPMCQ_Enq(entry));
     }
     
     WRK_Halt();
