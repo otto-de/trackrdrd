@@ -47,6 +47,8 @@
 #include <sys/fcntl.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <sys/wait.h>
+#include <sys/types.h>
 
 #include "compat/daemon.h"
 
@@ -95,8 +97,8 @@ submit(unsigned xid)
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     assert(entry->state == DATA_DONE);
     LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", entry->end, entry->data);
-    /* XXX: Termination */
-    while (SPMCQ_Enq((void *) entry) == NULL) {
+    while (!SPMCQ_Enq((void *) entry)) {
+        tbl.wait_qfull++;
         LOG_Log(LOG_ALERT, "%s", "Internal queue full, waiting for dequeue");
         AZ(pthread_mutex_lock(&spmcq_nonfull_lock));
         AZ(pthread_cond_wait(&spmcq_nonfull_cond, &spmcq_nonempty_lock));
@@ -409,7 +411,7 @@ child_main(struct VSM_data *vd, int endless)
     }
 
     errnum = WRK_Init();
-    if (errnum != NULL) {
+    if (errnum != 0) {
         LOG_Log(LOG_ERR, "Cannot prepare worker threads: %s",
             strerror(errnum));
         exit(EXIT_FAILURE);

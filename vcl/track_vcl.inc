@@ -47,6 +47,14 @@ sub vcl_recv_track {
 			std.log("track " + req.xid + " " +
                         	regsub(req.url, "^.+\?(.+)$", "\1"));
 		}
-		error 204 "track";
+		set req.url = "/ts-processor/204";
 	}
 }
+
+sub vcl_fetch_track {
+        if (req.url == "/ts-processor/204" && beresp.status == 204) {
+                set beresp.ttl = 4294967295s;
+                return(deliver);
+        }
+}
+
