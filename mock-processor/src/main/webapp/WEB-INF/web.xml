@@ -5,8 +5,16 @@
         <servlet-name>mock-processor</servlet-name>
         <servlet-class>de.otto.lhotse.track.rdr.mockproc.Processor</servlet-class>
     </servlet>
+    <servlet>
+        <servlet-name>respond204</servlet-name>
+        <servlet-class>de.otto.lhotse.track.rdr.mockproc.Respond204</servlet-class>
+    </servlet>
     <servlet-mapping>
         <servlet-name>mock-processor</servlet-name>
-        <url-pattern>/ts-processor</url-pattern>
+        <url-pattern>/httpProcess</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>respond204</servlet-name>
+        <url-pattern>/204</url-pattern>
     </servlet-mapping>
 </web-app>
