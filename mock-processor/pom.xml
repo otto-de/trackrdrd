@@ -22,6 +22,6 @@
     </dependency>
   </dependencies>
   <build>
-    <finalName>mock-processor</finalName>
+    <finalName>ts-processor</finalName>
   </build>
 </project>
