@@ -38,6 +38,8 @@
 #include "trackrdrd.h"
 #include "vas.h"
 
+static int run;
+
 void
 *MON_StatusThread(void *arg)
 {
@@ -48,12 +50,14 @@ void
     t.tv_nsec = (long)(t.tv_sec - *interval) * 10e9;
     LOG_Log(LOG_INFO, "Monitor thread running every %.2f secs",
             t.tv_sec + ((float) t.tv_nsec * 10e-9));
+    run = 1;
     
-    while (1) {
+    while (run) {
         int err;
         if (nanosleep(&t, NULL) != 0) {
             if (errno == EINTR) {
-                /* XXX: Terminate on TERM, INT, etc. */
+                if (run == 0)
+		    break;
                 LOG_Log0(LOG_INFO, "Monitoring thread interrupted");
                 continue;
             }
@@ -73,6 +77,16 @@ void
             tbl.occ_hi, tbl.seen, tbl.submitted, tbl.sent, tbl.failed,
             tbl.wait_qfull, tbl.data_hi);
     }
+
+    LOG_Log0(LOG_INFO, "Monitoring thread exiting");
+    pthread_exit((void *) NULL);
+}
+
+void
+MON_StatusShutdown(pthread_t monitor)
+{
+    run = 0;
+    AZ(pthread_join(monitor, NULL));
 }
 
 void
