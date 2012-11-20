@@ -84,16 +84,25 @@ AMQ_Worker::AMQ_Worker(std::string& qName,
 }
 
 AMQ_Worker::~AMQ_Worker() {
-    if (connection != NULL)
-        connection->close();
-    delete producer;
-    producer = NULL;
-    delete queue;
-    queue = NULL;
-    delete session;
-    session = NULL;
-    delete connection;
-    connection = NULL;
+    if (producer != NULL) {
+	delete producer;
+	producer = NULL;
+    }
+    if (queue != NULL) {
+	delete queue;
+	queue = NULL;
+    }
+    if (session != NULL) {
+	delete session;
+	session = NULL;
+    }
+    if (connection != NULL) {
+#if 0	    
+	connection->close();
+#endif	    
+	delete connection;
+	connection = NULL;
+    }
 }
 
 /* XXX: Timeout */
