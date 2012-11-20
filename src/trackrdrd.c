@@ -484,7 +484,8 @@ child_main(struct VSM_data *vd, int endless)
     WRK_Halt();
     WRK_Shutdown();
     AZ(MQ_GlobalShutdown());
-    MON_StatusShutdown(monitor);
+    if (config.monitor_interval > 0.0)
+	MON_StatusShutdown(monitor);
     LOG_Log0(LOG_INFO, "Worker process exiting");
     LOG_Close();
     exit(EXIT_SUCCESS);
