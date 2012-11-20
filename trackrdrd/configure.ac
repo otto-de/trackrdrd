@@ -43,6 +43,7 @@ PKG_PROG_PKG_CONFIG
 
 # Checks for header files.
 AC_HEADER_STDC
+AC_CHECK_HEADERS([execinfo.h])
 
 ## From Varnish configure.ac
 # white lie - we don't actually test it

@@ -30,12 +30,18 @@
  */
 
 
-PARENT(SIGTERM, terminate);
-PARENT(SIGINT, terminate);
-PARENT(SIGUSR1, SIG_IGN);
-PARENT(SIGUSR2, SIG_IGN);
+PARENT(SIGTERM, terminate_action);
+PARENT(SIGINT, terminate_action);
+PARENT(SIGUSR1, ignore_action);
+PARENT(SIGUSR2, ignore_action);
+PARENT(SIGABRT, stacktrace_action);
+PARENT(SIGSEGV, stacktrace_action);
+PARENT(SIGBUS, stacktrace_action);
 
-CHILD(SIGTERM, terminate);
-CHILD(SIGINT, terminate);
-CHILD(SIGUSR1, dump);
-CHILD(SIGUSR2, SIG_IGN);
+CHILD(SIGTERM, terminate_action);
+CHILD(SIGINT, terminate_action);
+CHILD(SIGUSR1, dump_action);
+CHILD(SIGUSR2, ignore_action);
+CHILD(SIGABRT, stacktrace_action);
+CHILD(SIGSEGV, stacktrace_action);
+CHILD(SIGBUS, stacktrace_action);

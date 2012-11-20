@@ -50,6 +50,11 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
+#ifndef HAVE_EXECINFO_H
+#include "compat/execinfo.h"
+#else
+#include <execinfo.h>
+#endif
 #include "compat/daemon.h"
 
 #include "vsb.h"
@@ -70,13 +75,16 @@
 
 #define DEFAULT_CONFIG "/etc/trackrdrd.conf"
 
+/* XXX: should this be configurable ? */
+#define MAX_STACK_DEPTH 100
+
 /* Hack, because we cannot have #ifdef in the macro definition SIGDISP */
 #define _UNDEFINED(SIG) ((#SIG)[0] == 0)
 #define UNDEFINED(SIG) _UNDEFINED(SIG)
 
-#define SIGDISP(SIG, disp)						\
+#define SIGDISP(SIG, action)						\
     do { if (UNDEFINED(SIG)) break;					\
-         if (signal((SIG), (disp)) == SIG_ERR)                          \
+	if (sigaction((SIG), (&action), NULL) != 0)			\
              LOG_Log(LOG_ALERT,						\
                  "Cannot install handler for " #SIG ": %s",		\
                  strerror(errno));					\
@@ -85,6 +93,9 @@
 static void child_main(struct VSM_data *vd, int endless);
 
 static volatile sig_atomic_t term;
+
+static struct sigaction terminate_action, dump_action, ignore_action,
+	stacktrace_action, default_action;
 
 /*--------------------------------------------------------------------*/
 
@@ -251,18 +262,51 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
 struct vpf_fh *pfh = NULL;
 
 static void
+stacktrace(int sig)
+{
+    void *buf[MAX_STACK_DEPTH];
+    int depth, i;
+    char **strings;
+
+    depth = backtrace (buf, MAX_STACK_DEPTH);
+    LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
+	strsignal(sig));
+    if (depth == 0) {
+	LOG_Log0(LOG_ERR, "Stacktrace empty");
+	return;
+    }
+    strings = backtrace_symbols(buf, depth);
+    if (strings == NULL) {
+	LOG_Log0(LOG_ERR, "Cannot retrieve symbols for stacktrace");
+	return;
+    }
+    for (i = 0; i < depth; i++)
+	LOG_Log(LOG_ERR, "%p: %s", buf[i], strings[i]);
+    
+    free(strings);
+}
+
+static void
 dump(int sig)
 {
+    (void) sig;
     DATA_Dump();
-    signal(sig, dump);
 }
 
 static void
 terminate(int sig)
 {
-    LOG_Log0(LOG_DEBUG, "Signal handler terminate called");
     (void) sig;
     term = 1;
+}
+
+static void
+stacktrace_abort(int sig)
+{
+    stacktrace(sig);
+    AZ(sigaction(SIGABRT, &default_action, NULL));
+    LOG_Log0(LOG_ALERT, "Aborting");
+    abort();
 }
 
 static void
@@ -325,8 +369,9 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
             LOG_Log(LOG_WARNING, "Worker process %d exited with status %d",
                 child_pid, WEXITSTATUS(status));
         if (WIFSIGNALED(status))
-            LOG_Log(LOG_WARNING, "Worker process %d exited due to signal %d",
-                child_pid, WTERMSIG(status));
+            LOG_Log(LOG_WARNING,
+		"Worker process %d exited due to signal %d (%s)",
+                child_pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
 
         if (config.restarts && restarts > config.restarts) {
             LOG_Log(LOG_ERR, "Too many restarts: %d", restarts);
@@ -431,6 +476,7 @@ child_main(struct VSM_data *vd, int endless)
     /* Main loop */
     term = 0;
     /* XXX: Varnish restart? */
+    /* XXX: TERM not noticed until request received */
     while (VSL_Dispatch(vd, OSL_Track, NULL))
         if (term || !endless)
             break;
@@ -438,6 +484,7 @@ child_main(struct VSM_data *vd, int endless)
     WRK_Halt();
     WRK_Shutdown();
     AZ(MQ_GlobalShutdown());
+    MON_StatusShutdown(monitor);
     LOG_Log0(LOG_INFO, "Worker process exiting");
     LOG_Close();
     exit(EXIT_SUCCESS);
@@ -567,6 +614,19 @@ main(int argc, char * const *argv)
 
 	if (pfh != NULL)
 		VPF_Write(pfh);
+
+	terminate_action.sa_handler = terminate;
+	AZ(sigemptyset(&terminate_action.sa_mask));
+	terminate_action.sa_flags &= ~SA_RESTART;
+
+	dump_action.sa_handler = dump;
+	AZ(sigemptyset(&dump_action.sa_mask));
+	dump_action.sa_flags |= SA_RESTART;
+
+	stacktrace_action.sa_handler = stacktrace_abort;
+
+	ignore_action.sa_handler = SIG_IGN;
+	default_action.sa_handler = SIG_DFL;
 
         if (!D_flag) {
             child_pid = fork();
