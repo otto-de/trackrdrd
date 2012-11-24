@@ -45,6 +45,7 @@
  */
 int WRK_Init(void);
 void WRK_Start(void);
+void WRK_Stats(void);
 void WRK_Halt(void);
 void WRK_Shutdown(void);
 

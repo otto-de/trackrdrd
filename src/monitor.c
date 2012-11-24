@@ -76,6 +76,7 @@ void
             tbl.open, tbl.done, 100.0 * ((float) tbl.open + tbl.done) / tbl.len,
             tbl.occ_hi, tbl.seen, tbl.submitted, tbl.sent, tbl.failed,
             tbl.wait_qfull, tbl.data_hi);
+        WRK_Stats();
     }
 
     LOG_Log0(LOG_INFO, "Monitoring thread exiting");
