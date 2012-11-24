@@ -44,6 +44,10 @@ typedef struct {
 #define WORKER_DATA_MAGIC 0xd8eef137
     unsigned id;
     unsigned status;
+    unsigned deqs;
+    unsigned waits;
+    unsigned sends;
+    unsigned fails;
 } worker_data_t;
 
 typedef struct {
@@ -55,7 +59,7 @@ static unsigned run, cleaned = 0;
 static thread_data_t *thread_data;
 
 static inline void
-wrk_send(void *amq_worker, dataentry *entry, unsigned id)
+wrk_send(void *amq_worker, dataentry *entry, worker_data_t *wrk)
 {
     const char *err;
     
@@ -66,13 +70,16 @@ wrk_send(void *amq_worker, dataentry *entry, unsigned id)
     err = MQ_Send(amq_worker, entry->data, entry->end);
     if (err != NULL) {
         /* XXX: error recovery? reconnect? preserve the data? */
-        LOG_Log(LOG_ALERT, "Worker %d: Failed to send data: %s", id, err);
-        LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", id, entry->end,
-            entry->data);
+        wrk->fails++;
+        LOG_Log(LOG_ALERT, "Worker %d: Failed to send data: %s", wrk->id, err);
+        LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
+            entry->end, entry->data);
         MON_StatsUpdate(STATS_FAILED);
     }
-    else
+    else {
+        wrk->sends++;
         MON_StatsUpdate(STATS_SENT);
+    }
     entry->state = DATA_EMPTY;
     /* From Varnish vmb.h -- platform-independent write memory barrier */
     VWMB();
@@ -100,8 +107,8 @@ static void
     while (run) {
 	entry = (dataentry *) SPMCQ_Deq();
 	if (entry != NULL) {
-	    /* Dequeued a data entry */
-            wrk_send(amq_worker, entry, wrk->id);
+	    wrk->deqs++;
+            wrk_send(amq_worker, entry, wrk);
             continue;
         }
         /* Queue is empty, wait until data are available, or quit is
@@ -110,15 +117,19 @@ static void
            barrier */
         AZ(pthread_mutex_lock(&spmcq_nonempty_lock));
         /* run is guaranteed to be fresh here */
-        if (run)
+        if (run) {
+            wrk->waits++;
             AZ(pthread_cond_wait(&spmcq_nonempty_cond,
                     &spmcq_nonempty_lock));
+        }
         AZ(pthread_mutex_unlock(&spmcq_nonempty_lock));
     }
     
     /* Prepare to exit, drain the queue */
-    while ((entry = (dataentry *) SPMCQ_Deq()) != NULL)
-        wrk_send(amq_worker, entry, wrk->id);
+    while ((entry = (dataentry *) SPMCQ_Deq()) != NULL) {
+        wrk->deqs++;
+        wrk_send(amq_worker, entry, wrk);
+    }
 
     wrk->status = EXIT_SUCCESS;
     err = MQ_WorkerShutdown(&amq_worker);
@@ -165,9 +176,11 @@ WRK_Init(void)
                 i+1, strerror(errno));
             return(errno);
         }
-                
-        thread_data[i].wrk_data->magic = WORKER_DATA_MAGIC;
-        thread_data[i].wrk_data->id = i + 1;
+        
+        worker_data_t *wrk = thread_data[i].wrk_data;
+        wrk->magic = WORKER_DATA_MAGIC;
+        wrk->id = i + 1;
+        wrk->deqs = wrk->waits = wrk->sends = wrk->fails = 0;
     }
     
     AZ(pthread_mutex_init(&spmcq_nonempty_lock, NULL));
@@ -185,6 +198,20 @@ WRK_Start(void)
     for (int i = 0; i < config.nworkers; i++)
         AZ(pthread_create(&thread_data[i].worker, NULL, wrk_main,
                 thread_data[i].wrk_data));
+}
+
+void
+WRK_Stats(void)
+{
+    worker_data_t *wrk;
+
+    if (!run) return;
+    
+    for (int i = 0; i < config.nworkers; i++) {
+        wrk = thread_data[i].wrk_data;
+        LOG_Log(LOG_INFO, "Worker %d: seen=%d waits=%d sent=%d failed=%d",
+            wrk->id, wrk->deqs, wrk->waits, wrk->sends, wrk->fails);
+    }
 }
 
 void

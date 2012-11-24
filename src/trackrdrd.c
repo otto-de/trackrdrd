@@ -262,15 +262,26 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
 struct vpf_fh *pfh = NULL;
 
 static void
-stacktrace(int sig)
+assert_failure(const char *func, const char *file, int line, const char *cond,
+    int err, int xxx)
+{
+    (void) xxx;
+    
+    LOG_Log(LOG_ALERT, "Condition (%s) failed in %s(), %s line %d",
+        cond, func, file, line);
+    if (err)
+        LOG_Log(LOG_ALERT, "errno = %d (%s)", err, strerror(err));
+    abort();
+}
+
+static void
+stacktrace(void)
 {
     void *buf[MAX_STACK_DEPTH];
     int depth, i;
     char **strings;
 
     depth = backtrace (buf, MAX_STACK_DEPTH);
-    LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
-	strsignal(sig));
     if (depth == 0) {
 	LOG_Log0(LOG_ERR, "Stacktrace empty");
 	return;
@@ -280,8 +291,9 @@ stacktrace(int sig)
 	LOG_Log0(LOG_ERR, "Cannot retrieve symbols for stacktrace");
 	return;
     }
+    /* XXX: get symbol names from nm? cf. cache_panic.c/pan_backtrace */
     for (i = 0; i < depth; i++)
-	LOG_Log(LOG_ERR, "%p: %s", buf[i], strings[i]);
+	LOG_Log(LOG_ERR, "%s", strings[i]);
     
     free(strings);
 }
@@ -303,7 +315,9 @@ terminate(int sig)
 static void
 stacktrace_abort(int sig)
 {
-    stacktrace(sig);
+    LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
+	strsignal(sig));
+    stacktrace();
     AZ(sigaction(SIGABRT, &default_action, NULL));
     LOG_Log0(LOG_ALERT, "Aborting");
     abort();
@@ -592,10 +606,13 @@ main(int argc, char * const *argv)
         if (LOG_Open(PACKAGE_NAME) != 0) {
             exit(EXIT_FAILURE);
         }
+
+        VAS_Fail = assert_failure;
         
         if (d_flag)
             LOG_SetLevel(LOG_DEBUG);
-        LOG_Log0(LOG_INFO, "initializing");
+        LOG_Log0(LOG_INFO,
+            "initializing (v" PACKAGE_VERSION " revision " REVISION ")");
 
         CONF_Dump();
         
