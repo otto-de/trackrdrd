@@ -48,6 +48,7 @@ sub vcl_recv_track {
                         	regsub(req.url, "^.+\?(.+)$", "\1"));
 		}
 		set req.url = "/ts-processor/204";
+		unset req.http.Cookie;
 	}
 }
 
