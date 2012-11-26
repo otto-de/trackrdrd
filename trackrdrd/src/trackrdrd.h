@@ -113,6 +113,8 @@ typedef struct {
     unsigned		seen;		/* Records (ReqStarts) seen */
     unsigned		open;
     unsigned		done;
+    unsigned		len_overflows;
+    unsigned		data_overflows;
     unsigned		submitted;	/* Records submitted */
     unsigned		sent;		/* Records sent to MQ */
     unsigned		failed;		/* MQ send fails */
