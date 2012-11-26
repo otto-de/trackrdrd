@@ -18,3 +18,5 @@ endif
 include doxygen-include.am
 
 EXTRA_DIST = README.rst autogen.sh m4/* $(DX_CONFIG) doc/html
+
+doc/html: doxygen-run
