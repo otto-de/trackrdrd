@@ -70,12 +70,13 @@ void
         }
         LOG_Log(LOG_INFO,
             "Data table: len=%d collisions=%d insert_probes=%d find_probes=%d "
-            "open=%d done=%d load=%.2f occ_hi=%d seen=%d submitted=%d "
-            "sent=%d failed=%d wait_qfull=%d data_hi=%d",
+            "open=%d done=%d load=%.2f len_overflows=%d data_overflows=%d "
+            "occ_hi=%d seen=%d submitted=%d sent=%d failed=%d wait_qfull=%d "
+            "data_hi=%d",
             tbl.len, tbl.collisions, tbl.insert_probes, tbl.find_probes,
             tbl.open, tbl.done, 100.0 * ((float) tbl.open + tbl.done) / tbl.len,
-            tbl.occ_hi, tbl.seen, tbl.submitted, tbl.sent, tbl.failed,
-            tbl.wait_qfull, tbl.data_hi);
+            tbl.len_overflows, tbl.data_overflows, tbl.occ_hi, tbl.seen,
+            tbl.submitted, tbl.sent, tbl.failed, tbl.wait_qfull, tbl.data_hi);
         WRK_Stats();
     }
 
