@@ -114,7 +114,7 @@ submit(unsigned xid)
         AZ(pthread_mutex_lock(&spmcq_nonfull_lock));
         AZ(pthread_cond_wait(&spmcq_nonfull_cond, &spmcq_nonempty_lock));
     }
-    AZ(pthread_cond_broadcast(&spmcq_nonempty_cond));
+    AZ(pthread_cond_signal(&spmcq_nonempty_cond));
     tbl.submitted++;
 }
 
@@ -223,6 +223,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
                 "%s: Data too long, XID=%d, current length=%d, "
                 "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
                 datalen, data);
+            tbl.data_overflows++;
             break;
         }
         
@@ -491,9 +492,13 @@ child_main(struct VSM_data *vd, int endless)
     term = 0;
     /* XXX: Varnish restart? */
     /* XXX: TERM not noticed until request received */
-    while (VSL_Dispatch(vd, OSL_Track, NULL))
+    while (VSL_Dispatch(vd, OSL_Track, NULL) > 0)
         if (term || !endless)
             break;
+        else {
+            LOG_Log0(LOG_WARNING, "Log read interrupted, continuing");
+            continue;
+        }
 
     WRK_Halt();
     WRK_Shutdown();

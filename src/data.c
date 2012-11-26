@@ -144,8 +144,8 @@ DATA_Init(void)
     datatable init_tbl =
         { .magic = DATATABLE_MAGIC, .len = entries, .collisions = 0,
           .insert_probes = 0, .find_probes = 0, .seen = 0, .open = 0, .done = 0,
-          .submitted = 0, .occ_hi = 0, .data_hi = 0, .entry = entryptr,
-          .buf = bufptr };
+          .len_overflows = 0, .data_overflows = 0, .submitted = 0, .occ_hi = 0,
+          .data_hi = 0, .entry = entryptr, .buf = bufptr };
     memcpy(&tbl, &init_tbl, sizeof(datatable));
 
     for (int i = 0; i < entries; i++) {
@@ -171,8 +171,10 @@ dataentry
     while (++probes <= tbl.len && tbl.entry[INDEX(h)].state != DATA_EMPTY)
         h++;
     tbl.insert_probes += probes;
-    if (probes > tbl.len)
+    if (probes > tbl.len) {
+        tbl.len_overflows++;
         return(NULL);
+    }
     return(&tbl.entry[INDEX(h)]);
 }
 
