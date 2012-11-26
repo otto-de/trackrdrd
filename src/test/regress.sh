@@ -14,8 +14,10 @@
 echo
 echo "TEST: $0"
 echo "... testing log output at debug level against a known checksum"
-CKSUM=$(../trackrdrd -D -f varnish.binlog -l - -d -c test.conf | cksum)
-if [ "$CKSUM" != '1301373213 229245' ]; then
+CMD="../trackrdrd -D -f varnish.binlog -l - -d -c test.conf"
+# grep out the "initializing" line, which includes the version/revision
+CKSUM=$( $CMD | grep -v initializing | cksum)
+if [ "$CKSUM" != '3698127258 229202' ]; then
     echo "ERROR: Regression test incorrect cksum: $CKSUM"
     exit 1
 fi
