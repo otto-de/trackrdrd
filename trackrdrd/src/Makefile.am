@@ -16,7 +16,8 @@ trackrdrd_SOURCES = \
 	activemq/amq.h \
 	activemq/amq.cpp \
 	spmcq.c \
-	worker.c
+	worker.c \
+	sandbox.c
 
 trackrdrd_LDADD = \
 	$(VARNISHSRC)/lib/libvarnishcompat/libvarnishcompat.la \
