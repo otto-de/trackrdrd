@@ -38,9 +38,13 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <math.h>
+#include <unistd.h>
+#include <pwd.h>
 
 #include "trackrdrd.h"
 #include "libvarnish.h"
+
+#define DEFAULT_USER "nobody"
 
 static const int facilitynum[8] =
     { LOG_LOCAL0, LOG_LOCAL1, LOG_LOCAL2, LOG_LOCAL3, LOG_LOCAL4, LOG_LOCAL5,
@@ -136,6 +140,18 @@ CONF_Add(const char *lval, const char *rval)
         return(0);
     }
 
+    if (strcmp(lval, "user") == 0) {
+        struct passwd *pw;
+        
+        pw = getpwnam(rval);
+        if (pw == NULL)
+            return(EINVAL);
+        strcpy(config.user_name, pw->pw_name);
+        config.uid = pw->pw_uid;
+        config.gid = pw->pw_gid;
+        return(0);
+    }
+
     return EINVAL;
 }
 
@@ -166,6 +182,8 @@ conf_ParseLine(char *ptr, char **lval, char **rval)
 void
 CONF_Init(void)
 {
+    struct passwd *pw;
+
     strcpy(config.pid_file, "/var/run/trackrdrd.pid");
     config.varnish_name[0] = '\0';
     config.log_file[0] = '\0';
@@ -179,6 +197,14 @@ CONF_Init(void)
     config.mq_qname[0] = '\0';
     config.nworkers = 1;
     config.restarts = 1;
+    
+    pw = getpwnam(DEFAULT_USER);
+    if (pw == NULL)
+        pw = getpwuid(getuid());
+    AN(pw);
+    strcpy(config.user_name, pw->pw_name);
+    config.uid = pw->pw_uid;
+    config.gid = pw->pw_gid;
 }
 
 int
@@ -251,4 +277,5 @@ CONF_Dump(void)
     confdump("mq.qname = %s", config.mq_qname);
     confdump("nworkers = %d", config.nworkers);
     confdump("restarts = %d", config.restarts);
+    confdump("user = %s", config.user_name);
 }
