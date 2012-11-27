@@ -32,6 +32,13 @@ make
 make check
 [[ $? -ne 0 ]] && exit 1
 
+for DIR in BUILD BUILDROOT RPMS SOURCES SRPMS
+do
+    RPMDIR=$WORKSPACE/trackrdrd/rpmbuild/$DIR
+    [[ -d $RPMDIR ]] && rm -rf $RPMDIR
+    mkdir -p $RPMDIR
+done
+
 VERSION=$(grep ' VERSION ' $WORKSPACE/trackrdrd/config.h | sed 's/^.*"\([^"]*\)".*$/\1/')
 REVISION=$(git show -s --pretty=format:%h)
 BUILDPATH=$WORKSPACE/trackrdrd/rpmbuild/BUILDROOT/trackrdrd-$VERSION-rev${REVISION}_build$BUILD_NUMBER.$(uname -m)
