@@ -32,11 +32,8 @@ make
 make check
 [[ $? -ne 0 ]] && exit 1
 
-$WORKSPACE/trackrdrd/src/.libs/trackrdrd -V
-[[ $? -ne 0 ]] && exit 1
-
-VERSION=$($WORKSPACE/trackrdrd/src/.libs/trackrdrd -V | awk '{print $2}')
-REVISION=$($WORKSPACE/trackrdrd/src/.libs/trackrdrd -V | awk '{print $4}')
+VERSION=$(grep ' VERSION ' $WORKSPACE/trackrdrd/config.h | sed 's/^.*"\([^"]*\)".*$/\1/')
+REVISION=$(git show -s --pretty=format:%h)
 BUILDPATH=$WORKSPACE/trackrdrd/rpmbuild/BUILDROOT/trackrdrd-$VERSION-rev${REVISION}_build$BUILD_NUMBER.$(uname -m)
 DESTDIR=$BUILDPATH make install
 [[ $? -ne 0 ]] && exit 1
