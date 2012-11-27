@@ -8,7 +8,8 @@ Group: System Environment/Daemons
 URL: https://qspa.otto.de/confluence/display/LHOT/C-Implementierung
 Packager: LHOTSE Operations <lhotse-ops@dv.otto.de>
 #Source0: git@git.lhotse.ov.otto.de:lhotse-tracking-varnish
-BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+#BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+#BuildRoot: %{_topdir}/BUILDROOT
 #BuildRequires: XXX
 #Requires: varnish_bestats
 #Requires: libactivemq
