@@ -42,7 +42,10 @@ done
 VERSION=$(grep ' VERSION ' $WORKSPACE/trackrdrd/config.h | sed 's/^.*"\([^"]*\)".*$/\1/')
 REVISION=$(git show -s --pretty=format:%h)
 
-BUILDPATH=$WORKSPACE/trackrdrd/rpmbuild/BUILDROOT/trackrdrd-$VERSION-rev${REVISION}_build$BUILD_NUMBER.$(uname -m)
+BUILDPATH=$WORKSPACE/trackrdrd/rpmbuild/BUILD
+BUILDROOTPREFIX=$WORKSPACE/trackrdrd/rpmbuild/BUILDROOT
+PKGNAME=trackrdrd-$VERSION-rev${REVISION}_build$BUILD_NUMBER.$(uname -m)
+BUILDROOTPATH=$BUILDROOTPREFIX/$PKGNAME
 DESTDIR=$BUILDPATH make install
 [[ $? -ne 0 ]] && exit 1
 
@@ -59,7 +62,7 @@ rpmbuild \
     --define 'revision '$REVISION \
     --define 'build_number '$BUILD_NUMBER \
     --define 'prefix '$LHOTSE_TRACKING_PREFIX \
-    --buildroot $BUILDPATH -bb SPECS/trackrdrd.spec
+    --buildroot $BUILDROOTPATH -bb SPECS/trackrdrd.spec
 [[ $? -ne 0 ]] && exit 1
 
 cd $WORKSPACE/trackrdrd

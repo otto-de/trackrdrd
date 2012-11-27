@@ -31,10 +31,11 @@ broker.
 # Empty section.
 
 %install
-# Empty section.
+cp -rP . $RPM_BUILD_ROOT
 
 %clean
 rm -rf %{buildroot}
+rm -rf %{_builddir}/*
 
 %files
 %defattr(-,root,root,-)
