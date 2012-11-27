@@ -32,9 +32,12 @@ make
 make check
 [[ $? -ne 0 ]] && exit 1
 
+$WORKSPACE/trackrdrd/src/.libs/trackrdrd -V
+[[ $? -ne 0 ]] && exit 1
+
 VERSION=$($WORKSPACE/trackrdrd/src/.libs/trackrdrd -V | awk '{print $2}')
 REVISION=$($WORKSPACE/trackrdrd/src/.libs/trackrdrd -V | awk '{print $4}')
-BUILDPATH=$WORKSPACE/trackrdrd/rpmbuild/BUILDROOT/trackrdrd-$VERSION-rev${REVISION}_build$JENKINS_BUILD_NUMBER.$(uname -m)
+BUILDPATH=$WORKSPACE/trackrdrd/rpmbuild/BUILDROOT/trackrdrd-$VERSION-rev${REVISION}_build$BUILD_NUMBER.$(uname -m)
 DESTDIR=$BUILDPATH make install
 [[ $? -ne 0 ]] && exit 1
 
@@ -45,5 +48,5 @@ cp $WORKSPACE/trackrdrd/etc/sample.conf $BUILDPATH/$LHOTSE_TRACKING_PREFIX/etc/
 cp $WORKSPACE/trackrdrd/etc/trackrdrd $BUILDPATH/etc/init.d/
 
 cd $WORKSPACE/trackrdrd/rpmbuild
-rpmbuild --define '_topdir '$WORKSPACE/trackrdrd/rpmbuild --define 'version '$VERSION --define 'revision '$REVISION --define 'build_number '$JENKINS_BUILD_NUMBER --define 'prefix '$LHOTSE_TRACKING_PREFIX -bb SPECS/trackrdrd.spec
+rpmbuild --define '_topdir '$WORKSPACE/trackrdrd/rpmbuild --define 'version '$VERSION --define 'revision '$REVISION --define 'build_number '$BUILD_NUMBER --define 'prefix '$LHOTSE_TRACKING_PREFIX -bb SPECS/trackrdrd.spec
 [[ $? -ne 0 ]] && exit 1
