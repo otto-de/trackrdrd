@@ -32,8 +32,13 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <sys/types.h>
 
 #define MIN_TABLE_SCALE 10
+
+/* sandbox.c */
+
+void PRIV_Sandbox(void);
 
 /* worker.c */
 
@@ -151,6 +156,9 @@ struct config {
     char	mq_qname[BUFSIZ];
     unsigned	nworkers;
     unsigned	restarts;
+    char	user_name[BUFSIZ];
+    uid_t	uid;
+    gid_t	gid;
 } config;
 
 void CONF_Init(void);
