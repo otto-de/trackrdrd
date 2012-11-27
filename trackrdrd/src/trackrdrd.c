@@ -49,6 +49,7 @@
 #include <stdarg.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <pwd.h>
 
 #ifndef HAVE_EXECINFO_H
 #include "compat/execinfo.h"
@@ -425,13 +426,16 @@ vsl_diag(void *priv, const char *fmt, ...)
 static void
 child_main(struct VSM_data *vd, int endless)
 {
-    /* XXX: privilege separation */
-    
     int errnum;
     const char *errmsg;
     pthread_t monitor;
+    struct passwd *pw;
 
-    LOG_Log0(LOG_INFO, "Worker process starting");
+    PRIV_Sandbox();
+    pw = getpwuid(geteuid());
+    AN(pw);
+    
+    LOG_Log(LOG_INFO, "Worker process starting, running as %s", pw->pw_name);
 
     /* install signal handlers */
 #define CHILD(SIG,disp) SIGDISP(SIG,disp)
@@ -528,6 +532,8 @@ main(int argc, char * const *argv)
 
 	vd = VSM_New();
 	VSL_Setup(vd);
+
+        CONF_Init();
 
         if (access(DEFAULT_CONFIG, F_OK) == 0) {
             if (access(DEFAULT_CONFIG, R_OK) != 0) {
