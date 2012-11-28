@@ -76,8 +76,9 @@
 
 #define DEFAULT_CONFIG "/etc/trackrdrd.conf"
 
-/* XXX: should this be configurable ? */
+/* XXX: should these be configurable ? */
 #define MAX_STACK_DEPTH 100
+#define REQEND_T_VAR "req_endt"
 
 /* Hack, because we cannot have #ifdef in the macro definition SIGDISP */
 #define _UNDEFINED(SIG) ((#SIG)[0] == 0)
@@ -171,6 +172,30 @@ static inline dataentry
     return entry;
 }
 
+static inline void
+append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
+    int datalen)
+{
+    /* Data overflow */
+    /* XXX: Encapsulate (1 << (config.maxdata_scale+10)) */
+    if (entry->end + datalen + 1 > (1 << (config.maxdata_scale+10))) {
+        LOG_Log(LOG_ALERT,
+            "%s: Data too long, XID=%d, current length=%d, "
+            "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
+            datalen, data);
+        tbl.data_overflows++;
+        return;
+    }
+        
+    entry->data[entry->end] = '&';
+    entry->end++;
+    memcpy(&entry->data[entry->end], data, datalen);
+    entry->end += datalen;
+    if (entry->end > tbl.data_hi)
+        tbl.data_hi = entry->end;
+    return;
+}
+
 static int
 OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
           unsigned spec, const char *ptr, uint64_t bitmap)
@@ -178,7 +203,8 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     unsigned xid;
     dataentry *entry;
     int err, datalen;
-    char *data;
+    char *data, reqend_str[strlen(REQEND_T_VAR)+22];
+    struct timespec reqend_t;
 
     (void) priv;
     (void) bitmap;
@@ -217,34 +243,22 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         if (entry == NULL)
             break;
 
-        /* Data overflow */
-        /* XXX: Encapsulate (1 << (config.maxdata_scale+10)) */
-        if (entry->end + datalen + 1 > (1 << (config.maxdata_scale+10))) {
-            LOG_Log(LOG_ALERT,
-                "%s: Data too long, XID=%d, current length=%d, "
-                "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
-                datalen, data);
-            tbl.data_overflows++;
-            break;
-        }
-        
-        entry->data[entry->end] = '&';
-        entry->end++;
-        memcpy(&entry->data[entry->end], data, datalen);
-        entry->end += datalen;
-        if (entry->end > tbl.data_hi)
-            tbl.data_hi = entry->end;
+        append(entry, tag, xid, data, datalen);
         break;
 
     case SLT_ReqEnd:
 
-        err = Parse_ReqEnd(ptr, len, &xid);
+        err = Parse_ReqEnd(ptr, len, &xid, &reqend_t);
         AZ(err);
-        LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
+        LOG_Log(LOG_DEBUG, "%s: XID=%d req_endt=%u.%09lu", VSL_tags[tag], xid,
+            (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
 
         entry = find_or_insert(xid, tag, fd);
         if (entry == NULL)
             break;
+        sprintf(reqend_str, "%s=%u.%09lu", REQEND_T_VAR,
+            (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
+        append(entry, tag, xid, reqend_str, strlen(reqend_str));
         entry->state = DATA_DONE;
         MON_StatsUpdate(STATS_DONE);
         submit(xid);

@@ -148,18 +148,23 @@ static char
 {
     unsigned xid;
     int err;
+    struct timespec reqend_t;
 
     printf("... testing Parse_ReqEnd\n");
 
     #define REQEND "1253687608 1348291555.658257008 1348291555.670388222 -0.012122154 NaN NaN"
 
-    err = Parse_ReqEnd(REQEND, strlen(REQEND), &xid);
+    err = Parse_ReqEnd(REQEND, strlen(REQEND), &xid, &reqend_t);
     sprintf(errmsg, "ReqEnd %s: %s", REQEND, strerror(err));
     mu_assert(errmsg, err == 0);
     sprintf(errmsg, "ReqEnd %s: returned XID=%d", REQEND, xid);
     mu_assert(errmsg, xid == 1253687608);
+    sprintf(errmsg, "ReqEnd %s: returned end_t=%d.%lu", REQEND,
+        (int) reqend_t.tv_sec, reqend_t.tv_nsec);
+    mu_assert(errmsg, reqend_t.tv_sec == 1348291555
+        && reqend_t.tv_nsec == 670388222);
 
-    err = Parse_ReqEnd("1253687608", 10, &xid);
+    err = Parse_ReqEnd("1253687608", 10, &xid, &reqend_t);
     sprintf(errmsg, "ReqEnd 1253687608: expected EINVAL, got %d", err);
     mu_assert(errmsg, err == EINVAL);
 
