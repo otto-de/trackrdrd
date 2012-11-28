@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <sys/types.h>
+#include <time.h>
 
 #define MIN_TABLE_SCALE 10
 
@@ -209,7 +210,8 @@ pthread_mutex_t stats_update_lock;
 /* parse.c */
 int Parse_XID(const char *str, int len, unsigned *xid);
 int Parse_ReqStart(const char *ptr, int len, unsigned *xid);
-int Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid);
+int Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid,
+    struct timespec *reqend_t);
 int Parse_VCL_Log(const char *ptr, int len, unsigned *xid,
     char **data, int *datalen);
 
