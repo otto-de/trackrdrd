@@ -32,8 +32,11 @@
 #include <errno.h>
 #include <ctype.h>
 #include <string.h>
+#include <time.h>
 
 #include "trackrdrd.h"
+
+#define Parse_UnsignedDec(str,len,xid) Parse_XID((str),(len),(xid))
 
 int
 Parse_XID(const char *str, int len, unsigned *xid)
@@ -63,12 +66,41 @@ Parse_ReqStart(const char *ptr, int len, unsigned *xid)
 }
 
 int
-Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid)
+Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid,
+    struct timespec *reqend_t)
 {
-    char *blank = memchr(ptr, ' ', len);
+    int err;
+    char *blank, *reqend_tstr, *dot;
+    
+    blank = memchr(ptr, ' ', len);
     if (blank == NULL)
         return EINVAL;
-    return Parse_XID(ptr, blank-ptr, xid);
+    err = Parse_XID(ptr, blank-ptr, xid);
+    if (err != 0)
+        return err;
+    
+    reqend_tstr = memchr(blank + 1, ' ', len-(blank-ptr));
+    if (reqend_tstr == NULL)
+        return EINVAL;
+    else
+        reqend_tstr++;
+    dot = memchr(reqend_tstr, '.', len-(reqend_tstr-ptr));
+    if (dot == NULL)
+        return EINVAL;
+    blank = memchr(dot + 1, ' ', len-(dot-ptr));
+    if (blank == NULL)
+        return EINVAL;
+    err = Parse_UnsignedDec(reqend_tstr, dot-reqend_tstr,
+        (unsigned *)&reqend_t->tv_sec);
+    reqend_t->tv_sec &= 0x0ffffffff;
+    if (err != 0)
+        return err;
+    err = Parse_UnsignedDec(dot+1, blank-dot-1,
+        (unsigned *) &reqend_t->tv_nsec);
+    if (err != 0)
+        return err;
+    reqend_t->tv_nsec &= 0x0ffffffff;
+    return 0;
 }
 
 /* ptr points to the first char after "track "
