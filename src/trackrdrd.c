@@ -538,9 +538,9 @@ usage(int status)
 int
 main(int argc, char * const *argv)
 {
-    	int c, d_flag = 0, D_flag = 0, endless = 1;
+    	int c, d_flag = 0, D_flag = 0, endless = 1, err;
 	const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
-            *y_arg = NULL, *c_arg = NULL;
+            *y_arg = NULL, *c_arg = NULL, *u_arg = NULL;
 	struct VSM_data *vd;
         pid_t child_pid;
 
@@ -559,7 +559,7 @@ main(int argc, char * const *argv)
                 exit(EXIT_FAILURE);
         }
 
-	while ((c = getopt(argc, argv, "P:Vn:hl:df:y:c:D")) != -1) {
+	while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:D")) != -1) {
 		switch (c) {
 		case 'P':
                     P_arg = optarg;
@@ -588,6 +588,9 @@ main(int argc, char * const *argv)
                 case 'D':
                     D_flag = 1;
                     break;
+                case 'u':
+                    u_arg = optarg;
+                    break;
                 case 'h':
                     usage(EXIT_SUCCESS);
 		default:
@@ -609,14 +612,28 @@ main(int argc, char * const *argv)
         if (l_arg && y_arg)
             usage(EXIT_FAILURE);
         
+        if (u_arg) {
+            err = CONF_Add("user", u_arg);
+            if (err) {
+                LOG_Log(LOG_ALERT, "Unknown user: %s", u_arg);
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        if (y_arg) {
+            err = CONF_Add("syslog.facility", y_arg);
+            if (err) {
+                LOG_Log(LOG_ALERT, "Unknown syslog facility: %s", y_arg);
+                exit(EXIT_FAILURE);
+            }
+        }
+        
         if (P_arg)
             strcpy(config.pid_file, P_arg);
         if (n_arg)
             strcpy(config.varnish_name, n_arg);
         if (l_arg)
             strcpy(config.log_file, l_arg);
-        if (y_arg)
-            CONF_Add("syslog.facility", y_arg);
         if (f_arg) {
             strcpy(config.varnish_bindump, f_arg);
             endless = 0;
