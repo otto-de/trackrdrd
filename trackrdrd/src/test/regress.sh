@@ -20,7 +20,7 @@ CMD="../trackrdrd -D -f varnish.binlog -l - -d -c test.conf"
 # the second sed removes the user under which the child process runs
 CKSUM=$( $CMD | sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(, running as\) \(.*\)/\1/' | cksum)
 
-if [ "$CKSUM" != '646018814 229297' ]; then
+if [ "$CKSUM" != '4048021999 232297' ]; then
     echo "ERROR: Regression test incorrect cksum: $CKSUM"
     exit 1
 fi
