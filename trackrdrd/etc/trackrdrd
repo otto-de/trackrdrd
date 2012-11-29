@@ -66,7 +66,7 @@ function getstatus_trackrdrd {
 
 function check_varnishd {
     pgrep -f varnishd.*pa_proxy >/dev/null
-    if [ $? -ne 0 ]
+    if [ $? -ne 0 ]; then
         echo "varnishd not running"
         exit 1
     fi
