@@ -92,12 +92,14 @@
                  strerror(errno));					\
     } while(0)
 
-static void child_main(struct VSM_data *vd, int endless);
+static void child_main(struct VSM_data *vd, int endless, int readconfig);
 
-static volatile sig_atomic_t term;
+static volatile sig_atomic_t term, reload;
 
 static struct sigaction terminate_action, dump_action, ignore_action,
-	stacktrace_action, default_action;
+    stacktrace_action, default_action, restart_action;
+
+static char cli_config_filename[BUFSIZ] = "";
 
 /*--------------------------------------------------------------------*/
 
@@ -278,6 +280,19 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
 struct vpf_fh *pfh = NULL;
 
 static void
+read_default_config(void) {
+    if (access(DEFAULT_CONFIG, F_OK) == 0) {
+        if (access(DEFAULT_CONFIG, R_OK) != 0) {
+            perror(DEFAULT_CONFIG);
+            exit(EXIT_FAILURE);
+        }
+        printf("Reading config from %s\n", DEFAULT_CONFIG);
+        if (CONF_ReadFile(DEFAULT_CONFIG) != 0)
+            exit(EXIT_FAILURE);
+    }
+}
+
+static void
 assert_failure(const char *func, const char *file, int line, const char *cond,
     int err, int xxx)
 {
@@ -329,6 +344,13 @@ terminate(int sig)
 }
 
 static void
+restart(int sig)
+{
+    (void) sig;
+    reload = 1;
+}
+
+static void
 stacktrace_abort(int sig)
 {
     LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
@@ -357,6 +379,32 @@ parent_shutdown(int status, pid_t child_pid)
     exit(status);
 }
 
+static pid_t
+child_restart(pid_t child_pid, struct VSM_data *vd, int endless, int readconfig)
+{
+    int errnum;
+    
+    if (readconfig) {
+        LOG_Log(LOG_INFO, "Sending TERM signal to worker process %d",
+            child_pid);
+        if ((errnum = kill(child_pid, SIGTERM)) != 0) {
+            LOG_Log(LOG_ALERT, "Signal TERM delivery to process %d failed: %s",
+                strerror(errnum));
+            parent_shutdown(EXIT_FAILURE, 0);
+        }
+    }
+    LOG_Log0(LOG_INFO, "Restarting child process");
+    child_pid = fork();
+    if (child_pid == -1) {
+        LOG_Log(LOG_ALERT, "Cannot fork: %s", strerror(errno));
+        parent_shutdown(EXIT_FAILURE, child_pid);
+    }
+    else if (child_pid == 0)
+        child_main(vd, endless, readconfig);
+
+    return child_pid;
+}   
+
 static void
 parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
 {
@@ -366,6 +414,7 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
     LOG_Log0(LOG_INFO, "Management process starting");
     
     term = 0;
+    reload = 0;
     /* install signal handlers */
 #define PARENT(SIG,disp) SIGDISP(SIG,disp)
 #define CHILD(SIG,disp) ((void) 0)
@@ -374,11 +423,16 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
 #undef CHILD
     
     while (!term) {
-        wpid = waitpid(child_pid, &status, 0);
+        wpid = wait(&status);
         if (wpid == -1) {
             if (errno == EINTR) {
                 if (term)
                     parent_shutdown(EXIT_SUCCESS, child_pid);
+                else if (reload) {
+                    child_pid = child_restart(child_pid, vd, endless, reload);
+                    reload = 0;
+                    continue;
+                }
                 else {
                     LOG_Log0(LOG_WARNING,
                         "Interrupted while waiting for worker process, "
@@ -386,41 +440,30 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
                     continue;
                 }
             }
-            LOG_Log(LOG_ERR, "Cannot wait for worker process %d: %s", child_pid,
+            LOG_Log(LOG_ERR, "Cannot wait for worker processes: %s",
                 strerror(errno));
             parent_shutdown(EXIT_FAILURE, child_pid);
         }
-        assert(wpid == child_pid);
         AZ(WIFSTOPPED(status));
         AZ(WIFCONTINUED(status));
         if (WIFEXITED(status))
-            LOG_Log(LOG_INFO, "Worker process %d exited normally", child_pid);
-        else
             LOG_Log(LOG_WARNING, "Worker process %d exited with status %d",
-                child_pid, WEXITSTATUS(status));
+                wpid, WEXITSTATUS(status));
         if (WIFSIGNALED(status))
             LOG_Log(LOG_WARNING,
 		"Worker process %d exited due to signal %d (%s)",
-                child_pid, WTERMSIG(status), strsignal(WTERMSIG(status)));
+                wpid, WTERMSIG(status), strsignal(WTERMSIG(status)));
 
+        if (wpid != child_pid)
+            continue;
+        
         if (config.restarts && restarts > config.restarts) {
             LOG_Log(LOG_ERR, "Too many restarts: %d", restarts);
             parent_shutdown(EXIT_FAILURE, 0);
         }
         
-        LOG_Log0(LOG_INFO, "Restarting child process");
-        child_pid = fork();
-        switch(child_pid) {
-        case -1:
-            LOG_Log(LOG_ALERT, "Cannot fork: %s", strerror(errno));
-            parent_shutdown(EXIT_FAILURE, child_pid);
-            break;
-        case 0:
-            child_main(vd, endless);
-            break;
-        default:
-            restarts++;
-        }
+        child_pid = child_restart(child_pid, vd, endless, 0);
+        restarts++;
     }
 }
 
@@ -438,18 +481,34 @@ vsl_diag(void *priv, const char *fmt, ...)
 }
 
 static void
-child_main(struct VSM_data *vd, int endless)
+child_main(struct VSM_data *vd, int endless, int readconfig)
 {
     int errnum;
     const char *errmsg;
     pthread_t monitor;
     struct passwd *pw;
 
+    LOG_Log0(LOG_INFO, "Worker process starting");
+
+    /* XXX: does not re-configure logging. Feature or bug? */
+    if (readconfig) {
+        LOG_Log0(LOG_INFO, "Re-reading config");
+        CONF_Init();
+        read_default_config();
+        if (! EMPTY(cli_config_filename))
+            LOG_Log(LOG_INFO, "Reading config from %s", cli_config_filename);
+            /* XXX: CONF_ReadFile prints err messages to stderr */
+            if (CONF_ReadFile(cli_config_filename) != 0) {
+                LOG_Log(LOG_ERR, "Error reading config from %s",
+                    cli_config_filename);
+                exit(EXIT_FAILURE);
+            }
+    }
+    
     PRIV_Sandbox();
     pw = getpwuid(geteuid());
     AN(pw);
-    
-    LOG_Log(LOG_INFO, "Worker process starting, running as %s", pw->pw_name);
+    LOG_Log(LOG_INFO, "Running as %s", pw->pw_name);
 
     /* install signal handlers */
 #define CHILD(SIG,disp) SIGDISP(SIG,disp)
@@ -457,7 +516,7 @@ child_main(struct VSM_data *vd, int endless)
 #include "signals.h"
 #undef PARENT
 #undef CHILD
-    
+
     if (DATA_Init() != 0) {
         LOG_Log(LOG_ERR, "Cannot init data table: %s", strerror(errno));
         exit(EXIT_FAILURE);
@@ -548,16 +607,7 @@ main(int argc, char * const *argv)
 	VSL_Setup(vd);
 
         CONF_Init();
-
-        if (access(DEFAULT_CONFIG, F_OK) == 0) {
-            if (access(DEFAULT_CONFIG, R_OK) != 0) {
-                perror(DEFAULT_CONFIG);
-                exit(EXIT_FAILURE);
-            }
-            printf("Reading config from %s\n", DEFAULT_CONFIG);
-            if (CONF_ReadFile(DEFAULT_CONFIG) != 0)
-                exit(EXIT_FAILURE);
-        }
+        read_default_config();
 
 	while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:D")) != -1) {
 		switch (c) {
@@ -602,6 +652,7 @@ main(int argc, char * const *argv)
             usage(EXIT_FAILURE);
 
         if (c_arg) {
+            strcpy(cli_config_filename, c_arg);
             printf("Reading config from %s\n", c_arg);
             if (CONF_ReadFile(c_arg) != 0)
                 exit(EXIT_FAILURE);
@@ -615,7 +666,7 @@ main(int argc, char * const *argv)
         if (u_arg) {
             err = CONF_Add("user", u_arg);
             if (err) {
-                LOG_Log(LOG_ALERT, "Unknown user: %s", u_arg);
+                fprintf(stderr, "Unknown user: %s\n", u_arg);
                 exit(EXIT_FAILURE);
             }
         }
@@ -623,7 +674,7 @@ main(int argc, char * const *argv)
         if (y_arg) {
             err = CONF_Add("syslog.facility", y_arg);
             if (err) {
-                LOG_Log(LOG_ALERT, "Unknown syslog facility: %s", y_arg);
+                fprintf(stderr, "Unknown syslog facility: %s\n", y_arg);
                 exit(EXIT_FAILURE);
             }
         }
@@ -683,6 +734,10 @@ main(int argc, char * const *argv)
 	AZ(sigemptyset(&dump_action.sa_mask));
 	dump_action.sa_flags |= SA_RESTART;
 
+	restart_action.sa_handler = restart;
+	AZ(sigemptyset(&restart_action.sa_mask));
+	restart_action.sa_flags &= ~SA_RESTART;
+
 	stacktrace_action.sa_handler = stacktrace_abort;
 
 	ignore_action.sa_handler = SIG_IGN;
@@ -695,10 +750,10 @@ main(int argc, char * const *argv)
                 LOG_Log(LOG_ALERT,
                     "Cannot fork (%s), running as single process",
                     strerror(errno));
-                child_main(vd, endless);
+                child_main(vd, endless, 0);
                 break;
             case 0:
-                child_main(vd, endless);
+                child_main(vd, endless, 0);
                 break;
             default:
                 parent_main(child_pid, vd, endless);
@@ -707,6 +762,6 @@ main(int argc, char * const *argv)
         }
         else {
             LOG_Log0(LOG_INFO, "Running as non-demon single process");
-            child_main(vd, endless);
+            child_main(vd, endless, 0);
         }
 }
