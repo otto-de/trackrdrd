@@ -32,7 +32,7 @@
 
 PARENT(SIGTERM, terminate_action);
 PARENT(SIGINT, terminate_action);
-PARENT(SIGUSR1, ignore_action);
+PARENT(SIGUSR1, restart_action);
 PARENT(SIGUSR2, ignore_action);
 PARENT(SIGABRT, stacktrace_action);
 PARENT(SIGSEGV, stacktrace_action);
