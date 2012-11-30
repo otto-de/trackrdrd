@@ -112,6 +112,12 @@ submit(unsigned xid)
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     assert(entry->state == DATA_DONE);
     LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", entry->end, entry->data);
+    
+    if (! entry->hasdata) {
+        entry->state = DATA_EMPTY;
+        MON_StatsUpdate(STATS_NODATA);
+        return;
+    }
     while (!SPMCQ_Enq((void *) entry)) {
         tbl.wait_qfull++;
         LOG_Log(LOG_ALERT, "%s", "Internal queue full, waiting for dequeue");
@@ -139,6 +145,7 @@ static inline dataentry
     entry->state = DATA_OPEN;
     entry->xid = xid;
     entry->tid = fd;
+    entry->hasdata = false;
     sprintf(entry->data, "XID=%d", xid);
     entry->end = strlen(entry->data);
     if (entry->end > tbl.data_hi)
@@ -246,6 +253,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
             break;
 
         append(entry, tag, xid, data, datalen);
+        entry->hasdata = true;
         break;
 
     case SLT_ReqEnd:

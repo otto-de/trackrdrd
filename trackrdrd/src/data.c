@@ -34,6 +34,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include <stdbool.h>
 
 #include "libvarnish.h"
 #include "miniobj.h"
@@ -144,13 +145,14 @@ DATA_Init(void)
     datatable init_tbl =
         { .magic = DATATABLE_MAGIC, .len = entries, .collisions = 0,
           .insert_probes = 0, .find_probes = 0, .seen = 0, .open = 0, .done = 0,
-          .len_overflows = 0, .data_overflows = 0, .submitted = 0, .occ_hi = 0,
-          .data_hi = 0, .entry = entryptr, .buf = bufptr };
+          .nodata = 0, .len_overflows = 0, .data_overflows = 0, .submitted = 0,
+          .occ_hi = 0, .data_hi = 0, .entry = entryptr, .buf = bufptr };
     memcpy(&tbl, &init_tbl, sizeof(datatable));
 
     for (int i = 0; i < entries; i++) {
         tbl.entry[i].magic = DATA_MAGIC;
         tbl.entry[i].state = DATA_EMPTY;
+        tbl.entry[i].hasdata = false;
         tbl.entry[i].data = &tbl.buf[i * bufsize];
     }
     atexit(data_Cleanup);
