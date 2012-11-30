@@ -97,12 +97,24 @@ case "$1" in
         getstatus_trackrdrd
 	exit 0
         ;;
+    reload)
+        check_varnishd
+        echo -n "Reloading service trackrdrd ... "
+        checkproc ${TRACKRDRD_BIN}
+        if [ $? -ne 0 ]; then
+            echo "FAILED trackrdrd NOT RUNNING"
+            exit 1
+        fi
+        kill -USR1 $(cat ${TRACKRDRD_PID})
+        getstatus_trackrdrd
+        exit 0
+        ;;
     status)
         getstatus_trackrdrd
         exit 0
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status}"
+        echo "Usage: $0 {start|stop|restart|reload|status}"
         exit 1
         ;;
 esac
