@@ -78,7 +78,8 @@ void
             tbl.len_overflows, tbl.data_overflows, tbl.occ_hi, tbl.seen,
             tbl.submitted, tbl.nodata, tbl.sent, tbl.failed, tbl.wait_qfull,
             tbl.data_hi);
-        WRK_Stats();
+        if (config.monitor_workers)
+            WRK_Stats();
     }
 
     LOG_Log0(LOG_INFO, "Monitoring thread exiting");

@@ -40,6 +40,7 @@
 #include <math.h>
 #include <unistd.h>
 #include <pwd.h>
+#include <stdbool.h>
 
 #include "trackrdrd.h"
 #include "libvarnish.h"
@@ -152,6 +153,24 @@ CONF_Add(const char *lval, const char *rval)
         return(0);
     }
 
+    if (strcmp(lval, "monitor.workers") == 0) {
+        if (strcasecmp(rval, "true") == 0
+            || strcasecmp(rval, "on") == 0
+            || strcasecmp(rval, "yes") == 0
+            || strcmp(rval, "1") == 0) {
+            config.monitor_workers = true;
+            return(0);
+        }
+        if (strcasecmp(rval, "false") == 0
+            || strcasecmp(rval, "off") == 0
+            || strcasecmp(rval, "no") == 0
+            || strcmp(rval, "0") == 0) {
+            config.monitor_workers = false;
+            return(0);
+        }
+        return(EINVAL);
+    }
+
     return EINVAL;
 }
 
@@ -190,6 +209,7 @@ CONF_Init(void)
     config.varnish_bindump[0] = '\0';
     config.syslog_facility = LOG_LOCAL0;
     config.monitor_interval = 30;
+    config.monitor_workers = false;
     config.processor_log[0] = '\0';
     config.maxopen_scale = 0;
     config.maxdata_scale = 0;
@@ -270,6 +290,7 @@ CONF_Dump(void)
     confdump("varnish.bindump = %s", config.varnish_bindump);
     confdump("syslog.facility = %s", config.syslog_facility_name);
     confdump("monitor.interval = %.1f", config.monitor_interval);
+    confdump("monitor.workers = %s", config.monitor_workers ? "true" : "false");
     confdump("processor.log = %s", config.processor_log);
     confdump("maxopen.scale = %d", config.maxopen_scale);
     confdump("maxdata.scale = %d", config.maxdata_scale);
