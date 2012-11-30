@@ -106,6 +106,7 @@ typedef struct {
     unsigned 		xid;
     unsigned 		tid;	/* 'Thread ID', fd in the callback */
     unsigned		end;	/* End of string index in data */
+    bool		hasdata;
     char		*data;
 } dataentry;
 
@@ -121,8 +122,9 @@ typedef struct {
     unsigned		done;
     unsigned		len_overflows;
     unsigned		data_overflows;
-    unsigned		submitted;	/* Records submitted */
-    unsigned		sent;		/* Records sent to MQ */
+    unsigned		submitted;	/* Submitted to worker threads */
+    unsigned		nodata;		/* Not submitted, no data */
+    unsigned		sent;		/* Sent successfully to MQ */
     unsigned		failed;		/* MQ send fails */
     unsigned		wait_qfull;	/* Waits for SPMCQ */
     unsigned		occ_hi;		/* Occupancy high water mark */ 
@@ -197,6 +199,8 @@ typedef enum {
     STATS_DONE,
     /* Update occupancy high water mark */
     STATS_OCCUPANCY,
+    /* ReqEnd seen, no data in the record */
+    STATS_NODATA,
 } stats_update_t;
 
 void *MON_StatusThread(void *arg);
