@@ -20,9 +20,9 @@ CMD="../trackrdrd -D -f varnish.binlog -l - -d -c test.conf"
 # the second sed removes the user under which the child process runs
 # "Not running as root" filtered so that the test is independent of
 # the user running it
-CKSUM=$( $CMD | sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(, running as\) \(.*\)/\1/' | grep -v 'Not running as root' | cksum)
+CKSUM=$( $CMD | sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(Running as\) \([a-zA-Z0-9]*\)$/\1/' | grep -v 'Not running as root' | cksum)
 
-if [ "$CKSUM" != '1127092118 232241' ]; then
+if [ "$CKSUM" != '2398306240 232246' ]; then
     echo "ERROR: Regression test incorrect cksum: $CKSUM"
     exit 1
 fi
