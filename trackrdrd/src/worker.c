@@ -79,6 +79,8 @@ wrk_send(void *amq_worker, dataentry *entry, worker_data_t *wrk)
     else {
         wrk->sends++;
         MON_StatsUpdate(STATS_SENT);
+        LOG_Log(LOG_DEBUG, "Worker %d: Successfully sent data [%.*s]", wrk->id,
+            entry->end, entry->data);
     }
     entry->state = DATA_EMPTY;
     /* From Varnish vmb.h -- platform-independent write memory barrier */
