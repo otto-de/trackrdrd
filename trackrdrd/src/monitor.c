@@ -69,10 +69,10 @@ void
             }
         }
         LOG_Log(LOG_INFO,
-            "Data table: len=%d collisions=%d insert_probes=%d find_probes=%d "
-            "open=%d done=%d load=%.2f len_overflows=%d data_overflows=%d "
-            "occ_hi=%d seen=%d submitted=%d nodata=%d sent=%d failed=%d "
-            "wait_qfull=%d data_hi=%d",
+            "Data table: len=%u collisions=%u insert_probes=%u find_probes=%u "
+            "open=%u done=%u load=%.2f len_overflows=%u data_overflows=%u "
+            "occ_hi=%u seen=%u submitted=%u nodata=%u sent=%u failed=%u "
+            "wait_qfull=%u data_hi=%u",
             tbl.len, tbl.collisions, tbl.insert_probes, tbl.find_probes,
             tbl.open, tbl.done, 100.0 * ((float) tbl.open + tbl.done) / tbl.len,
             tbl.len_overflows, tbl.data_overflows, tbl.occ_hi, tbl.seen,
