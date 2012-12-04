@@ -223,7 +223,8 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     
     /* spec != 'c' */
     if ((spec & VSL_S_CLIENT) == 0)
-        LOG_Log(LOG_WARNING, "%s: Client bit ('c') not set", VSL_tags[tag]);
+        LOG_Log(LOG_WARNING, "%s: Client bit ('c') not set [%.*s]",
+            VSL_tags[tag], len, ptr);
     
     switch (tag) {
     case SLT_ReqStart:
