@@ -492,7 +492,7 @@ vsl_diag(void *priv, const char *fmt, ...)
 static void
 child_main(struct VSM_data *vd, int endless, int readconfig)
 {
-    int errnum;
+    int errnum, nworkers;
     const char *errmsg;
     pthread_t monitor;
     struct passwd *pw;
@@ -562,7 +562,6 @@ child_main(struct VSM_data *vd, int endless, int readconfig)
             strerror(errnum));
         exit(EXIT_FAILURE);
     }
-
     if ((errnum = SPMCQ_Init()) != 0) {
         LOG_Log(LOG_ERR, "Cannot initialize internal worker queue: %s",
             strerror(errnum));
@@ -573,6 +572,16 @@ child_main(struct VSM_data *vd, int endless, int readconfig)
         
     /* Start worker threads */
     WRK_Start();
+    nworkers = WRK_Running();
+    LOG_Log0(LOG_INFO, "Worker threads initialized");
+    if (nworkers < config.nworkers) {
+        LOG_Log(LOG_WARNING, "%d of %d worker threads running", nworkers,
+            config.nworkers);
+        if (nworkers == 0) {
+            LOG_Log0(LOG_ALERT, "Worker process shutting down");
+            exit(EXIT_FAILURE);
+        }
+    }
         
     /* Main loop */
     term = 0;
