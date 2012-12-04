@@ -22,7 +22,7 @@ CMD="../trackrdrd -D -f varnish.binlog -l - -d -c test.conf"
 # the user running it
 CKSUM=$( $CMD | sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(Running as\) \([a-zA-Z0-9]*\)$/\1/' | grep -v 'Not running as root' | cksum)
 
-if [ "$CKSUM" != '718198351 232285' ]; then
+if [ "$CKSUM" != '1675646904 232318' ]; then
     echo "ERROR: Regression test incorrect cksum: $CKSUM"
     exit 1
 fi
