@@ -71,12 +71,12 @@
 #include "usage.h"
 
 #define TRACK_TAGS "ReqStart,VCL_log,ReqEnd"
-#define TRACKLOG_PREFIX "track "
-#define TRACKLOG_PREFIX_LEN (sizeof(TRACKLOG_PREFIX)-1)
 
 #define DEFAULT_CONFIG "/etc/trackrdrd.conf"
 
 /* XXX: should these be configurable ? */
+#define TRACKLOG_PREFIX "track "
+#define TRACKLOG_PREFIX_LEN (sizeof(TRACKLOG_PREFIX)-1)
 #define MAX_STACK_DEPTH 100
 #define REQEND_T_VAR "req_endt"
 
@@ -150,7 +150,6 @@ static inline dataentry
     entry->end = strlen(entry->data);
     if (entry->end > tbl.data_hi)
         tbl.data_hi = entry->end;
-    tbl.seen++;
     MON_StatsUpdate(STATS_OCCUPANCY);
     
     return entry;
@@ -167,6 +166,7 @@ static inline dataentry
             return NULL;
         LOG_Log(LOG_WARNING, "%s: XID %d not found, attempting insert",
             VSL_tags[tag], xid);
+        tbl.seen++;
         entry = insert(xid, tag, fd);
         if (entry == NULL)
             return NULL;
@@ -229,7 +229,8 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     case SLT_ReqStart:
 
         if (term) return(0);
-
+        
+        tbl.seen++;
         err = Parse_ReqStart(ptr, len, &xid);
         AZ(err);
         LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
