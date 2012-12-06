@@ -118,6 +118,7 @@ CONF_Add(const char *lval, const char *rval)
     confUnsigned("maxdata.scale", maxdata_scale);
     confUnsigned("nworkers", nworkers);
     confUnsigned("restarts", restarts);
+    confUnsigned("monitor.interval", monitor_interval);
 
     if (strcmp(lval, "syslog.facility") == 0) {
         if ((ret = conf_getFacility(rval)) < 0)
@@ -126,18 +127,6 @@ CONF_Add(const char *lval, const char *rval)
         strcpy(config.syslog_facility_name, rval);
         char *p = &config.syslog_facility_name[0];
         do { *p = toupper(*p); } while (*++p);
-        return(0);
-    }
-
-    if (strcmp(lval, "monitor.interval") == 0) {
-        char *p;
-        errno = 0;
-        double d = strtod(rval, &p);
-        if (errno)
-            return(errno);
-        if (strlen(p) != 0 || d < 0 || !isfinite(d))
-            return(EINVAL);
-        config.monitor_interval = d;
         return(0);
     }
 
@@ -289,14 +278,14 @@ CONF_Dump(void)
         strcmp(config.log_file,"-") == 0 ? "stdout" : config.log_file);
     confdump("varnish.bindump = %s", config.varnish_bindump);
     confdump("syslog.facility = %s", config.syslog_facility_name);
-    confdump("monitor.interval = %.1f", config.monitor_interval);
+    confdump("monitor.interval = %u", config.monitor_interval);
     confdump("monitor.workers = %s", config.monitor_workers ? "true" : "false");
     confdump("processor.log = %s", config.processor_log);
-    confdump("maxopen.scale = %d", config.maxopen_scale);
-    confdump("maxdata.scale = %d", config.maxdata_scale);
+    confdump("maxopen.scale = %u", config.maxopen_scale);
+    confdump("maxdata.scale = %u", config.maxdata_scale);
     confdump("mq.uri = %s", config.mq_uri);
     confdump("mq.qname = %s", config.mq_qname);
-    confdump("nworkers = %d", config.nworkers);
-    confdump("restarts = %d", config.restarts);
+    confdump("nworkers = %u", config.nworkers);
+    confdump("restarts = %u", config.restarts);
     confdump("user = %s", config.user_name);
 }
