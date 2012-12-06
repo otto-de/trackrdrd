@@ -28,11 +28,31 @@ CMD="${TRACKRDRD_BIN}"
 CURL=/usr/bin/curl
 URL=http://localhost/ts-rcv?testSession=true
 
+START_RETRIES=5
+
 if [ ! -e ${TRACKRDRD_BIN} ]; then
     echo "${TRACKRDRD_BIN} not installed"
 fi
 
 function start_trackrdrd {
+    START_CHECKS=0
+    echo -n "Checking if trackrdrd is running ..."
+    while [ ${START_CHECKS} -lt ${START_RETRIES} ]; do
+        checkproc ${TRACKRDRD_BIN}
+        if [ $? -ne 0 ]; then
+            break
+        fi
+        echo -n "."
+        START_CHECKS=$(( $START_CHECKS + 1 ))
+        sleep 1
+        continue
+    done
+    if [ ${START_CHECKS} -eq ${START_RETRIES} ]; then
+        echo " trackrdrd still running, giving up"
+        logger "trackrdrd still running, start FAILED"
+        exit 1
+    fi
+    echo ""
     echo -n "Starting trackrdrd ... "
     startproc -q ${CMD}
     if [ $? -ne 0 ]; then
@@ -48,7 +68,7 @@ function stop_trackrdrd {
     killproc ${TRACKRDRD_BIN}
     if [ $? -ne 0 ]; then
 	echo "FAILED (killproc returned $?)"
-        logger "trackrdrd start FAILED (killproc returned $?)"
+        logger "trackrdrd stop FAILED (killproc returned $?)"
         exit 1
     fi
     ${CURL} ${URL} >/dev/null 2&>1
@@ -74,11 +94,6 @@ function check_varnishd {
 
 case "$1" in
     start)
-        checkproc ${TRACKRDRD_BIN}
-        if [ $? -eq 0 ]; then
-            echo "trackrdrd already running"
-            exit 1
-        fi
         check_varnishd
 	start_trackrdrd
 	exit 0
@@ -91,7 +106,6 @@ case "$1" in
         check_varnishd
         echo "Restarting trackrdrd"
         stop_trackrdrd
-	sleep 1
         start_trackrdrd
 	sleep 1
         getstatus_trackrdrd

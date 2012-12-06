@@ -40,6 +40,32 @@
 
 static int run;
 
+static void
+log_output(void)
+{
+    LOG_Log(LOG_INFO,
+        "Data table: len=%u collisions=%u insert_probes=%u find_probes=%u "
+        "open=%u done=%u load=%.2f len_overflows=%u data_overflows=%u "
+        "occ_hi=%u seen=%u submitted=%u nodata=%u sent=%u failed=%u "
+        "wait_qfull=%u data_hi=%u",
+        tbl.len, tbl.collisions, tbl.insert_probes, tbl.find_probes,
+        tbl.open, tbl.done, 100.0 * ((float) tbl.open + tbl.done) / tbl.len,
+        tbl.len_overflows, tbl.data_overflows, tbl.occ_hi, tbl.seen,
+        tbl.submitted, tbl.nodata, tbl.sent, tbl.failed, tbl.wait_qfull,
+        tbl.data_hi);
+    if (config.monitor_workers)
+        WRK_Stats();
+}
+
+static void
+monitor_cleanup(void *arg)
+{
+    (void) arg;
+
+    log_output();
+    LOG_Log0(LOG_INFO, "Monitoring thread exiting");
+}
+
 void
 *MON_StatusThread(void *arg)
 {
@@ -51,7 +77,9 @@ void
     LOG_Log(LOG_INFO, "Monitor thread running every %.2f secs",
             t.tv_sec + ((float) t.tv_nsec * 10e-9));
     run = 1;
-    
+
+    pthread_cleanup_push(monitor_cleanup, arg);
+
     while (run) {
         int err;
         if (nanosleep(&t, NULL) != 0) {
@@ -68,20 +96,10 @@ void
                 pthread_exit(&err);
             }
         }
-        LOG_Log(LOG_INFO,
-            "Data table: len=%u collisions=%u insert_probes=%u find_probes=%u "
-            "open=%u done=%u load=%.2f len_overflows=%u data_overflows=%u "
-            "occ_hi=%u seen=%u submitted=%u nodata=%u sent=%u failed=%u "
-            "wait_qfull=%u data_hi=%u",
-            tbl.len, tbl.collisions, tbl.insert_probes, tbl.find_probes,
-            tbl.open, tbl.done, 100.0 * ((float) tbl.open + tbl.done) / tbl.len,
-            tbl.len_overflows, tbl.data_overflows, tbl.occ_hi, tbl.seen,
-            tbl.submitted, tbl.nodata, tbl.sent, tbl.failed, tbl.wait_qfull,
-            tbl.data_hi);
-        if (config.monitor_workers)
-            WRK_Stats();
+        log_output();
     }
 
+    pthread_cleanup_pop(0);
     LOG_Log0(LOG_INFO, "Monitoring thread exiting");
     pthread_exit((void *) NULL);
 }
@@ -90,6 +108,7 @@ void
 MON_StatusShutdown(pthread_t monitor)
 {
     run = 0;
+    AZ(pthread_cancel(monitor));
     AZ(pthread_join(monitor, NULL));
 }
 
