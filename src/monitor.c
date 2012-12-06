@@ -70,12 +70,11 @@ void
 *MON_StatusThread(void *arg)
 {
     struct timespec t;
-    double *interval = (double *) arg;
+    unsigned *interval = (unsigned *) arg;
 
     t.tv_sec = (time_t) *interval;
-    t.tv_nsec = (long)(t.tv_sec - *interval) * 10e9;
-    LOG_Log(LOG_INFO, "Monitor thread running every %.2f secs",
-            t.tv_sec + ((float) t.tv_nsec * 10e-9));
+    t.tv_nsec = 0;
+    LOG_Log(LOG_INFO, "Monitor thread running every %u secs", t.tv_sec);
     run = 1;
 
     pthread_cleanup_push(monitor_cleanup, arg);

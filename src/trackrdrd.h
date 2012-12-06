@@ -152,7 +152,7 @@ struct config {
     char	varnish_bindump[BUFSIZ];
     int		syslog_facility;
     char	syslog_facility_name[BUFSIZ];
-    double	monitor_interval;
+    unsigned	monitor_interval;
     bool	monitor_workers;
     char	processor_log[BUFSIZ];
     unsigned	maxopen_scale;
