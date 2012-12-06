@@ -122,7 +122,7 @@ submit(unsigned xid)
         tbl.wait_qfull++;
         LOG_Log(LOG_ALERT, "%s", "Internal queue full, waiting for dequeue");
         AZ(pthread_mutex_lock(&spmcq_nonfull_lock));
-        AZ(pthread_cond_wait(&spmcq_nonfull_cond, &spmcq_nonempty_lock));
+        AZ(pthread_cond_wait(&spmcq_nonfull_cond, &spmcq_nonfull_lock));
     }
     AZ(pthread_cond_signal(&spmcq_nonempty_cond));
     tbl.submitted++;
