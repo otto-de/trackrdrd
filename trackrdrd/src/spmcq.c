@@ -43,10 +43,9 @@ static pthread_mutex_t spmcq_deq_lock;
 static inline unsigned
 spmcq_len(void)
 {
-    if (spmcq.tail < spmcq.head)
-        return UINT_MAX - spmcq.head - 1 - spmcq.tail;
-    else
+    if (spmcq.tail >= spmcq.head)
         return spmcq.tail - spmcq.head;
+    return UINT_MAX - spmcq.head + 1 + spmcq.tail;
 }
 
 static void
@@ -99,3 +98,30 @@ void
     AZ(pthread_mutex_unlock(&spmcq_deq_lock));
     return ptr;
 }
+
+#ifdef TEST_DRIVER
+int
+main(int argc, char * const *argv)
+{
+    (void) argc;
+
+    printf("\nTEST: %s\n", argv[0]);
+    printf("... test SMPCQ enqueue at UINT_MAX overflow\n");
+    
+    config.maxopen_scale = 0;
+    SPMCQ_Init();
+    spmcq.head = spmcq.tail = UINT_MAX - 2;
+
+    assert(SPMCQ_Enq(NULL));
+    assert(SPMCQ_Enq(NULL));
+    assert(SPMCQ_Enq(NULL));
+    assert(SPMCQ_Enq(NULL));
+    assert(SPMCQ_Enq(NULL));
+    assert(SPMCQ_Enq(NULL));
+    assert(SPMCQ_Enq(NULL));
+    assert(spmcq_len() == 7);
+
+    printf("%s: 1 test run\n", argv[0]);
+    exit(0);
+}
+#endif
