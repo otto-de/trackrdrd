@@ -94,7 +94,7 @@ variable ``VARNISHSRC``::
 	$ git clone git@repo.org:trackrdrd
 	$ cd trackrdrd/trackrdrd/
 	$ ./autogen.sh
-	$ CFLAGS=-m64 ./configure VARNISHSRC=/path/to/varnish-cache
+	$ CXXFLAGS=-m64 CFLAGS=-m64 ./configure VARNISHSRC=/path/to/varnish-cache
 	$ make
 
 For self-tests after the build, run::
@@ -118,12 +118,12 @@ be shown with::
 For example, to specify a non-standard installation prefix, add the
 ``--prefix`` option::
 
-	$ CFLAGS=-m64 ./configure VARNISHSRC=/path/to/varnish-cache \\
+	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure VARNISHSRC=/path/to/varnish-cache \\
 	  --prefix=/path/to/varnish_tracking
 
 Developers can add a number of options as an aid to compiling and debugging::
 
-	$ CFLAGS=-m64 ./configure VARNISHSRC=/path/to/varnish-cache \\
+	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure VARNISHSRC=/path/to/varnish-cache \\
           --enable-developer-warnings --enable-debugging-symbols \\
           --enable-extra-developer-warnings --enable-werror
 
@@ -142,3 +142,9 @@ dumps, in stack traces on assertion failures, for debuggers and so
 forth. It is advisable to turn this switch on for production builds
 (not just for developer builds), so that runtime errors can more
 easily be debugged.
+
+If any of the needed requirements (for instance, the ActiveMQ C++ library)
+have been installed into non-default locations, PKG_CONFIG_PATH should
+be set to point to the appropriate pkg-config directories, like in this example::
+
+	$ PKG_CONFIG_PATH=/usr/local/lib/pkgconfig ./configure #...
