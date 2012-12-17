@@ -129,54 +129,24 @@ submit(unsigned xid)
 }
 
 static inline dataentry
-*insert(unsigned xid, enum VSL_tag_e tag, unsigned fd)
-{
-    dataentry *entry;
-    
-    entry = DATA_Insert(xid);
-    if (entry == NULL) {
-        LOG_Log(LOG_ALERT,
-            "%s: Cannot insert data, XID=%d tid=%d DISCARDED",
-            VSL_tags[tag], xid, fd);
-        return NULL;
-    }
-    CHECK_OBJ(entry, DATA_MAGIC);
-        
-    entry->state = DATA_OPEN;
-    entry->xid = xid;
-    entry->tid = fd;
-    entry->hasdata = false;
-    sprintf(entry->data, "XID=%d", xid);
-    entry->end = strlen(entry->data);
-    if (entry->end > tbl.data_hi)
-        tbl.data_hi = entry->end;
-    MON_StatsUpdate(STATS_OCCUPANCY);
-    
-    return entry;
-}
-
-static inline dataentry
-*find_or_insert(unsigned xid, enum VSL_tag_e tag, unsigned fd)
+*find(unsigned xid, enum VSL_tag_e tag, unsigned fd, const char *ptr,
+      unsigned len)
 {
     dataentry *entry;
 
     entry = DATA_Find(xid);
     if (entry == NULL) {
-        if (term)
-            return NULL;
-        LOG_Log(LOG_WARNING, "%s: XID %d not found, attempting insert",
-            VSL_tags[tag], xid);
-        tbl.seen++;
-        entry = insert(xid, tag, fd);
-        if (entry == NULL)
-            return NULL;
+        if (!term)
+            LOG_Log(LOG_WARNING,
+                "%s: XID %d not found, fd=%d, DISCARDING [%.*s]",
+                VSL_tags[tag], xid, fd, len, ptr);
+        return NULL;
     }
-    else {
-        CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-        assert(entry->xid == xid);
-        assert(entry->tid == fd);
-        assert(entry->state == DATA_OPEN);
-    }
+
+    CHECK_OBJ(entry, DATA_MAGIC);
+    assert(entry->xid == xid);
+    assert(entry->tid == fd);
+    assert(entry->state == DATA_OPEN);
 
     return entry;
 }
@@ -236,7 +206,25 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         AZ(err);
         LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
 
-        (void) insert(xid, tag, fd);
+        entry = DATA_Insert(xid);
+        if (entry == NULL) {
+            LOG_Log(LOG_ALERT,
+                "%s: Cannot insert data, XID=%d tid=%d DISCARDED",
+                VSL_tags[tag], xid, fd);
+            break;
+        }
+        CHECK_OBJ(entry, DATA_MAGIC);
+        
+        entry->state = DATA_OPEN;
+        entry->xid = xid;
+        entry->tid = fd;
+        entry->hasdata = false;
+        sprintf(entry->data, "XID=%d", xid);
+        entry->end = strlen(entry->data);
+        if (entry->end > tbl.data_hi)
+            tbl.data_hi = entry->end;
+        MON_StatsUpdate(STATS_OCCUPANCY);
+        
         break;
 
     case SLT_VCL_Log:
@@ -250,7 +238,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         LOG_Log(LOG_DEBUG, "%s: XID=%d, data=[%.*s]", VSL_tags[tag],
             xid, datalen, data);
         
-        entry = find_or_insert(xid, tag, fd);
+        entry = find(xid, tag, fd, ptr, len);
         if (entry == NULL)
             break;
 
@@ -265,7 +253,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         LOG_Log(LOG_DEBUG, "%s: XID=%d req_endt=%u.%09lu", VSL_tags[tag], xid,
             (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
 
-        entry = find_or_insert(xid, tag, fd);
+        entry = find(xid, tag, fd, ptr, len);
         if (entry == NULL)
             break;
         sprintf(reqend_str, "%s=%u.%09lu", REQEND_T_VAR,
