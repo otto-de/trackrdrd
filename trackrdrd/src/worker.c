@@ -4,7 +4,8 @@
  * All rights reserved
  * Use only with permission
  *
- * Author: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ * Authors: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ *	    Nils Goroll <nils.goroll@uplex.de>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,27 +38,47 @@
 #include "trackrdrd.h"
 #include "vas.h"
 #include "miniobj.h"
-#include "vmb.h"
+
+int nworkers = 0;
 
 typedef enum {
     WRK_NOTSTARTED = 0,
     WRK_INITIALIZING,
     WRK_RUNNING,
+    WRK_WAITING,
     WRK_SHUTTINGDOWN,
-    WRK_EXITED
+    WRK_EXITED,
+    WRK_STATE_E_LIMIT
 } wrk_state_e;
 
-typedef struct {
+static const char* statename[WRK_STATE_E_LIMIT] = { 
+	[WRK_NOTSTARTED]       	= "not started",
+	[WRK_INITIALIZING]	= "initializing",
+	[WRK_RUNNING]		= "running",
+	[WRK_WAITING]		= "waiting",
+	[WRK_SHUTTINGDOWN]	= "shutting down",
+	[WRK_EXITED]		= "exited"};
+
+struct worker_data_s {
     unsigned magic;
 #define WORKER_DATA_MAGIC 0xd8eef137
     unsigned id;
+    pthread_t tid;
     unsigned status;  /* exit status */
     wrk_state_e state;
+
+    /* per-worker freelist - return space in chunks */
+    struct freehead_s	wrk_freelist;
+    unsigned		wrk_nfree;
+
+    /* stats */
     unsigned deqs;
     unsigned waits;
     unsigned sends;
     unsigned fails;
-} worker_data_t;
+};
+
+typedef struct worker_data_s worker_data_t;
 
 typedef struct {
     pthread_t worker;
@@ -66,8 +87,6 @@ typedef struct {
     
 static unsigned run, cleaned = 0;
 static thread_data_t *thread_data;
-static const char* statename[5] = { "not started", "initializing", "running",
-                                    "shutting down", "exited" };
 
 static inline void
 wrk_send(void *amq_worker, dataentry *entry, worker_data_t *wrk)
@@ -78,6 +97,7 @@ wrk_send(void *amq_worker, dataentry *entry, worker_data_t *wrk)
     assert(entry->state == DATA_DONE);
     AN(amq_worker);
 
+    /* XXX: report entry->incomplete to backend ? */
     err = MQ_Send(amq_worker, entry->data, entry->end);
     if (err != NULL) {
         /* XXX: error recovery? reconnect? preserve the data? */
@@ -94,9 +114,16 @@ wrk_send(void *amq_worker, dataentry *entry, worker_data_t *wrk)
             entry->end, entry->data);
     }
     entry->state = DATA_EMPTY;
-    /* From Varnish vmb.h -- platform-independent write memory barrier */
-    VWMB();
-    AZ(pthread_cond_signal(&spmcq_nonfull_cond));
+    VSTAILQ_INSERT_TAIL(&wrk->wrk_freelist, entry, freelist);
+    wrk->wrk_nfree++;
+
+    if (dtbl.nfree == 0) {
+	    DATA_Return_Freelist(&wrk->wrk_freelist, wrk->wrk_nfree);
+	    wrk->wrk_nfree = 0;
+	    assert(VSTAILQ_EMPTY(&wrk->wrk_freelist));
+    }
+
+    spmcq_signal(room);
 }
 
 static void
@@ -110,7 +137,8 @@ static void
     LOG_Log(LOG_INFO, "Worker %d: starting", wrk->id);
     CHECK_OBJ_NOTNULL(wrk, WORKER_DATA_MAGIC);
     wrk->state = WRK_INITIALIZING;
-    
+    wrk->tid = pthread_self();
+
     err = MQ_WorkerInit(&amq_worker);
     if (err != NULL) {
         LOG_Log(LOG_ALERT, "Worker %d: Cannot initialize queue connection: %s",
@@ -120,6 +148,9 @@ static void
         pthread_exit((void *) wrk);
     }
 
+    VSTAILQ_INIT(&wrk->wrk_freelist);
+    wrk->wrk_nfree = 0;
+
     wrk->state = WRK_RUNNING;
     
     while (run) {
@@ -127,20 +158,49 @@ static void
 	if (entry != NULL) {
 	    wrk->deqs++;
             wrk_send(amq_worker, entry, wrk);
-            continue;
+
+	    /* should we go to sleep ? */
+	    if (SPMCQ_stop_worker(SPMCQ_Len(), (nworkers - spmcq_datawaiter), nworkers, (1 << config.qlen_goal_scale)))
+		    goto sleep;
+	    
+	    continue;
         }
-        /* Queue is empty, wait until data are available, or quit is
-           signaled.
-           Grab the CV lock, which also constitutes an implicit memory
-           barrier */
-        AZ(pthread_mutex_lock(&spmcq_nonempty_lock));
-        /* run is guaranteed to be fresh here */
-        if (run) {
-            wrk->waits++;
-            AZ(pthread_cond_wait(&spmcq_nonempty_cond,
-                    &spmcq_nonempty_lock));
+
+      sleep:
+	/* return space before sleeping */
+	if (wrk->wrk_nfree > 0) {
+		DATA_Return_Freelist(&wrk->wrk_freelist, wrk->wrk_nfree);
+		wrk->wrk_nfree = 0;
+	}
+
+
+        /*
+	 * Queue is empty or we should backoff
+	 *
+	 * wait until data are available, or quit is signaled.
+	 *
+	 * Grab the CV lock, which also constitutes an implicit memory
+         * barrier 
+	 */
+        AZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
+        /*
+	 * run is guaranteed to be fresh here
+	 *
+	 * also re-check the stop condition under the lock
+	 */
+        if (run &&
+	    ((! entry) ||
+	     SPMCQ_stop_worker(SPMCQ_Len(), (nworkers - spmcq_datawaiter),
+	                       nworkers, (1 << config.qlen_goal_scale)))) {
+		wrk->waits++;
+		spmcq_datawaiter++;
+		wrk->state = WRK_WAITING;
+		AZ(pthread_cond_wait(&spmcq_datawaiter_cond,
+			&spmcq_datawaiter_lock));
+		spmcq_datawaiter--;
+		wrk->state = WRK_RUNNING;
         }
-        AZ(pthread_mutex_unlock(&spmcq_nonempty_lock));
+        AZ(pthread_mutex_unlock(&spmcq_datawaiter_lock));
     }
 
     wrk->state = WRK_SHUTTINGDOWN;
@@ -171,10 +231,10 @@ static void wrk_cleanup(void)
     for (int i = 0; i < config.nworkers; i++)
         free(thread_data[i].wrk_data);
     free(thread_data);
-    AZ(pthread_mutex_destroy(&spmcq_nonempty_lock));
-    AZ(pthread_cond_destroy(&spmcq_nonempty_cond));
-    AZ(pthread_mutex_destroy(&spmcq_nonfull_lock));
-    AZ(pthread_cond_destroy(&spmcq_nonfull_cond));
+    AZ(pthread_mutex_destroy(&spmcq_datawaiter_lock));
+    AZ(pthread_cond_destroy(&spmcq_datawaiter_cond));
+    AZ(pthread_mutex_destroy(&spmcq_roomwaiter_lock));
+    AZ(pthread_cond_destroy(&spmcq_roomwaiter_cond));
     cleaned = 1;
 }
 
@@ -183,6 +243,7 @@ WRK_Init(void)
 {
     thread_data
         = (thread_data_t *) malloc(config.nworkers * sizeof(thread_data_t));
+
     if (thread_data == NULL) {
         LOG_Log(LOG_ALERT, "Cannot allocate thread data: %s", strerror(errno));
         return(errno);
@@ -204,11 +265,18 @@ WRK_Init(void)
         wrk->deqs = wrk->waits = wrk->sends = wrk->fails = 0;
         wrk->state = WRK_NOTSTARTED;
     }
-    
-    AZ(pthread_mutex_init(&spmcq_nonempty_lock, NULL));
-    AZ(pthread_cond_init(&spmcq_nonempty_cond, NULL));
-    AZ(pthread_mutex_init(&spmcq_nonfull_lock, NULL));
-    AZ(pthread_cond_init(&spmcq_nonfull_cond, NULL));
+
+    spmcq_datawaiter = 0;
+    AZ(pthread_mutex_init(&spmcq_datawaiter_lock, &attr_lock));
+    AZ(pthread_cond_init(&spmcq_datawaiter_cond, &attr_cond));
+
+    spmcq_roomwaiter = 0;
+    AZ(pthread_mutex_init(&spmcq_roomwaiter_lock, &attr_lock));
+    AZ(pthread_cond_init(&spmcq_roomwaiter_cond, &attr_cond));
+
+    AZ(pthread_mutexattr_destroy(&attr_lock));
+    AZ(pthread_condattr_destroy(&attr_cond)); 
+
     atexit(wrk_cleanup);
     return 0;
 }
@@ -231,8 +299,8 @@ WRK_Stats(void)
     
     for (int i = 0; i < config.nworkers; i++) {
         wrk = thread_data[i].wrk_data;
-        LOG_Log(LOG_INFO, "Worker %d (%s): seen=%d waits=%d sent=%d failed=%d",
-            wrk->id, statename[wrk->state], wrk->deqs, wrk->waits, wrk->sends,
+        LOG_Log(LOG_INFO, "Worker %d tid %u (%s): seen=%d waits=%d sent=%d failed=%d",
+            wrk->id, wrk->tid, statename[wrk->state], wrk->deqs, wrk->waits, wrk->sends,
             wrk->fails);
     }
 }
@@ -248,7 +316,9 @@ WRK_Running(void)
             wrk = thread_data[i].wrk_data;
             if (wrk->state > WRK_INITIALIZING)
                 initialized++;
-            if (wrk->state == WRK_RUNNING || wrk->state == WRK_SHUTTINGDOWN)
+            if (wrk->state == WRK_RUNNING ||
+		wrk->state == WRK_SHUTTINGDOWN ||
+		wrk->state == WRK_WAITING)
                 running++;
         }
         if (initialized == config.nworkers)
@@ -260,14 +330,14 @@ void
 WRK_Halt(void)
 {
     /*
-     * must only modify run under spmcq_nonempty_lock to ensure that
+     * must only modify run under spmcq_datawaiter_lock to ensure that
      * we signal all waiting consumers (otherwise a consumer could go
      * waiting _after_ we have broadcasted and so miss the event.
      */
-    AZ(pthread_mutex_lock(&spmcq_nonempty_lock));
+    AZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
     run = 0;
-    AZ(pthread_cond_broadcast(&spmcq_nonempty_cond));
-    AZ(pthread_mutex_unlock(&spmcq_nonempty_lock));
+    AZ(pthread_cond_broadcast(&spmcq_datawaiter_cond));
+    AZ(pthread_mutex_unlock(&spmcq_datawaiter_lock));
 
     for(int i = 0; i < config.nworkers; i++) {
         AZ(pthread_join(thread_data[i].worker,

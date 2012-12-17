@@ -101,6 +101,19 @@ conf_getUnsignedInt(const char *rval, unsigned *i)
         return(0);                               \
     }
 
+#define confUnsignedMinVal(name,fld,min)	 \
+    if (strcmp(lval, name) == 0) {               \
+        unsigned int i;                          \
+        int err = conf_getUnsignedInt(rval, &i); \
+        if (err != 0)                            \
+            return err;                          \
+	if (i < min)				 \
+	    return (EINVAL);		         \
+        config.fld = i;                          \
+        return(0);                               \
+    }
+	
+
 int
 CONF_Add(const char *lval, const char *rval)
 {
@@ -114,8 +127,13 @@ CONF_Add(const char *lval, const char *rval)
     confString("mq.uri", mq_uri);
     confString("mq.qname", mq_qname);
 
-    confUnsigned("maxopen.scale", maxopen_scale);
-    confUnsigned("maxdata.scale", maxdata_scale);
+    confUnsignedMinVal("maxopen.scale", maxopen_scale, MIN_MAXOPEN_SCALE);
+    confUnsignedMinVal("maxdone.scale", maxdone_scale, MIN_MAXDONE_SCALE);
+    confUnsignedMinVal("maxdata.scale", maxdata_scale, MIN_MAXDATA_SCALE);
+    confUnsigned("qlen_goal.scale", qlen_goal_scale);
+    confUnsigned("hash_max_probes", hash_max_probes);
+    confUnsigned("hash_ttl", hash_ttl);
+    confUnsigned("hash_mlt", hash_mlt);
     confUnsigned("nworkers", nworkers);
     confUnsigned("restarts", restarts);
     confUnsigned("monitor.interval", monitor_interval);
@@ -200,8 +218,14 @@ CONF_Init(void)
     config.monitor_interval = 30;
     config.monitor_workers = false;
     config.processor_log[0] = '\0';
-    config.maxopen_scale = 0;
-    config.maxdata_scale = 0;
+    config.maxopen_scale = MIN_MAXOPEN_SCALE;
+    config.maxdone_scale = MIN_MAXDONE_SCALE;
+    config.maxdata_scale = MIN_MAXDATA_SCALE;
+    config.qlen_goal_scale = DEF_QLEN_GOAL_SCALE;
+    config.hash_max_probes = DEF_HASH_MAX_PROBES;
+    config.hash_ttl = DEF_HASH_TTL;
+    config.hash_mlt = DEF_HASH_MTL;
+
     config.mq_uri[0] = '\0';
     config.mq_qname[0] = '\0';
     config.nworkers = 1;
@@ -283,6 +307,12 @@ CONF_Dump(void)
     confdump("processor.log = %s", config.processor_log);
     confdump("maxopen.scale = %u", config.maxopen_scale);
     confdump("maxdata.scale = %u", config.maxdata_scale);
+    confdump("qlen_goal.scale = %u", config.qlen_goal_scale);
+    confdump("hash_max_probes", config.hash_max_probes);
+    confdump("hash_ttl", config.hash_ttl);
+    confdump("hash_mlt", config.hash_mlt);
+
+
     confdump("mq.uri = %s", config.mq_uri);
     confdump("mq.qname = %s", config.mq_qname);
     confdump("nworkers = %u", config.nworkers);
