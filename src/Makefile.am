@@ -10,6 +10,7 @@ trackrdrd_SOURCES = \
 	parse.c \
 	log.c \
 	config.c \
+	hash.c \
 	data.c \
 	monitor.c \
 	mq.c \

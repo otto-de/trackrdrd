@@ -4,7 +4,8 @@
  * All rights reserved
  * Use only with permission
  *
- * Author: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ * Authors: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ *	    Nils Goroll <nils.goroll@uplex.de>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,8 +35,10 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include <time.h>
+#include "vqueue.h"
 
-#define MIN_TABLE_SCALE 10
+#define MIN(x, y)	((x) < (y) ? (x) : (y))
+#define MAX(x, y)	((x) < (y) ? (y) : (x))
 
 /* sandbox.c */
 
@@ -73,16 +76,71 @@ spmcq_t spmcq;
 int SPMCQ_Init(void);
 bool SPMCQ_Enq(void *ptr);
 void *SPMCQ_Deq(void);
+int SPMCQ_Len(void);
+
+#define spmcq_wait(what)						\
+	do {								\
+	AZ(pthread_mutex_lock(&spmcq_##what##waiter_lock));		\
+	    spmcq_##what##waiter++;					\
+            AZ(pthread_cond_wait(&spmcq_##what##waiter_cond,		\
+		    &spmcq_##what##waiter_lock));		        \
+	    spmcq_##what##waiter--;					\
+	    AZ(pthread_mutex_unlock(&spmcq_##what##waiter_lock));	\
+	} while (0)
+
+/* 
+ * the first test is not synced, so we might enter the if body too late or
+ * unnecessarily
+ *
+ * * too late: doesn't matter, will come back next time
+ * * unnecessarily: we'll find out now
+ */
+
+#define spmcq_signal(what)						\
+	do {								\
+	    if (spmcq_##what##waiter) {					\
+		AZ(pthread_mutex_lock(&spmcq_##what##waiter_lock));	\
+		if (spmcq_##what##waiter)				\
+		    AZ(pthread_cond_signal(&spmcq_##what##waiter_cond)); \
+		AZ(pthread_mutex_unlock(&spmcq_##what##waiter_lock));	\
+	    }								\
+	} while (0)
 
 /* Producer waits for this condition when the spmc queue is full.
    Consumers signal this condition after dequeue. */
-pthread_cond_t spmcq_nonfull_cond;
-pthread_mutex_t spmcq_nonfull_lock;
+pthread_cond_t  spmcq_roomwaiter_cond;
+pthread_mutex_t spmcq_roomwaiter_lock;
+int		spmcq_roomwaiter;
 
 /* Consumers wait for this condition when the spmc queue is empty.
    Producer signals this condition after enqueue. */
-pthread_cond_t spmcq_nonempty_cond;
-pthread_mutex_t spmcq_nonempty_lock;
+pthread_cond_t  spmcq_datawaiter_cond;
+pthread_mutex_t spmcq_datawaiter_lock;
+int		spmcq_datawaiter;
+
+/*
+ * should we wake up another worker?
+ *
+ * M = l / (u x p)
+ *
+ * l: arrival rate
+ * u: service rate
+ * p: utilization
+ *
+ * to get an optimal M, we would need to measure l and u, so to
+ * simplify, we just try to keep the number of workers proportional to
+ * the queue length
+ *
+ * wake up another worker if queue is sufficiently full
+ * Q_Len > working * qlen_goal / max_workers
+ */
+
+#define SPMCQ_need_worker(qlen, working, max_workers, qlen_goal)	\
+	((qlen) > (working) * (qlen_goal) / max_workers)
+
+/* stop workers when we have one more than we need */
+#define SPMCQ_stop_worker(qlen, working, max_workers, qlen_goal)	\
+	((qlen) < ((MAX(working,1)) - 1) * (qlen_goal) / max_workers)
 
 /* mq.c */
 const char *MQ_GlobalInit(void);
@@ -100,47 +158,162 @@ typedef enum {
     DATA_DONE
 } data_state_e;
 
-typedef struct {
-    unsigned 		magic;
+struct dataentry_s {
+    unsigned 			magic;
 #define DATA_MAGIC 0xb41cb1e1
-    data_state_e	state;
-    unsigned 		xid;
-    unsigned 		tid;	/* 'Thread ID', fd in the callback */
-    unsigned		end;	/* End of string index in data */
-    bool		hasdata;
-    char		*data;
-} dataentry;
+    VSTAILQ_ENTRY(dataentry_s)	freelist;
 
-typedef struct {
-    unsigned		magic;
-#define DATATABLE_MAGIC 0xd3ef3bd4
-    const unsigned	len;
-    unsigned		collisions;
-    unsigned		insert_probes;
-    unsigned		find_probes;
-    unsigned		seen;		/* Records (ReqStarts) seen */
-    unsigned		open;
-    unsigned		done;
-    unsigned		len_overflows;
-    unsigned		data_overflows;
-    unsigned		submitted;	/* Submitted to worker threads */
+    data_state_e		state;
+    unsigned 			xid;
+    unsigned 			tid;	/* 'Thread ID', fd in the callback */
+    unsigned			end;	/* End of string index in data */
+    bool			hasdata;
+    
+    bool		        incomplete; /* expired or evacuated */
+    char			*data;
+};
+typedef struct dataentry_s dataentry;
+
+VSTAILQ_HEAD(freehead_s, dataentry_s);
+
+/* stats owned by VSL thread */
+struct data_writer_stats_s {
     unsigned		nodata;		/* Not submitted, no data */
+    unsigned		submitted;	/* Submitted to worker threads */
+    unsigned		wait_qfull;	/* Waits for SPMCQ - should not happen */
+    unsigned		wait_room;	/* waits for space in dtbl */
+    unsigned		data_hi;	/* max string length of entry->data */
+
+#ifdef REMOVE
+    unsigned		len_overflows;
+#endif
+    unsigned		data_overflows;
+};
+
+/* stats protected by mutex */
+struct data_reader_stats_s {
+    pthread_mutex_t	mutex;
+    unsigned		done;
+    unsigned       	open;	
     unsigned		sent;		/* Sent successfully to MQ */
     unsigned		failed;		/* MQ send fails */
-    unsigned		wait_qfull;	/* Waits for SPMCQ */
     unsigned		occ_hi;		/* Occupancy high water mark */ 
-    unsigned		data_hi;	/* Data high water mark */
-    dataentry		*entry;
-    char		*buf;
-} datatable;
+    unsigned		occ_hi_this;	/* Occupancy high water mark this reporting interval*/
+};
 
-datatable tbl;
+struct datatable_s {
+    unsigned			magic;
+#define DATATABLE_MAGIC 	0xd3ef3bd4
+    unsigned			len;
 
-/* XXX: inline DATA_Insert and DATA_Find */
+    /* protected by freelist_lock */
+    struct freehead_s		freehead;
+    pthread_mutex_t		freelist_lock;
+    unsigned			nfree;
+
+    dataentry			*entry;
+    char			*buf;
+
+    struct data_writer_stats_s	w_stats;
+    struct data_reader_stats_s	r_stats;
+};
+
+typedef struct datatable_s datatable;
+
+datatable dtbl;
+
 int DATA_Init(void);
-dataentry *DATA_Insert(unsigned xid);
-dataentry *DATA_Find(unsigned xid);
+void DATA_Take_Freelist(struct freehead_s *dst);
+void DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned);
+
+/*
+ * the noMT functions are _not_ MT-safe, so they can only be called
+ * from the registered thread
+ */
+void DATA_noMT_Register(void);
+dataentry *DATA_noMT_Get(void);
+void DATA_noMT_Free(dataentry *de);
+void DATA_noMT_Submit(dataentry *de);
+
+void DATA_Dump1(dataentry *entry, int i);
 void DATA_Dump(void);
+
+/* hash.c */
+
+typedef enum {
+    HASH_EMPTY = 0,
+    /* OPEN when the main thread is filling data, ReqEnd not yet seen. */
+    HASH_OPEN
+    /* hashes become HASH_EMPTY for DATA_DONE */
+} hash_state_e;
+
+
+struct hashentry_s {
+	unsigned			magic;
+#define HASH_MAGIC			0xf8e12130
+
+	/* set in HASH_Insert */
+	hash_state_e			state;
+	unsigned			xid; /* == de->xid */
+	float				insert_time;
+	VTAILQ_ENTRY(hashentry_s)      	insert_list;
+
+	dataentry	*de;
+};
+typedef struct hashentry_s hashentry;
+
+VTAILQ_HEAD(insert_head_s, hashentry_s);
+
+
+struct hashtable_s {
+	unsigned	magic;
+#define HASHTABLE_MAGIC	0x89ea1d00
+	unsigned	len;
+	hashentry	*entry;
+
+	struct insert_head_s	insert_head;
+
+	/* config */
+	unsigned	max_probes;
+	float		ttl;		/* max age for a record */
+	float		mlt;		/* min life time */
+
+	/* == stats == */
+	unsigned       	seen;		/* Records (ReqStarts) seen */
+	/* 
+	 * records we have dropped because of no hash, no data
+	 * or no entry
+	 */
+	unsigned	drop_reqstart;
+	unsigned	drop_vcl_log;
+	unsigned	drop_reqend;
+
+	unsigned	expired;
+	unsigned	evacuated;
+	unsigned       	open;
+
+	unsigned	collisions;
+	unsigned	insert_probes;
+	unsigned	find_probes;
+	unsigned	fail;		/* failed to get record - no space */
+
+	unsigned	occ_hi;		/* Occupancy high water mark */ 
+	unsigned	occ_hi_this;	/* Occupancy high water mark this reporting interval*/
+};
+typedef struct hashtable_s hashtable;
+
+hashtable htbl;
+
+
+int HASH_Init(void);
+void HASH_Exp(float limit);
+void HASH_Submit(hashentry *he);
+void HASH_Evacuate(hashentry *he);
+hashentry *HASH_Insert(const unsigned xid, dataentry *de, const float t);
+hashentry *HASH_Find(unsigned xid);
+void HASH_Dump1(hashentry *entry, int i);
+void HASH_Dump(void);
+
 
 /* config.c */
 #define EMPTY(s) (s[0] == '\0')
@@ -155,8 +328,53 @@ struct config {
     unsigned	monitor_interval;
     bool	monitor_workers;
     char	processor_log[BUFSIZ];
-    unsigned	maxopen_scale;
-    unsigned	maxdata_scale;
+
+    /* scale: unit is log(2,n), iow scale is taken to the power of 2 */
+    unsigned	maxopen_scale;	/* max number of records in *_OPEN state */
+#define MIN_MAXOPEN_SCALE 10
+    unsigned	maxdone_scale;	/* max number of records in *_DONE state */
+#define MIN_MAXDONE_SCALE 10
+    unsigned	maxdata_scale;  /* scale for char data buffer */
+#define MIN_MAXDATA_SCALE 10
+
+    /*
+     * scale of queue-length goal:
+     *
+     * we scale te number of running workers dynamically propotionally to the
+     * queue length.
+     *
+     * this scale (log(2,n)) specifies the queue length at which all workers
+     * should be running
+     */
+    unsigned	qlen_goal_scale;
+#define DEF_QLEN_GOAL_SCALE 10
+
+    /* max number of probes for insert/lookup */
+    unsigned	hash_max_probes;
+#define DEF_HASH_MAX_PROBES 10
+
+    /* 
+     * hash_ttl: max ttl for entries in HASH_OPEN
+     * 
+     * entries which are older than this ttl _may_ get expired from the
+     * trackrdrd state.
+     *
+     * set to a value significantly longer than your maximum session lifetime in
+     * varnish.
+     */
+    unsigned	hash_ttl;
+#define DEF_HASH_TTL 120
+
+    /*
+     * hash_mlt: min lifetime for entries in HASH_OPEN before they could get evacuated
+     *
+     * entries are guaranteed to remain in trackrdrd for this duration.
+     * once the mlt is reached, they _may_ get expired if trackrdrd needs space
+     * in the hash
+     */
+    unsigned	hash_mlt;
+#define DEF_HASH_MTL 5
+
     char	mq_uri[BUFSIZ];
     char	mq_qname[BUFSIZ];
     unsigned	nworkers;
@@ -210,9 +428,6 @@ void MON_StatusShutdown(pthread_t monitor);
 void MON_StatsInit(void);
 void MON_StatsUpdate(stats_update_t update);
 
-/* Mutex for multi-threaded stats updates. */
-pthread_mutex_t stats_update_lock;
-
 /* parse.c */
 int Parse_XID(const char *str, int len, unsigned *xid);
 int Parse_ReqStart(const char *ptr, int len, unsigned *xid);
@@ -221,3 +436,9 @@ int Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid,
 int Parse_VCL_Log(const char *ptr, int len, unsigned *xid,
     char **data, int *datalen);
 
+/* generic init attributes */
+pthread_mutexattr_t attr_lock;
+pthread_condattr_t  attr_cond;
+
+/* globals */
+extern int nworkers;
