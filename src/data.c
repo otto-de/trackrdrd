@@ -4,7 +4,8 @@
  * All rights reserved
  * Use only with permission
  *
- * Author: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ * Authors: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ *	    Nils Goroll <nils.goroll@uplex.de>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,97 +31,20 @@
  */
 
 #include <stdlib.h>
-#include <syslog.h>
 #include <string.h>
-#include <stdint.h>
-#include <limits.h>
-#include <stdbool.h>
-
-#include "libvarnish.h"
+#include <syslog.h>
+#include "trackrdrd.h"
+#include "vas.h"
 #include "miniobj.h"
 
-#include "trackrdrd.h"
-
-#define MIN_DATA_SCALE 10
-
-#define INDEX(u) ((u) & (tbl.len - 1))
-
 static const char *statename[3] = { "EMPTY", "OPEN", "DONE" };
-
-/*
- * N.B.: Hash functions defined for XIDs, which are declared in Varnish as
- * unsigned int, assuming that they are 32 bit.
- */
-#if UINT_MAX != UINT32_MAX
-#error "Unsigned ints are not 32 bit"
-#endif
-
-#define rotr(v,n) (((v) >> (n)) | ((v) << (32 - (n))))
-#define USE_JENKMULVEY1
-#define h1(k) jenkmulvey1(k)
-#define h2(k) wang(k)
-
-#ifdef USE_JENKMULVEY1
-/*
- * http://home.comcast.net/~bretm/hash/3.html
- * Bret Mulvey ascribes this to Bob Jenkins, but I can't find any
- * reference to it by Jenkins himself.
- */
-static uint32_t
-jenkmulvey1(uint32_t n)
-{
-    n += (n << 12);
-    n ^= (n >> 22);
-    n += (n << 4);
-    n ^= (n >> 9);
-    n += (n << 10);
-    n ^= (n >> 2);
-    n += (n << 7);
-    n ^= (n >> 12);
-    return(n);
-}
-#endif
-
-#ifdef USE_JENKMULVEY2
-/*
- * http://home.comcast.net/~bretm/hash/4.html
- * Mulvey's modification of the (alleged) Jenkins algorithm
- */
-static uint32_t
-jenkmulvey2(uint32_t n)
-{
-    n += (n << 16);
-    n ^= (n >> 13);
-    n += (n << 4);
-    n ^= (n >> 7);
-    n += (n << 10);
-    n ^= (n >> 5);
-    n += (n << 8);
-    n ^= (n >> 16);
-    return(n);
-}
-#endif
-
-/*
- * http://www.cris.com/~Ttwang/tech/inthash.htm
- */
-static uint32_t
-wang(uint32_t n)
-{
-  n  = ~n + (n << 15); // n = (n << 15) - n - 1;
-  n ^= rotr(n,12);
-  n += (n << 2);
-  n ^= rotr(n,4);
-  n  = (n + (n << 3)) + (n << 11);
-  n ^= rotr(n,16);
-  return n;
-}
 
 static void
 data_Cleanup(void)
 {
-    free(tbl.entry);
-    free(tbl.buf);
+    free(dtbl.entry);
+    free(dtbl.buf);
+    AZ(pthread_mutex_destroy(&dtbl.freelist_lock));
 }
 
 int
@@ -129,8 +53,13 @@ DATA_Init(void)
     dataentry *entryptr;
     char *bufptr;
     
-    int bufsize = 1 << (config.maxdata_scale + MIN_DATA_SCALE);
-    int entries = 1 << (config.maxopen_scale + MIN_TABLE_SCALE);
+    int bufsize = 1 << config.maxdata_scale;
+    
+    /*
+     * we want enough space to accomodate all open and done records
+     *
+     */
+    int entries = (1 << config.maxopen_scale) + (1 << config.maxdone_scale);
 
     entryptr = (dataentry *) calloc(entries, sizeof(dataentry));
     if (entryptr == NULL)
@@ -142,69 +71,181 @@ DATA_Init(void)
         return(errno);
     }
 
-    datatable init_tbl =
-        { .magic = DATATABLE_MAGIC, .len = entries, .collisions = 0,
-          .insert_probes = 0, .find_probes = 0, .seen = 0, .open = 0, .done = 0,
-          .nodata = 0, .len_overflows = 0, .data_overflows = 0, .submitted = 0,
-          .occ_hi = 0, .data_hi = 0, .entry = entryptr, .buf = bufptr };
-    memcpy(&tbl, &init_tbl, sizeof(datatable));
+    memset(&dtbl, 0, sizeof(datatable));
+    dtbl.magic	= DATATABLE_MAGIC;
+    dtbl.len	= entries;
+
+    VSTAILQ_INIT(&dtbl.freehead);
+    AZ(pthread_mutex_init(&dtbl.freelist_lock, &attr_lock));
+
+    dtbl.entry	= entryptr;
+    dtbl.buf	= bufptr;
+    dtbl.nfree  = 0;
 
     for (int i = 0; i < entries; i++) {
-        tbl.entry[i].magic = DATA_MAGIC;
-        tbl.entry[i].state = DATA_EMPTY;
-        tbl.entry[i].hasdata = false;
-        tbl.entry[i].data = &tbl.buf[i * bufsize];
+	dtbl.entry[i].magic = DATA_MAGIC;
+        dtbl.entry[i].state = DATA_EMPTY;
+        dtbl.entry[i].hasdata = false;
+        dtbl.entry[i].data = &dtbl.buf[i * bufsize];
+	VSTAILQ_INSERT_TAIL(&dtbl.freehead, &dtbl.entry[i], freelist);
+	dtbl.nfree++;
     }
+    assert(dtbl.nfree == entries);
+    assert(VSTAILQ_FIRST(&dtbl.freehead));
+
     atexit(data_Cleanup);
     return(0);
 }
 
-/* XXX: set xid and DATA_OPEN in the entry */
-dataentry 
-*DATA_Insert(unsigned xid)
+/* 
+ * take all free entries from the datatable for lockless
+ * allocation
+ */
+
+void
+DATA_Take_Freelist(struct freehead_s *dst)
 {
-    uint32_t h = h1(xid);
-    if (tbl.entry[INDEX(h)].state == DATA_EMPTY)
-        return(&tbl.entry[INDEX(h)]);
-    
-    unsigned probes = 0;
-    tbl.collisions++;
-    h += h2(xid);
-    while (++probes <= tbl.len && tbl.entry[INDEX(h)].state != DATA_EMPTY)
-        h++;
-    tbl.insert_probes += probes;
-    if (probes > tbl.len) {
-        tbl.len_overflows++;
-        return(NULL);
-    }
-    return(&tbl.entry[INDEX(h)]);
+	AZ(pthread_mutex_lock(&dtbl.freelist_lock));
+	VSTAILQ_CONCAT(dst, &dtbl.freehead);
+	dtbl.nfree = 0;
+	AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
 }
 
-dataentry
-*DATA_Find(unsigned xid)
+/*
+ * return to dtbl.freehead
+ *
+ * returned must be locked by caller, if required
+ */
+void
+DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned)
 {
-    uint32_t h = h1(xid);
-    if (tbl.entry[INDEX(h)].xid == xid)
-        return &tbl.entry[INDEX(h)];
-    h += h2(xid);
-    unsigned probes = 0;
-    while (++probes <= tbl.len && tbl.entry[INDEX(h)].xid != xid)
-        h++;
-    tbl.find_probes += probes;
-    if (probes > tbl.len)
-        return NULL;
-    return &tbl.entry[INDEX(h)];
+	AZ(pthread_mutex_lock(&dtbl.freelist_lock));
+	VSTAILQ_CONCAT(&dtbl.freehead, returned);
+	dtbl.nfree += nreturned;
+	AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
+}
+
+
+/* ------------------------------------------------------------  */
+/* noMT Functions to be used by one thread (the VSL reader) only */
+/* ------------------------------------------------------------  */
+
+static struct freehead_s data_noMT_freelist = 
+    VSTAILQ_HEAD_INITIALIZER(data_noMT_freelist);
+static pthread_t	 data_noMT_threadid = 0;
+
+#if defined(WITHOUT_EXPENSIVE_ASSERTS) || defined(WITHOUT_ASSERTS)
+#define DATA_noMT_check_thread()	do {} while(0)
+#else
+#define DATA_noMT_check_thread()					\
+	assert(data_noMT_threadid == pthread_self());
+#endif
+
+/* the one thread has to register */
+void
+DATA_noMT_Register(void)
+{
+	AZ(data_noMT_threadid);
+	data_noMT_threadid = pthread_self();
+}
+
+/* efficiently retrieve a single data entry */
+
+dataentry
+*DATA_noMT_Get(void)
+{
+	dataentry *data;
+
+	DATA_noMT_check_thread();
+	
+  take:
+	data = VSTAILQ_FIRST(&data_noMT_freelist);
+	if (data) {
+		VSTAILQ_REMOVE_HEAD(&data_noMT_freelist, freelist);
+	} else {
+		assert(VSTAILQ_EMPTY(&data_noMT_freelist));
+
+		while (dtbl.nfree == 0) {
+			dtbl.w_stats.wait_room++;
+			spmcq_wait(room);
+		}
+		DATA_Take_Freelist(&data_noMT_freelist);
+		assert(! VSTAILQ_EMPTY(&data_noMT_freelist));
+		goto take;
+	}
+	assert(data->state == DATA_EMPTY);
+	return (data);
+}
+
+/* return to our own local cache */
+
+static inline void
+data_nomt_free(dataentry *de)
+{
+	DATA_noMT_check_thread();
+	assert(de->state == DATA_EMPTY);
+	VSTAILQ_INSERT_HEAD(&data_noMT_freelist, de, freelist);
+}
+
+void
+DATA_noMT_Free(dataentry *de)
+{
+	data_nomt_free(de);
+}
+
+
+void
+DATA_noMT_Submit(dataentry *de)
+{
+	DATA_noMT_check_thread();
+	CHECK_OBJ_NOTNULL(de, DATA_MAGIC);
+	assert(de->state == DATA_DONE);
+	LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", de->end, de->data);
+	if (de->hasdata == false) {
+		de->state = DATA_EMPTY;
+		MON_StatsUpdate(STATS_NODATA);
+		data_nomt_free(de);
+		return;
+	}
+
+	while (!SPMCQ_Enq((void *) de)) {
+		dtbl.w_stats.wait_qfull++;
+		LOG_Log(LOG_ALERT, "%s", "Internal queue full, waiting for dequeue");
+
+		spmcq_wait(room);
+	}
+	dtbl.w_stats.submitted++;
+
+	/* should we wake up another worker? */
+	if (SPMCQ_need_worker(SPMCQ_Len(), (nworkers - spmcq_datawaiter), nworkers, (1 << config.qlen_goal_scale)))
+		spmcq_signal(data);
+
+	/*
+	 * base case: wake up a worker if all are sleeping
+	 *
+	 * this is an un-synced access to spmcq_data_waiter, but
+	 * if we don't wake them up now, we will next time around
+	 */
+	if (nworkers == spmcq_datawaiter)
+		spmcq_signal(data);
+}
+
+
+
+
+void
+DATA_Dump1(dataentry *entry, int i)
+{
+        if (entry->state == DATA_EMPTY)
+		return;
+        LOG_Log(LOG_INFO, "Data entry %d: XID=%d tid=%d state=%s data=[%.*s]",
+            i, entry->xid, entry->tid, statename[entry->state], entry->end,
+            entry->data);
 }
 
 void
 DATA_Dump(void)
 {
-    for (int i = 0; i < tbl.len; i++) {
-        dataentry entry = tbl.entry[i];
-        if (entry.state == DATA_EMPTY)
-            continue;
-        LOG_Log(LOG_INFO, "Data entry %d: XID=%d tid=%d state=%s data=[%.*s]",
-            i, entry.xid, entry.tid, statename[entry.state], entry.end,
-            entry.data);
-    }
+	for (int i = 0; i < dtbl.len; i++)
+		DATA_Dump1(&dtbl.entry[i], i);
 }
