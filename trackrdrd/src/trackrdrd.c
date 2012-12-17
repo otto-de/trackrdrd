@@ -4,7 +4,9 @@
  * All rights reserved
  * Use only with permission
  *
- * Author: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ * Authors: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ *	    Nils Goroll <nils.goroll@uplex.de>
+ *
  * Portions adopted from varnishlog.c from the Varnish project
  *	Author: Poul-Henning Kamp <phk@phk.freebsd.dk>
  * 	Copyright (c) 2006 Verdens Gang AS
@@ -101,194 +103,35 @@ static struct sigaction terminate_action, dump_action, ignore_action,
 
 static char cli_config_filename[BUFSIZ] = "";
 
-/*--------------------------------------------------------------------*/
+#ifdef WITHOUT_ASSERTS
+#define entry_assert(e, cond)       do { (void)(e);(void)(cond);} while(0)
+#else /* WITH_ASSERTS */
+#define entry_assert(e, cond)						\
+	do {								\
+		if (!(cond))						\
+			entry_assert_failure(__func__, __FILE__, __LINE__, #cond, (e), errno, 0); \
+	} while (0)
+
+static void assert_failure(const char *func, const char *file, int line, const char *cond,
+int err, int xxx);
 
 static void
-submit(unsigned xid)
+entry_assert_failure(const char *func, const char *file, int line, const char *cond,
+                     hashentry *he, int err, int xxx)
 {
-    dataentry *entry;
-    
-    entry = DATA_Find(xid);
-    CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-    assert(entry->state == DATA_DONE);
-    LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", entry->end, entry->data);
-    
-    if (! entry->hasdata) {
-        entry->state = DATA_EMPTY;
-        MON_StatsUpdate(STATS_NODATA);
-        return;
-    }
-    while (!SPMCQ_Enq((void *) entry)) {
-        tbl.wait_qfull++;
-        LOG_Log(LOG_ALERT, "%s", "Internal queue full, waiting for dequeue");
-        AZ(pthread_mutex_lock(&spmcq_nonfull_lock));
-        AZ(pthread_cond_wait(&spmcq_nonfull_cond, &spmcq_nonfull_lock));
-    }
-    AZ(pthread_cond_signal(&spmcq_nonempty_cond));
-    tbl.submitted++;
+	dataentry *de = he->de;
+	LOG_Log(LOG_ALERT, "Hashentry %p magic %0x state %u xid %u insert_time %f de %p",
+	    (he), (he)->magic, (he)->state, (he)->xid, (he)->insert_time, (he)->de);
+	if (de)
+		LOG_Log(LOG_ALERT, "Dataentry %p magic %0x state %u xid %u tid %u end %u",
+		    (de), (de)->magic, (de)->state, (de)->xid, (de)->tid, (de)->end);
+	else
+		LOG_Log(LOG_ALERT, "Dataentry %p NULL!", (de));
+	assert_failure(func, file, line, cond, err, xxx);
 }
-
-static inline dataentry
-*find(unsigned xid, enum VSL_tag_e tag, unsigned fd, const char *ptr,
-      unsigned len)
-{
-    dataentry *entry;
-
-    entry = DATA_Find(xid);
-    if (entry == NULL) {
-        if (!term)
-            LOG_Log(LOG_WARNING,
-                "%s: XID %d not found, fd=%d, DISCARDING [%.*s]",
-                VSL_tags[tag], xid, fd, len, ptr);
-        return NULL;
-    }
-
-    CHECK_OBJ(entry, DATA_MAGIC);
-    assert(entry->xid == xid);
-    assert(entry->tid == fd);
-    assert(entry->state == DATA_OPEN);
-
-    return entry;
-}
-
-static inline void
-append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
-    int datalen)
-{
-    /* Data overflow */
-    /* XXX: Encapsulate (1 << (config.maxdata_scale+10)) */
-    if (entry->end + datalen + 1 > (1 << (config.maxdata_scale+10))) {
-        LOG_Log(LOG_ALERT,
-            "%s: Data too long, XID=%d, current length=%d, "
-            "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
-            datalen, data);
-        tbl.data_overflows++;
-        return;
-    }
-        
-    entry->data[entry->end] = '&';
-    entry->end++;
-    memcpy(&entry->data[entry->end], data, datalen);
-    entry->end += datalen;
-    if (entry->end > tbl.data_hi)
-        tbl.data_hi = entry->end;
-    return;
-}
-
-static int
-OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
-          unsigned spec, const char *ptr, uint64_t bitmap)
-{
-    unsigned xid;
-    dataentry *entry;
-    int err, datalen;
-    char *data, reqend_str[strlen(REQEND_T_VAR)+22];
-    struct timespec reqend_t;
-
-    (void) priv;
-    (void) bitmap;
-
-    if (term && tbl.open == 0)
-        return 1;
-    
-    /* spec != 'c' */
-    if ((spec & VSL_S_CLIENT) == 0)
-        LOG_Log(LOG_WARNING, "%s: Client bit ('c') not set [%.*s]",
-            VSL_tags[tag], len, ptr);
-    
-    switch (tag) {
-    case SLT_ReqStart:
-
-        if (term) return(0);
-        
-        tbl.seen++;
-        err = Parse_ReqStart(ptr, len, &xid);
-        AZ(err);
-        LOG_Log(LOG_DEBUG, "%s: XID=%d", VSL_tags[tag], xid);
-
-        entry = DATA_Insert(xid);
-        if (entry == NULL) {
-            LOG_Log(LOG_ALERT,
-                "%s: Cannot insert data, XID=%d tid=%d DISCARDED",
-                VSL_tags[tag], xid, fd);
-            break;
-        }
-        CHECK_OBJ(entry, DATA_MAGIC);
-        
-        entry->state = DATA_OPEN;
-        entry->xid = xid;
-        entry->tid = fd;
-        entry->hasdata = false;
-        sprintf(entry->data, "XID=%d", xid);
-        entry->end = strlen(entry->data);
-        if (entry->end > tbl.data_hi)
-            tbl.data_hi = entry->end;
-        MON_StatsUpdate(STATS_OCCUPANCY);
-        
-        break;
-
-    case SLT_VCL_Log:
-        /* Skip VCL_Log entries without the "track " prefix. */
-        if (strncmp(ptr, TRACKLOG_PREFIX, TRACKLOG_PREFIX_LEN) != 0)
-            break;
-        
-        err = Parse_VCL_Log(&ptr[TRACKLOG_PREFIX_LEN], len-TRACKLOG_PREFIX_LEN,
-                            &xid, &data, &datalen);
-        AZ(err);
-        LOG_Log(LOG_DEBUG, "%s: XID=%d, data=[%.*s]", VSL_tags[tag],
-            xid, datalen, data);
-        
-        entry = find(xid, tag, fd, ptr, len);
-        if (entry == NULL)
-            break;
-
-        append(entry, tag, xid, data, datalen);
-        entry->hasdata = true;
-        break;
-
-    case SLT_ReqEnd:
-
-        err = Parse_ReqEnd(ptr, len, &xid, &reqend_t);
-        AZ(err);
-        LOG_Log(LOG_DEBUG, "%s: XID=%d req_endt=%u.%09lu", VSL_tags[tag], xid,
-            (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
-
-        entry = find(xid, tag, fd, ptr, len);
-        if (entry == NULL)
-            break;
-        sprintf(reqend_str, "%s=%u.%09lu", REQEND_T_VAR,
-            (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
-        append(entry, tag, xid, reqend_str, strlen(reqend_str));
-        entry->state = DATA_DONE;
-        MON_StatsUpdate(STATS_DONE);
-        submit(xid);
-        break;
-
-    default:
-        /* Unreachable */
-        AN(NULL);
-        return(1);
-    }
-    return(0);
-}
+#endif
 
 /*--------------------------------------------------------------------*/
-
-/* Handle for the PID file */
-struct vpf_fh *pfh = NULL;
-
-static void
-read_default_config(void) {
-    if (access(DEFAULT_CONFIG, F_OK) == 0) {
-        if (access(DEFAULT_CONFIG, R_OK) != 0) {
-            perror(DEFAULT_CONFIG);
-            exit(EXIT_FAILURE);
-        }
-        printf("Reading config from %s\n", DEFAULT_CONFIG);
-        if (CONF_ReadFile(DEFAULT_CONFIG) != 0)
-            exit(EXIT_FAILURE);
-    }
-}
 
 static void
 assert_failure(const char *func, const char *file, int line, const char *cond,
@@ -301,6 +144,21 @@ assert_failure(const char *func, const char *file, int line, const char *cond,
     if (err)
         LOG_Log(LOG_ALERT, "errno = %d (%s)", err, strerror(err));
     abort();
+}
+
+static inline void
+check_entry(hashentry *he, unsigned xid, unsigned tid)
+{
+	dataentry *de;
+	CHECK_OBJ_NOTNULL(he, HASH_MAGIC);
+	entry_assert(he, he->xid == xid);
+	entry_assert(he, he->state == HASH_OPEN);
+
+	de = he->de;
+	entry_assert(he, de != NULL);
+	entry_assert(he, de->magic == DATA_MAGIC);
+	entry_assert(he, de->xid == xid);
+	entry_assert(he, de->tid == tid);
 }
 
 static void
@@ -328,10 +186,241 @@ stacktrace(void)
 }
 
 static void
+stacktrace_abort(int sig)
+{
+    LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
+	strsignal(sig));
+    stacktrace();
+    AZ(sigaction(SIGABRT, &default_action, NULL));
+    LOG_Log0(LOG_ALERT, "Aborting");
+    abort();
+}
+
+/*--------------------------------------------------------------------*/
+
+
+static inline dataentry
+*insert(unsigned xid, unsigned fd, float tim)
+{
+    dataentry *de = DATA_noMT_Get();
+    hashentry *he = HASH_Insert(xid, de, tim);
+
+    if (! he) {
+	    LOG_Log(LOG_WARNING, "Insert: Could not insert hash for XID %d",
+		xid);
+	    DATA_noMT_Free(de);
+	    return (NULL);
+    }
+
+    /* he being filled out by Hash_Insert, we need to look after de */
+    de->xid	= xid;
+    de->state	= DATA_OPEN;
+    de->tid	= fd;
+    de->hasdata	= false;
+
+    sprintf(de->data, "XID=%d", xid);
+    de->end = strlen(de->data);
+    if (de->end > dtbl.w_stats.data_hi)
+	dtbl.w_stats.data_hi = de->end;
+    MON_StatsUpdate(STATS_OCCUPANCY);
+    
+    return (de);
+}
+
+static inline void
+append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
+    int datalen)
+{
+    CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+    /* Data overflow */
+    if (entry->end + datalen + 1 > (1 << (config.maxdata_scale))) {
+        LOG_Log(LOG_ALERT,
+            "%s: Data too long, XID=%d, current length=%d, "
+            "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
+            datalen, data);
+        dtbl.w_stats.data_overflows++;
+        return;
+    }
+        
+    entry->data[entry->end] = '&';
+    entry->end++;
+    memcpy(&entry->data[entry->end], data, datalen);
+    entry->end += datalen;
+    if (entry->end > dtbl.w_stats.data_hi)
+        dtbl.w_stats.data_hi = entry->end;
+    return;
+}
+
+/*
+ * rules for reading VSL:
+ *
+ * Under all circumstances do we need to avoid to fall behind reading the VSL:
+ * - if we miss ReqEnd, we will clobber our hash, which has a bunch of negative
+ *   consequences:
+ *   - hash lookups become inefficient
+ *   - inserts become more likely to fail
+ *   - before we had HASH_Exp, the hash would become useless
+ * - if the VSL wraps, we will see corrupt data
+ *
+ * so if we really cannot create an entry at ReqStart time, we need to thow
+ * it away, and process the next log/end records to make room
+ *
+ */
+static int
+OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
+          unsigned spec, const char *ptr, uint64_t bitmap)
+{
+    unsigned xid;
+    hashentry *he;
+    dataentry *de;
+    int err, datalen;
+    char *data, reqend_str[strlen(REQEND_T_VAR)+22];
+    struct timespec reqend_t;
+    float tim, tim_exp_check = 0.0;
+
+    /* wrap detection statistics */
+    static const char *pptr = (const char *)UINTPTR_MAX;
+
+    static unsigned wrap_start_xid = 0;
+    static unsigned wrap_end_xid = 0;
+
+    static unsigned last_start_xid = 0;
+    static unsigned last_end_xid = 0;
+
+    static unsigned xid_spread_sum = 0;
+    static unsigned xid_spread_count = 0;
+
+    (void) priv;
+    (void) bitmap;
+
+
+    if (term && htbl.open == 0)
+        return 1;
+    
+    /* spec != 'c' */
+    if ((spec & VSL_S_CLIENT) == 0)
+        LOG_Log(LOG_WARNING, "%s: Client bit ('c') not set [%.*s]",
+            VSL_tags[tag], len, ptr);
+    
+    switch (tag) {
+    case SLT_ReqStart:
+        if (term) return(0);
+        
+        htbl.seen++;
+        err = Parse_ReqStart(ptr, len, &xid);
+        AZ(err);
+        LOG_Log(LOG_DEBUG, "%s: XID=%u", VSL_tags[tag], xid);
+
+	if (xid > last_start_xid)
+		last_start_xid = xid;
+
+	tim = TIM_mono();
+        if (! insert(xid, fd, tim)) {
+	    htbl.drop_reqstart++;
+	    break;
+	}
+
+	/* configurable ? */
+	if ((tim - tim_exp_check) > 10) {
+		HASH_Exp(tim - htbl.ttl);
+		tim_exp_check = tim;
+	}
+	break;
+
+    case SLT_VCL_Log:
+        /* Skip VCL_Log entries without the "track " prefix. */
+        if (strncmp(ptr, TRACKLOG_PREFIX, TRACKLOG_PREFIX_LEN) != 0)
+            break;
+        
+        err = Parse_VCL_Log(&ptr[TRACKLOG_PREFIX_LEN], len-TRACKLOG_PREFIX_LEN,
+                            &xid, &data, &datalen);
+        AZ(err);
+        LOG_Log(LOG_DEBUG, "%s: XID=%u, data=[%.*s]", VSL_tags[tag],
+            xid, datalen, data);
+
+	he = HASH_Find(xid);
+	if (! he) {
+	    LOG_Log(LOG_WARNING, "%s: XID %d not found",
+		VSL_tags[tag], xid);
+	    htbl.drop_vcl_log++;
+	    break;
+	}
+	check_entry(he, xid, fd);
+	de = he->de;
+        append(de, tag, xid, data, datalen);
+        de->hasdata = true;
+        break;
+
+    case SLT_ReqEnd:
+
+        err = Parse_ReqEnd(ptr, len, &xid, &reqend_t);
+        AZ(err);
+        LOG_Log(LOG_DEBUG, "%s: XID=%u req_endt=%u.%09lu", VSL_tags[tag], xid,
+            (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
+
+	if (xid > last_end_xid)
+		last_end_xid = xid;
+
+	xid_spread_sum += (last_end_xid - last_start_xid);
+	xid_spread_count++;
+
+	he = HASH_Find(xid);
+	if (! he) {
+	    LOG_Log(LOG_WARNING, "%s: XID %d not found",
+		VSL_tags[tag], xid);
+	    htbl.drop_reqend++;
+	    break;
+	}
+	check_entry(he, xid, fd);
+	de = he->de;
+
+        sprintf(reqend_str, "%s=%u.%09lu", REQEND_T_VAR,
+            (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
+        append(de, tag, xid, reqend_str, strlen(reqend_str));
+        de->state = DATA_DONE;
+        MON_StatsUpdate(STATS_DONE);
+        HASH_Submit(he);
+        break;
+
+    default:
+        /* Unreachable */
+        AN(NULL);
+        return(1);
+    }
+
+    /* 
+     * log when the vsl ptr wraps, so we can relate lost records, if
+     * applicable 
+     */
+    if (ptr < pptr) {
+	    LOG_Log(LOG_INFO, "VSL wrap at %u", xid);
+	    if (wrap_start_xid) {
+		    LOG_Log(LOG_INFO, "VSL wrap start xid %10u current %10u delta %10d",
+			wrap_start_xid, last_start_xid, (last_start_xid - wrap_start_xid));
+		    LOG_Log(LOG_INFO, "VSL wrap end   xid %10u current %10u delta %10d",
+			wrap_end_xid, last_end_xid, (last_end_xid - wrap_end_xid));
+		    /* AAARRRGLLL, I confess: yes, I am calculating an average here */
+		    LOG_Log(LOG_INFO, "VSL wrap xid spread is %u - avg xid spread is %f",
+			(last_start_xid - last_end_xid),
+			(1.0 * xid_spread_sum / xid_spread_count));
+		    xid_spread_count = xid_spread_sum = 0;
+	    }
+
+	    wrap_start_xid = last_start_xid;
+	    wrap_end_xid = last_end_xid;
+    }
+    pptr = ptr;
+
+    return(0);
+}
+
+/*--------------------------------------------------------------------*/
+
+static void
 dump(int sig)
 {
     (void) sig;
-    DATA_Dump();
+    HASH_Dump();
 }
 
 static void
@@ -348,16 +437,22 @@ restart(int sig)
     reload = 1;
 }
 
+/* Handle for the PID file */
+struct vpf_fh *pfh = NULL;
+
 static void
-stacktrace_abort(int sig)
-{
-    LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
-	strsignal(sig));
-    stacktrace();
-    AZ(sigaction(SIGABRT, &default_action, NULL));
-    LOG_Log0(LOG_ALERT, "Aborting");
-    abort();
+read_default_config(void) {
+    if (access(DEFAULT_CONFIG, F_OK) == 0) {
+        if (access(DEFAULT_CONFIG, R_OK) != 0) {
+            perror(DEFAULT_CONFIG);
+            exit(EXIT_FAILURE);
+        }
+        printf("Reading config from %s\n", DEFAULT_CONFIG);
+        if (CONF_ReadFile(DEFAULT_CONFIG) != 0)
+            exit(EXIT_FAILURE);
+    }
 }
+
 
 static void
 parent_shutdown(int status, pid_t child_pid)
@@ -479,13 +574,29 @@ vsl_diag(void *priv, const char *fmt, ...)
 }
 
 static void
+init_pthread_attrs(void)
+{
+    AZ(pthread_mutexattr_init(&attr_lock));
+    AZ(pthread_condattr_init(&attr_cond));
+
+    // important to make mutex/cv efficient
+    AZ(pthread_mutexattr_setpshared(&attr_lock,
+	    PTHREAD_PROCESS_PRIVATE));
+    AZ(pthread_condattr_setpshared(&attr_cond,
+	    PTHREAD_PROCESS_PRIVATE)); 
+}
+
+static void
 child_main(struct VSM_data *vd, int endless, int readconfig)
 {
-    int errnum, nworkers;
+    int errnum;
     const char *errmsg;
     pthread_t monitor;
     struct passwd *pw;
 
+    init_pthread_attrs();
+    MON_StatsInit();
+        
     LOG_Log0(LOG_INFO, "Worker process starting");
 
     /* XXX: does not re-configure logging. Feature or bug? */
@@ -517,6 +628,10 @@ child_main(struct VSM_data *vd, int endless, int readconfig)
 
     if (DATA_Init() != 0) {
         LOG_Log(LOG_ERR, "Cannot init data table: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    if (HASH_Init() != 0) {
+        LOG_Log(LOG_ERR, "Cannot init hash table: %s", strerror(errno));
         exit(EXIT_FAILURE);
     }
 
@@ -557,8 +672,6 @@ child_main(struct VSM_data *vd, int endless, int readconfig)
         exit(EXIT_FAILURE);
     }
 
-    MON_StatsInit();
-        
     /* Start worker threads */
     WRK_Start();
     nworkers = WRK_Running();
@@ -576,6 +689,7 @@ child_main(struct VSM_data *vd, int endless, int readconfig)
     term = 0;
     /* XXX: Varnish restart? */
     /* XXX: TERM not noticed until request received */
+    DATA_noMT_Register();
     while (VSL_Dispatch(vd, OSL_Track, NULL) > 0)
         if (term || !endless)
             break;
@@ -745,7 +859,15 @@ main(int argc, char * const *argv)
 	AZ(sigemptyset(&restart_action.sa_mask));
 	restart_action.sa_flags &= ~SA_RESTART;
 
+	/* dont' get proper gdb backtraces with the handler in place */
+#ifdef  DISABLE_STACKTRACE
+	do {
+		void *foo;
+		foo = stacktrace_abort;
+	} while (0);
+#else
 	stacktrace_action.sa_handler = stacktrace_abort;
+#endif
 
 	ignore_action.sa_handler = SIG_IGN;
 	default_action.sa_handler = SIG_DFL;

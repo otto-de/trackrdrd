@@ -37,6 +37,7 @@
 
 #include "trackrdrd.h"
 #include "vas.h"
+#include "vmb.h"
 
 static pthread_mutex_t spmcq_deq_lock;
 
@@ -46,6 +47,24 @@ spmcq_len(void)
     if (spmcq.tail >= spmcq.head)
         return spmcq.tail - spmcq.head;
     return UINT_MAX - spmcq.head + 1 + spmcq.tail;
+}
+
+/* 
+ * this is only approximately correct and could even become negative when values
+ * get updated while we read them!
+ * 
+ */
+int SPMCQ_Len(void) {
+    unsigned	l;
+
+    do {
+	l = spmcq_len();
+	if (l <= spmcq.mask + 1)
+	    break;
+	VRMB();
+    } while (1);
+
+    return (l);
 }
 
 static void
@@ -60,7 +79,7 @@ SPMCQ_Init(void)
 {
     void *buf;
     
-    size_t n = 1 << (MIN_TABLE_SCALE + config.maxopen_scale);
+    size_t n = 1 << config.maxdone_scale;
     buf = calloc(n, sizeof(void *));
     if (buf == NULL)
         return(errno);
@@ -108,7 +127,7 @@ main(int argc, char * const *argv)
     printf("\nTEST: %s\n", argv[0]);
     printf("... test SMPCQ enqueue at UINT_MAX overflow\n");
     
-    config.maxopen_scale = 0;
+    config.maxopen_scale = 10;
     SPMCQ_Init();
     spmcq.head = spmcq.tail = UINT_MAX - 2;
 
@@ -120,6 +139,7 @@ main(int argc, char * const *argv)
     assert(SPMCQ_Enq(NULL));
     assert(SPMCQ_Enq(NULL));
     assert(spmcq_len() == 7);
+    assert(SPMCQ_Len() == 7);
 
     printf("%s: 1 test run\n", argv[0]);
     exit(0);
