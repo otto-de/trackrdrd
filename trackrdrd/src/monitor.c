@@ -44,15 +44,78 @@ static void
 log_output(void)
 {
     LOG_Log(LOG_INFO,
-        "Data table: len=%u collisions=%u insert_probes=%u find_probes=%u "
-        "open=%u done=%u load=%.2f len_overflows=%u data_overflows=%u "
-        "occ_hi=%u seen=%u submitted=%u nodata=%u sent=%u failed=%u "
-        "wait_qfull=%u data_hi=%u",
-        tbl.len, tbl.collisions, tbl.insert_probes, tbl.find_probes,
-        tbl.open, tbl.done, 100.0 * ((float) tbl.open + tbl.done) / tbl.len,
-        tbl.len_overflows, tbl.data_overflows, tbl.occ_hi, tbl.seen,
-        tbl.submitted, tbl.nodata, tbl.sent, tbl.failed, tbl.wait_qfull,
-        tbl.data_hi);
+	"Hash table: "
+        "len=%u "
+	"seen=%u "
+	"drop_reqstart=%u "
+	"drop_vcl_log=%u "
+	"drop_reqend=%u "
+	"expired=%u "
+	"evacuated=%u "
+	"open=%u "
+	"load=%.2f "    
+	"collisions=%u "
+	"insert_probes=%u "
+	"find_probes=%u "
+	"fail=%u "
+	"occ_hi=%u "
+	"occ_hi_this=%u ",
+        htbl.len,
+	htbl.seen,
+	htbl.drop_reqstart,
+	htbl.drop_vcl_log,
+	htbl.drop_reqend,
+	htbl.expired,
+	htbl.evacuated,
+	htbl.open,
+        100.0 * htbl.open / htbl.len,
+	htbl.collisions,
+	htbl.insert_probes,
+	htbl.find_probes,
+	htbl.fail,
+	htbl.occ_hi,
+	htbl.occ_hi_this);
+
+    htbl.occ_hi_this = 0;
+
+    LOG_Log(LOG_INFO,
+        "Data table writer: "
+	"len=%u "
+	"nodata=%u "
+	"submitted=%u "
+	"wait_qfull=%u "
+	"wait_room=%u "
+	"data_hi=%u "
+	"data_overflows=%u ",
+	dtbl.len,
+	dtbl.w_stats.nodata,
+	dtbl.w_stats.submitted,
+	dtbl.w_stats.wait_qfull,
+	dtbl.w_stats.wait_room,
+	dtbl.w_stats.data_hi,
+	dtbl.w_stats.data_overflows);
+
+    LOG_Log(LOG_INFO,
+        "Data table reader: "
+	"done=%u "
+	"open=%u "
+	"load=%.2f "
+	"sent=%u "
+	"failed=%u "
+	"occ_hi=%u "
+	"occ_hi_this=%u ",
+	dtbl.r_stats.done,
+	dtbl.r_stats.open,
+	(100.0 * (1.0 * dtbl.r_stats.done + 1.0 * dtbl.r_stats.open) / dtbl.len),
+	dtbl.r_stats.sent,
+	dtbl.r_stats.failed,
+	dtbl.r_stats.occ_hi,
+	dtbl.r_stats.occ_hi_this
+	);
+
+    /* locking would be overkill */
+    dtbl.r_stats.occ_hi_this = 0;
+
     if (config.monitor_workers)
         WRK_Stats();
 }
@@ -109,49 +172,52 @@ MON_StatusShutdown(pthread_t monitor)
     run = 0;
     AZ(pthread_cancel(monitor));
     AZ(pthread_join(monitor, NULL));
+    AZ(pthread_mutex_destroy(&dtbl.r_stats.mutex));
 }
 
 void
 MON_StatsInit(void)
 {
-    AZ(pthread_mutex_init(&stats_update_lock, NULL));
+    AZ(pthread_mutex_init(&dtbl.r_stats.mutex, &attr_lock));
 }
 
 void
 MON_StatsUpdate(stats_update_t update)
 {
-    AZ(pthread_mutex_lock(&stats_update_lock));
+    AZ(pthread_mutex_lock(&dtbl.r_stats.mutex));
     switch(update) {
         
     case STATS_SENT:
-        tbl.sent++;
-        tbl.done--;
+        dtbl.r_stats.sent++;
+        dtbl.r_stats.done--;
         break;
         
     case STATS_FAILED:
-        tbl.failed++;
-        tbl.done--;
+        dtbl.r_stats.failed++;
+        dtbl.r_stats.done--;
         break;
         
     case STATS_DONE:
-        tbl.done++;
-        tbl.open--;
+        dtbl.r_stats.done++;
+        dtbl.r_stats.open--;
         break;
 
     case STATS_OCCUPANCY:
-        tbl.open++;
-        if (tbl.open + tbl.done > tbl.occ_hi)
-            tbl.occ_hi = tbl.open + tbl.done;
+        dtbl.r_stats.open++;
+        if (dtbl.r_stats.open + dtbl.r_stats.done > dtbl.r_stats.occ_hi)
+            dtbl.r_stats.occ_hi = dtbl.r_stats.open + dtbl.r_stats.done;
+        if (dtbl.r_stats.open + dtbl.r_stats.done > dtbl.r_stats.occ_hi_this)
+            dtbl.r_stats.occ_hi_this = dtbl.r_stats.open + dtbl.r_stats.done;
         break;
 
     case STATS_NODATA:
-        tbl.nodata++;
-        tbl.done--;
+	dtbl.w_stats.nodata++;
+        dtbl.r_stats.done--;
         break;
         
     default:
         /* Unreachable */
         AN(NULL);
     }
-    AZ(pthread_mutex_unlock(&stats_update_lock));
+    AZ(pthread_mutex_unlock(&dtbl.r_stats.mutex));
 }
