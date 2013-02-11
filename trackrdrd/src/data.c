@@ -217,7 +217,7 @@ DATA_noMT_Submit(dataentry *de)
 	dtbl.w_stats.submitted++;
 
 	/* should we wake up another worker? */
-	if (SPMCQ_need_worker(SPMCQ_Len(), (nworkers - spmcq_datawaiter), nworkers, (1 << config.qlen_goal_scale)))
+	if (SPMCQ_NeedWorker())
 		spmcq_signal(data);
 
 	/*
