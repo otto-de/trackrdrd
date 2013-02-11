@@ -308,9 +308,9 @@ CONF_Dump(void)
     confdump("maxopen.scale = %u", config.maxopen_scale);
     confdump("maxdata.scale = %u", config.maxdata_scale);
     confdump("qlen_goal.scale = %u", config.qlen_goal_scale);
-    confdump("hash_max_probes", config.hash_max_probes);
-    confdump("hash_ttl", config.hash_ttl);
-    confdump("hash_mlt", config.hash_mlt);
+    confdump("hash_max_probes = %u", config.hash_max_probes);
+    confdump("hash_ttl = %u", config.hash_ttl);
+    confdump("hash_mlt = %u", config.hash_mlt);
 
 
     confdump("mq.uri = %s", config.mq_uri);

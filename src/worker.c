@@ -160,7 +160,7 @@ static void
             wrk_send(amq_worker, entry, wrk);
 
 	    /* should we go to sleep ? */
-	    if (SPMCQ_stop_worker(SPMCQ_Len(), (nworkers - spmcq_datawaiter), nworkers, (1 << config.qlen_goal_scale)))
+	    if (SPMCQ_StopWorker())
 		    goto sleep;
 	    
 	    continue;
@@ -188,10 +188,7 @@ static void
 	 *
 	 * also re-check the stop condition under the lock
 	 */
-        if (run &&
-	    ((! entry) ||
-	     SPMCQ_stop_worker(SPMCQ_Len(), (nworkers - spmcq_datawaiter),
-	                       nworkers, (1 << config.qlen_goal_scale)))) {
+        if (run && ((! entry) || SPMCQ_StopWorker())) {
 		wrk->waits++;
 		spmcq_datawaiter++;
 		wrk->state = WRK_WAITING;

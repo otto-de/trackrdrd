@@ -40,6 +40,7 @@
 #include "vmb.h"
 
 static pthread_mutex_t spmcq_deq_lock;
+static unsigned qlen_goal;
 
 static inline unsigned
 spmcq_len(void)
@@ -49,6 +50,7 @@ spmcq_len(void)
     return UINT_MAX - spmcq.head + 1 + spmcq.tail;
 }
 
+#if 0
 /* 
  * this is only approximately correct and could even become negative when values
  * get updated while we read them!
@@ -66,12 +68,19 @@ int SPMCQ_Len(void) {
 
     return (l);
 }
+#endif
 
 static void
 spmcq_cleanup(void)
 {
     free(spmcq.data);
     AZ(pthread_mutex_destroy(&spmcq_deq_lock));
+}
+
+static inline int
+spmcq_wrk_len_ratio(int working)
+{
+    return working * qlen_goal / nworkers;
 }
 
 int
@@ -91,6 +100,9 @@ SPMCQ_Init(void)
         { .magic = SPMCQ_MAGIC, .mask = n - 1, .data = buf, .head = 0,
           .tail = 0 };
     memcpy(&spmcq, &q, sizeof(spmcq_t));
+
+    qlen_goal = 1 << config.qlen_goal_scale;
+    
     atexit(spmcq_cleanup);
     return(0);
 }
@@ -118,6 +130,39 @@ void
     return ptr;
 }
 
+/*
+ * should we wake up another worker?
+ *
+ * M = l / (u x p)
+ *
+ * l: arrival rate
+ * u: service rate
+ * p: utilization
+ *
+ * to get an optimal M, we would need to measure l and u, so to
+ * simplify, we just try to keep the number of workers proportional to
+ * the queue length
+ *
+ * wake up another worker if queue is sufficiently full
+ * Q_Len > working * qlen_goal / max_workers
+ */
+
+bool
+SPMCQ_NeedWorker(void)
+{
+    if (nworkers == 0)
+        return false;
+    return spmcq_len() > spmcq_wrk_len_ratio(nworkers - spmcq_datawaiter);
+}
+
+bool
+SPMCQ_StopWorker(void)
+{
+    if (nworkers == 0)
+        return false;
+    return spmcq_len() < spmcq_wrk_len_ratio(nworkers - spmcq_datawaiter - 1);
+}
+
 #ifdef TEST_DRIVER
 int
 main(int argc, char * const *argv)
@@ -127,7 +172,7 @@ main(int argc, char * const *argv)
     printf("\nTEST: %s\n", argv[0]);
     printf("... test SMPCQ enqueue at UINT_MAX overflow\n");
     
-    config.maxopen_scale = 10;
+    config.maxdone_scale = 10;
     SPMCQ_Init();
     spmcq.head = spmcq.tail = UINT_MAX - 2;
 
@@ -139,7 +184,6 @@ main(int argc, char * const *argv)
     assert(SPMCQ_Enq(NULL));
     assert(SPMCQ_Enq(NULL));
     assert(spmcq_len() == 7);
-    assert(SPMCQ_Len() == 7);
 
     printf("%s: 1 test run\n", argv[0]);
     exit(0);
