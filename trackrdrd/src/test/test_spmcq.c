@@ -44,6 +44,8 @@
 
 #define NCON 10
 
+#define MIN_TABLE_SCALE (MIN_MAXOPEN_SCALE + MIN_MAXDONE_SCALE)
+
 int run;
 
 typedef enum {
@@ -80,7 +82,7 @@ static void
     srand48(time(NULL));
     unsigned xid = (unsigned int) lrand48();
 
-    for (int i = 0; i < (1 << MIN_TABLE_SCALE); i++) {
+    for (int i = 0; i < (1 << MIN_MAXOPEN_SCALE); i++) {
         xids[i] = xid;
         debug_print("Producer: enqueue %d (xid = %u)\n", ++enqs, xid);
         if (!SPMCQ_Enq(&xids[i])) {
@@ -88,7 +90,7 @@ static void
             pthread_exit(&proddata);
         }
         debug_print("%s\n", "Producer: broadcast");
-        if (pthread_cond_broadcast(&spmcq_nonempty_cond) != 0) {
+        if (pthread_cond_broadcast(&spmcq_datawaiter_cond) != 0) {
             proddata.fail = PRODUCER_BCAST;
             pthread_exit(&proddata);
         }
@@ -122,17 +124,17 @@ static void
 	    /* grab the CV lock, which also constitutes an implicit memory
                barrier */
 	    debug_print("Consumer %d: mutex\n", id);
-	    if (pthread_mutex_lock(&spmcq_nonempty_lock) != 0)
+	    if (pthread_mutex_lock(&spmcq_datawaiter_lock) != 0)
 		consumer_exit(pcdata, CONSUMER_MUTEX);
 	    /* run is guaranteed to be fresh here */
 	    if (run) {
 		debug_print("Consumer %d: wait, run = %d\n", id, run);
-		if (pthread_cond_wait(&spmcq_nonempty_cond,
-                                      &spmcq_nonempty_lock) != 0)
+		if (pthread_cond_wait(&spmcq_datawaiter_cond,
+                                      &spmcq_datawaiter_lock) != 0)
 		    consumer_exit(pcdata, CONSUMER_WAIT);
 	    }
 	    debug_print("Consumer %d: unlock\n", id);
-	    if (pthread_mutex_unlock(&spmcq_nonempty_lock) != 0)
+	    if (pthread_mutex_unlock(&spmcq_datawaiter_lock) != 0)
 		consumer_exit(pcdata, CONSUMER_MUTEX);
 	    if (! run) {
 		debug_print("Consumer %d: quit signaled, run = %d\n", id, run);
@@ -162,16 +164,17 @@ static char
 
     printf("... testing SPMCQ initialization\n");
 
-    if (pthread_mutex_init(&spmcq_nonempty_lock, NULL) != 0) {
+    if (pthread_mutex_init(&spmcq_datawaiter_lock, NULL) != 0) {
         sprintf(errmsg, "mutex_init failed: %s", strerror(errno));
         return(errmsg);
     }
-    if (pthread_cond_init(&spmcq_nonempty_cond, NULL) != 0) {
+    if (pthread_cond_init(&spmcq_datawaiter_cond, NULL) != 0) {
         sprintf(errmsg, "cond_init failed: %s", strerror(errno));
         return(errmsg);
     }
     
-    config.maxopen_scale = 0;
+    config.maxopen_scale = MIN_MAXOPEN_SCALE;
+    config.maxdone_scale = MIN_MAXDONE_SCALE;
     err = SPMCQ_Init();
     sprintf(errmsg, "SPMCQ_Init: %s", strerror(err));
     mu_assert(errmsg, err == 0);
@@ -224,14 +227,14 @@ static const char
     mu_assert(errmsg, err == 0);
     
     /*
-     * must only modify run under spmcq_nonempty_lock to ensure that
+     * must only modify run under spmcq_datawaiter_lock to ensure that
      * we signal all waiting consumers (otherwise a consumer could go
      * waiting _after_ we have broadcasted and so miss the event.
      */
-    MAZ(pthread_mutex_lock(&spmcq_nonempty_lock));
+    MAZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
     run = 0;
-    MAZ(pthread_cond_broadcast(&spmcq_nonempty_cond));
-    MAZ(pthread_mutex_unlock(&spmcq_nonempty_lock));
+    MAZ(pthread_cond_broadcast(&spmcq_datawaiter_cond));
+    MAZ(pthread_mutex_unlock(&spmcq_datawaiter_lock));
     
     err = pthread_join(con1, (void **) &con1_data);
     sprintf(errmsg, "Failed to join consumer 1: %s", strerror(err));
@@ -305,14 +308,14 @@ static const char
     prodsum = prod_data->sum;
     
     /*
-     * must only modify run under spmcq_nonempty_lock to ensure that
+     * must only modify run under spmcq_datawaiter_lock to ensure that
      * we signal all waiting consumers (otherwise a consumer could go
      * waiting _after_ we have broadcasted and so miss the event.
      */
-    MAZ(pthread_mutex_lock(&spmcq_nonempty_lock));
+    MAZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
     run = 0;
-    MAZ(pthread_cond_broadcast(&spmcq_nonempty_cond));
-    MAZ(pthread_mutex_unlock(&spmcq_nonempty_lock));
+    MAZ(pthread_cond_broadcast(&spmcq_datawaiter_cond));
+    MAZ(pthread_mutex_unlock(&spmcq_datawaiter_lock));
 
     for (int i = 0; i < NCON; i++) {
         err = pthread_join(con[i], (void **) &con_data[i]);

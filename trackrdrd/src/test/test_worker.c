@@ -36,6 +36,7 @@
 #include "../trackrdrd.h"
 #include "vas.h"
 #include "miniobj.h"
+#include "libvarnish.h"
 
 #define DEBUG 0
 #define debug_print(fmt, ...) \
@@ -58,7 +59,8 @@ static char
 
     printf("... testing worker initialization\n");
 
-    config.maxopen_scale = 0;
+    config.maxopen_scale = 10;
+    config.maxdone_scale = 10;
     config.nworkers = NWORKERS;
     strcpy(config.mq_uri, "tcp://localhost:61616");
     strcpy(config.mq_qname, "lhoste/tracking/test");
@@ -72,6 +74,7 @@ static char
     mu_assert(errmsg, err == 0);
 
     AZ(LOG_Open("test_worker"));
+    AZ(HASH_Init());
     AZ(DATA_Init());
     AZ(SPMCQ_Init());
 
@@ -82,6 +85,7 @@ static char
 *test_worker_run(void)
 {
     dataentry *entry;
+    hashentry *he;
 
     printf("... testing run of %d workers\n", NWORKERS);
 
@@ -89,15 +93,17 @@ static char
     unsigned xid = (unsigned int) lrand48();
 
     WRK_Start();
+    DATA_noMT_Register();
     for (int i = 0; i < 1024; i++) {
-        entry = DATA_Insert(xid);
+        entry = DATA_noMT_Get();
         CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+        he = HASH_Insert(++xid, entry, TIM_mono());
+        CHECK_OBJ_NOTNULL(he, HASH_MAGIC);
         entry->xid = xid;
         sprintf(entry->data, "XID=%d&foo=bar&baz=quux&record=%d", xid, i+1);
         entry->end = strlen(entry->data);
         entry->state = DATA_DONE;
-        sprintf(errmsg, "SPMCQ_Enq: queue full");
-        mu_assert(errmsg, SPMCQ_Enq(entry));
+        HASH_Submit(he);
     }
     
     WRK_Halt();

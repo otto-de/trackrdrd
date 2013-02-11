@@ -1,5 +1,6 @@
 # VMOD std *must* be imported by the including VCL
 import urlcode;
+import header;
 
 sub vcl_recv_track {
         # Track URLs, Cookie and User-Agent headers
@@ -14,8 +15,27 @@ sub vcl_recv_track {
                         	" url=" + urlcode.encode(req.url));
 		}
 		if (req.http.Cookie) {
-			std.log("track " + req.xid + " http_Cookie="
-                                + urlcode.encode(req.http.Cookie));
+                        if (req.http.Cookie ~ "visitorId"
+                            && req.http.Cookie ~ "BrowserId") {
+			    std.log("track " + req.xid + " http_Cookie="
+                                    + urlcode.encode(req.http.Cookie));
+                        }
+                        else {
+                             set req.http.X-VisitorId
+                                 = header.get(req.http.Cookie, "visitorId");
+                             set req.http.X-BrowserId 
+                                 = header.get(req.http.Cookie, "BrowserId");
+                             if (req.http.X-VisitorId) {
+			        std.log("track " + req.xid + " visitorId="
+                                        + urlcode.encode(req.http.X-VisitorId));
+                             }
+                             if (req.http.X-BrowserId) {
+			        std.log("track " + req.xid + " BrowserId="
+                                        + urlcode.encode(req.http.X-BrowserId));
+                             }
+                             unset req.http.X-VisitorId;
+                             unset req.http.X-BrowserId;
+                        }
 		}
 		if (req.http.User-Agent) {
 			std.log("track " + req.xid + " http_User-Agent="
