@@ -76,7 +76,8 @@ spmcq_t spmcq;
 int SPMCQ_Init(void);
 bool SPMCQ_Enq(void *ptr);
 void *SPMCQ_Deq(void);
-int SPMCQ_Len(void);
+bool SPMCQ_NeedWorker(void);
+bool SPMCQ_StopWorker(void);
 
 #define spmcq_wait(what)						\
 	do {								\
@@ -117,30 +118,6 @@ int		spmcq_roomwaiter;
 pthread_cond_t  spmcq_datawaiter_cond;
 pthread_mutex_t spmcq_datawaiter_lock;
 int		spmcq_datawaiter;
-
-/*
- * should we wake up another worker?
- *
- * M = l / (u x p)
- *
- * l: arrival rate
- * u: service rate
- * p: utilization
- *
- * to get an optimal M, we would need to measure l and u, so to
- * simplify, we just try to keep the number of workers proportional to
- * the queue length
- *
- * wake up another worker if queue is sufficiently full
- * Q_Len > working * qlen_goal / max_workers
- */
-
-#define SPMCQ_need_worker(qlen, working, max_workers, qlen_goal)	\
-	((qlen) > (working) * (qlen_goal) / max_workers)
-
-/* stop workers when we have one more than we need */
-#define SPMCQ_stop_worker(qlen, working, max_workers, qlen_goal)	\
-	((qlen) < ((MAX(working,1)) - 1) * (qlen_goal) / max_workers)
 
 /* mq.c */
 const char *MQ_GlobalInit(void);
