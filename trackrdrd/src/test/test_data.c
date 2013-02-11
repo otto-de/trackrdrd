@@ -38,6 +38,9 @@
 int tests_run = 0;
 static char errmsg[BUFSIZ];
 
+static struct freehead_s local_freehead
+    = VSTAILQ_HEAD_INITIALIZER(local_freehead);
+
 /* N.B.: Always run this test first */
 static char
 *test_data_init(void)
@@ -46,17 +49,58 @@ static char
 
     printf("... testing data table initialization\n");
     
-    config.maxopen_scale = 0;
-    config.maxdata_scale = 0;
+    config.maxopen_scale = 10;
+    config.maxdone_scale = 10;
     err = DATA_Init();
     sprintf(errmsg, "DATA_Init: %s", strerror(err));
     mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "DATA_Init: expected table length 1024, got %d", tbl.len);
-    mu_assert(errmsg, tbl.len == 1024);
+    sprintf(errmsg, "DATA_Init: expected table length 2048, got %d", dtbl.len);
+    mu_assert(errmsg, dtbl.len == 2048);
 
     return NULL;
 }
 
+static const char
+*test_data_take(void)
+{
+    printf("... testing freelist take\n");
+
+    DATA_Take_Freelist(&local_freehead);
+    
+    mu_assert("Local freelist empty after take",
+        !VSTAILQ_EMPTY(&local_freehead));
+    
+    sprintf(errmsg, "Global free count non-zero after take (%u)", dtbl.nfree);
+    mu_assert(errmsg, dtbl.nfree == 0);
+
+    mu_assert("Global free list non-empty after take",
+        VSTAILQ_EMPTY(&dtbl.freehead));
+
+    return NULL;
+}
+
+static const char
+*test_data_return(void)
+{
+    printf("... testing freelist return\n");
+
+    DATA_Return_Freelist(&local_freehead, 2048);
+
+    mu_assert("Local freelist non-empty after return",
+        VSTAILQ_EMPTY(&local_freehead));
+    
+    sprintf(errmsg, "Expected global free count == 2048 after return (%u)",
+        dtbl.nfree);
+    mu_assert(errmsg, dtbl.nfree == 2048);
+
+    mu_assert("Global free list empty after take",
+        !VSTAILQ_EMPTY(&dtbl.freehead));
+
+    return NULL;
+}
+    
+#if 0
+/* XXX: should be tests for the hash table */
 static const char
 *test_data_insert(void)
 {
@@ -151,13 +195,18 @@ static const char
     
     return NULL;
 }
+#endif
 
 static const char
 *all_tests(void)
 {
     mu_run_test(test_data_init);
+#if 0
     mu_run_test(test_data_insert);
     mu_run_test(test_data_find);
+#endif
+    mu_run_test(test_data_take);
+    mu_run_test(test_data_return);
     return NULL;
 }
 
