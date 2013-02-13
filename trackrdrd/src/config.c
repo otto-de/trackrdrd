@@ -290,6 +290,20 @@ CONF_ReadFile(const char *file) {
     return(0);
 }
 
+/* XXX: stdout is /dev/null in child process */
+int
+CONF_ReadDefault(void)
+{
+    if (access(DEFAULT_CONFIG, F_OK) == 0) {
+        if (access(DEFAULT_CONFIG, R_OK) != 0)
+            return(errno);
+        printf("Reading config from %s\n", DEFAULT_CONFIG);
+        if (CONF_ReadFile(DEFAULT_CONFIG) != 0)
+            return -1;
+    }
+    return 0;
+}
+
 #define confdump(str,val) \
     LOG_Log(LOG_DEBUG, "config: " str, (val))
 
