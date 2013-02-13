@@ -35,10 +35,35 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include <time.h>
+#include <signal.h>
+
 #include "vqueue.h"
+#include "varnishapi.h"
 
 #define MIN(x, y)	((x) < (y) ? (x) : (y))
 #define MAX(x, y)	((x) < (y) ? (y) : (x))
+
+/* handler.c */
+
+/* Hack, because we cannot have #ifdef in the macro definition SIGDISP */
+#define _UNDEFINED(SIG) ((#SIG)[0] == 0)
+#define UNDEFINED(SIG) _UNDEFINED(SIG)
+
+#define SIGDISP(SIG, action)						\
+    do { if (UNDEFINED(SIG)) break;					\
+	if (sigaction((SIG), (&action), NULL) != 0)			\
+             LOG_Log(LOG_ALERT,						\
+                 "Cannot install handler for " #SIG ": %s",		\
+                 strerror(errno));					\
+    } while(0)
+
+volatile sig_atomic_t term;
+
+struct sigaction terminate_action, ignore_action, stacktrace_action,
+    default_action;
+    
+void HNDL_Abort(int sig);
+void HNDL_Terminate(int sig);
 
 /* sandbox.c */
 
@@ -63,12 +88,12 @@ void WRK_Shutdown(void);
 
 /* Single producer multiple consumer bounded FIFO queue */
 typedef struct {
-        unsigned magic;
+    unsigned magic;
 #define SPMCQ_MAGIC 0xe9a5d0a8
-        const unsigned mask;
-        void **data;
-        volatile unsigned head;
-        volatile unsigned tail;
+    const unsigned mask;
+    void **data;
+    volatile unsigned head;
+    volatile unsigned tail;
 } spmcq_t;
 
 spmcq_t spmcq;
@@ -80,14 +105,14 @@ bool SPMCQ_NeedWorker(int running);
 bool SPMCQ_StopWorker(int running);
 
 #define spmcq_wait(what)						\
-	do {								\
+    do {								\
 	AZ(pthread_mutex_lock(&spmcq_##what##waiter_lock));		\
-	    spmcq_##what##waiter++;					\
-            AZ(pthread_cond_wait(&spmcq_##what##waiter_cond,		\
-		    &spmcq_##what##waiter_lock));		        \
-	    spmcq_##what##waiter--;					\
-	    AZ(pthread_mutex_unlock(&spmcq_##what##waiter_lock));	\
-	} while (0)
+        spmcq_##what##waiter++;                                         \
+        AZ(pthread_cond_wait(&spmcq_##what##waiter_cond,		\
+                &spmcq_##what##waiter_lock));                           \
+        spmcq_##what##waiter--;                                         \
+        AZ(pthread_mutex_unlock(&spmcq_##what##waiter_lock));           \
+    } while (0)
 
 /* 
  * the first test is not synced, so we might enter the if body too late or
@@ -98,14 +123,14 @@ bool SPMCQ_StopWorker(int running);
  */
 
 #define spmcq_signal(what)						\
-	do {								\
-	    if (spmcq_##what##waiter) {					\
-		AZ(pthread_mutex_lock(&spmcq_##what##waiter_lock));	\
-		if (spmcq_##what##waiter)				\
-		    AZ(pthread_cond_signal(&spmcq_##what##waiter_cond)); \
-		AZ(pthread_mutex_unlock(&spmcq_##what##waiter_lock));	\
-	    }								\
-	} while (0)
+    do {								\
+        if (spmcq_##what##waiter) {					\
+            AZ(pthread_mutex_lock(&spmcq_##what##waiter_lock));         \
+            if (spmcq_##what##waiter)                                   \
+                AZ(pthread_cond_signal(&spmcq_##what##waiter_cond));    \
+            AZ(pthread_mutex_unlock(&spmcq_##what##waiter_lock));	\
+        }								\
+    } while (0)
 
 /* Producer waits for this condition when the spmc queue is full.
    Consumers signal this condition after dequeue. */
@@ -206,87 +231,16 @@ void DATA_Dump1(dataentry *entry, int i);
 void DATA_Dump(void);
 
 /* trackrdrd.c */
-
 void HASH_Stats(void);
 
-#if 0
-typedef enum {
-    HASH_EMPTY = 0,
-    /* OPEN when the main thread is filling data, ReqEnd not yet seen. */
-    HASH_OPEN
-    /* hashes become HASH_EMPTY for DATA_DONE */
-} hash_state_e;
-
-
-struct hashentry_s {
-	unsigned			magic;
-#define HASH_MAGIC			0xf8e12130
-
-	/* set in HASH_Insert */
-	hash_state_e			state;
-	unsigned			xid; /* == de->xid */
-	float				insert_time;
-	VTAILQ_ENTRY(hashentry_s)      	insert_list;
-
-	dataentry	*de;
-};
-typedef struct hashentry_s hashentry;
-
-VTAILQ_HEAD(insert_head_s, hashentry_s);
-
-
-struct hashtable_s {
-	unsigned	magic;
-#define HASHTABLE_MAGIC	0x89ea1d00
-	unsigned	len;
-	hashentry	*entry;
-
-	struct insert_head_s	insert_head;
-
-	/* config */
-	unsigned	max_probes;
-	float		ttl;		/* max age for a record */
-	float		mlt;		/* min life time */
-
-	/* == stats == */
-	unsigned       	seen;		/* Records (ReqStarts) seen */
-	/* 
-	 * records we have dropped because of no hash, no data
-	 * or no entry
-	 */
-	unsigned	drop_reqstart;
-	unsigned	drop_vcl_log;
-	unsigned	drop_reqend;
-
-	unsigned	expired;
-	unsigned	evacuated;
-	unsigned       	open;
-
-	unsigned	collisions;
-	unsigned	insert_probes;
-	unsigned	find_probes;
-	unsigned	fail;		/* failed to get record - no space */
-
-	unsigned	occ_hi;		/* Occupancy high water mark */ 
-	unsigned	occ_hi_this;	/* Occupancy high water mark this reporting interval*/
-};
-typedef struct hashtable_s hashtable;
-
-hashtable htbl;
-
-
-int HASH_Init(void);
-void HASH_Exp(float limit);
-void HASH_Submit(hashentry *he);
-void HASH_Evacuate(hashentry *he);
-hashentry *HASH_Insert(const unsigned xid, dataentry *de, const float t);
-hashentry *HASH_Find(unsigned xid);
-void HASH_Dump1(hashentry *entry, int i);
-void HASH_Dump(void);
-#endif
+/* child.c */
+void CHILD_Main(struct VSM_data *vd, int endless, int readconfig);
 
 /* config.c */
 #define EMPTY(s) (s[0] == '\0')
+
+#define DEFAULT_CONFIG "/etc/trackrdrd.conf"
+char cli_config_filename[BUFSIZ];
 
 struct config {
     char	pid_file[BUFSIZ];
@@ -357,6 +311,7 @@ struct config {
 void CONF_Init(void);
 int CONF_Add(const char *lval, const char *rval);
 int CONF_ReadFile(const char *file);
+int CONF_ReadDefault(void);
 void CONF_Dump(void);
 
 /* log.c */
@@ -409,6 +364,3 @@ int Parse_VCL_Log(const char *ptr, int len, unsigned *xid,
 /* generic init attributes */
 pthread_mutexattr_t attr_lock;
 pthread_condattr_t  attr_cond;
-
-/* globals */
-extern int nworkers;
