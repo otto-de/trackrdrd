@@ -22,13 +22,7 @@ test_data_SOURCES = \
 
 test_data_LDADD = \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	../worker.$(OBJEXT) \
-	../monitor.$(OBJEXT) \
-	../spmcq.$(OBJEXT) \
-	../mq.$(OBJEXT) \
-	../amq.$(OBJEXT) \
-	../data.$(OBJEXT) \
-	@AMQ_LIBS@
+	../data.$(OBJEXT)
 
 test_mq_SOURCES = \
 	minunit.h \
@@ -48,13 +42,7 @@ test_spmcq_SOURCES = \
 
 test_spmcq_LDADD = \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	../worker.$(OBJEXT) \
-	../monitor.$(OBJEXT) \
-	../mq.$(OBJEXT) \
-	../amq.$(OBJEXT) \
-	../data.$(OBJEXT) \
-	../spmcq.$(OBJEXT) \
-	@AMQ_LIBS@
+	../spmcq.$(OBJEXT)
 
 test_spmcq_len_SOURCES = \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
@@ -62,19 +50,14 @@ test_spmcq_len_SOURCES = \
 	../trackrdrd.h
 
 test_spmcq_len_LDADD = \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	../worker.$(OBJEXT) \
-	../monitor.$(OBJEXT) \
-	../mq.$(OBJEXT) \
-	../amq.$(OBJEXT) \
-	../data.$(OBJEXT) \
-	@AMQ_LIBS@
+	$(VARNISHSRC)/lib/libvarnish/libvarnish.la
 
 test_spmcq_len_CFLAGS = -DTEST_DRIVER
 
 test_worker_SOURCES = \
 	minunit.h \
 	test_worker.c \
+	../monitor.c \
 	../trackrdrd.h
 
 test_worker_LDADD = \
@@ -85,6 +68,6 @@ test_worker_LDADD = \
 	../spmcq.$(OBJEXT) \
 	../amq.$(OBJEXT) \
 	../data.$(OBJEXT) \
-	../monitor.$(OBJEXT) \
-	../hash.$(OBJEXT) \
 	@AMQ_LIBS@
+
+test_worker_CFLAGS = -DTEST_DRIVER

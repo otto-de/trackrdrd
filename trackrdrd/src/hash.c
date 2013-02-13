@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  *
  */
-
+#if 0
 #include <stdlib.h>
 #include <syslog.h>
 #include <string.h>
@@ -343,3 +343,4 @@ HASH_Dump(void)
 	for (int i = 0; i < htbl.len; i++)
 		HASH_Dump1(&htbl.entry[i], i);
 }
+#endif
