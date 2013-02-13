@@ -43,41 +43,12 @@ static int run;
 static void
 log_output(void)
 {
-    LOG_Log(LOG_INFO,
-	"Hash table: "
-        "len=%u "
-	"seen=%u "
-	"drop_reqstart=%u "
-	"drop_vcl_log=%u "
-	"drop_reqend=%u "
-	"expired=%u "
-	"evacuated=%u "
-	"open=%u "
-	"load=%.2f "    
-	"collisions=%u "
-	"insert_probes=%u "
-	"find_probes=%u "
-	"fail=%u "
-	"occ_hi=%u "
-	"occ_hi_this=%u ",
-        htbl.len,
-	htbl.seen,
-	htbl.drop_reqstart,
-	htbl.drop_vcl_log,
-	htbl.drop_reqend,
-	htbl.expired,
-	htbl.evacuated,
-	htbl.open,
-        100.0 * htbl.open / htbl.len,
-	htbl.collisions,
-	htbl.insert_probes,
-	htbl.find_probes,
-	htbl.fail,
-	htbl.occ_hi,
-	htbl.occ_hi_this);
 
-    htbl.occ_hi_this = 0;
-
+    /* Eliminate the dependency of trackrdrd.o for unit tests */
+#ifndef TEST_DRIVER
+    HASH_Stats();
+#endif
+    
     LOG_Log(LOG_INFO,
         "Data table writer: "
 	"len=%u "

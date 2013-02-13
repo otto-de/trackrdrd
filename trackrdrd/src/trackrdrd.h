@@ -76,8 +76,8 @@ spmcq_t spmcq;
 int SPMCQ_Init(void);
 bool SPMCQ_Enq(void *ptr);
 void *SPMCQ_Deq(void);
-bool SPMCQ_NeedWorker(void);
-bool SPMCQ_StopWorker(void);
+bool SPMCQ_NeedWorker(int running);
+bool SPMCQ_StopWorker(int running);
 
 #define spmcq_wait(what)						\
 	do {								\
@@ -202,21 +202,14 @@ datatable dtbl;
 int DATA_Init(void);
 void DATA_Take_Freelist(struct freehead_s *dst);
 void DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned);
-
-/*
- * the noMT functions are _not_ MT-safe, so they can only be called
- * from the registered thread
- */
-void DATA_noMT_Register(void);
-dataentry *DATA_noMT_Get(void);
-void DATA_noMT_Free(dataentry *de);
-void DATA_noMT_Submit(dataentry *de);
-
 void DATA_Dump1(dataentry *entry, int i);
 void DATA_Dump(void);
 
-/* hash.c */
+/* trackrdrd.c */
 
+void HASH_Stats(void);
+
+#if 0
 typedef enum {
     HASH_EMPTY = 0,
     /* OPEN when the main thread is filling data, ReqEnd not yet seen. */
@@ -290,7 +283,7 @@ hashentry *HASH_Insert(const unsigned xid, dataentry *de, const float t);
 hashentry *HASH_Find(unsigned xid);
 void HASH_Dump1(hashentry *entry, int i);
 void HASH_Dump(void);
-
+#endif
 
 /* config.c */
 #define EMPTY(s) (s[0] == '\0')
