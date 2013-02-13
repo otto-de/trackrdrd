@@ -10,7 +10,6 @@ trackrdrd_SOURCES = \
 	parse.c \
 	log.c \
 	config.c \
-	hash.c \
 	data.c \
 	monitor.c \
 	mq.c \
@@ -18,7 +17,9 @@ trackrdrd_SOURCES = \
 	activemq/amq.cpp \
 	spmcq.c \
 	worker.c \
-	sandbox.c
+	sandbox.c \
+	child.c \
+	handler.c
 
 trackrdrd_LDADD = \
 	$(VARNISHSRC)/lib/libvarnishcompat/libvarnishcompat.la \
