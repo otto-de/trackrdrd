@@ -78,9 +78,9 @@ spmcq_cleanup(void)
 }
 
 static inline int
-spmcq_wrk_len_ratio(int working)
+spmcq_wrk_len_ratio(int working, int running)
 {
-    return working * qlen_goal / nworkers;
+    return working * qlen_goal / running;
 }
 
 int
@@ -148,19 +148,21 @@ void
  */
 
 bool
-SPMCQ_NeedWorker(void)
+SPMCQ_NeedWorker(int running)
 {
-    if (nworkers == 0)
+    if (running == 0)
         return false;
-    return spmcq_len() > spmcq_wrk_len_ratio(nworkers - spmcq_datawaiter);
+    return spmcq_len() > spmcq_wrk_len_ratio(running - spmcq_datawaiter,
+                                             running);
 }
 
 bool
-SPMCQ_StopWorker(void)
+SPMCQ_StopWorker(int running)
 {
-    if (nworkers == 0)
+    if (running == 0)
         return false;
-    return spmcq_len() < spmcq_wrk_len_ratio(nworkers - spmcq_datawaiter - 1);
+    return spmcq_len() < spmcq_wrk_len_ratio(running - spmcq_datawaiter - 1,
+                                             running);
 }
 
 #ifdef TEST_DRIVER

@@ -39,7 +39,7 @@
 #include "vas.h"
 #include "miniobj.h"
 
-int nworkers = 0;
+static int running = 0;
 
 typedef enum {
     WRK_NOTSTARTED = 0,
@@ -87,6 +87,8 @@ typedef struct {
     
 static unsigned run, cleaned = 0;
 static thread_data_t *thread_data;
+
+static pthread_mutex_t running_lock;
 
 static inline void
 wrk_send(void *amq_worker, dataentry *entry, worker_data_t *wrk)
@@ -152,6 +154,9 @@ static void
     wrk->wrk_nfree = 0;
 
     wrk->state = WRK_RUNNING;
+    AZ(pthread_mutex_lock(&running_lock));
+    running++;
+    AZ(pthread_mutex_unlock(&running_lock));
     
     while (run) {
 	entry = (dataentry *) SPMCQ_Deq();
@@ -160,7 +165,7 @@ static void
             wrk_send(amq_worker, entry, wrk);
 
 	    /* should we go to sleep ? */
-	    if (SPMCQ_StopWorker())
+	    if (SPMCQ_StopWorker(running))
 		    goto sleep;
 	    
 	    continue;
@@ -188,7 +193,7 @@ static void
 	 *
 	 * also re-check the stop condition under the lock
 	 */
-        if (run && ((! entry) || SPMCQ_StopWorker())) {
+        if (run && ((! entry) || SPMCQ_StopWorker(running))) {
 		wrk->waits++;
 		spmcq_datawaiter++;
 		wrk->state = WRK_WAITING;
@@ -305,22 +310,7 @@ WRK_Stats(void)
 int
 WRK_Running(void)
 {
-    worker_data_t *wrk;
-
-    while (1) {
-        int initialized = 0, running = 0;
-        for (int i = 0; i < config.nworkers; i++) {
-            wrk = thread_data[i].wrk_data;
-            if (wrk->state > WRK_INITIALIZING)
-                initialized++;
-            if (wrk->state == WRK_RUNNING ||
-		wrk->state == WRK_SHUTTINGDOWN ||
-		wrk->state == WRK_WAITING)
-                running++;
-        }
-        if (initialized == config.nworkers)
-            return running;
-    }
+    return running;
 }
 
 void
