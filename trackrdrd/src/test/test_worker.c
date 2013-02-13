@@ -74,7 +74,6 @@ static char
     mu_assert(errmsg, err == 0);
 
     AZ(LOG_Open("test_worker"));
-    AZ(HASH_Init());
     AZ(DATA_Init());
     AZ(SPMCQ_Init());
 
@@ -85,7 +84,6 @@ static char
 *test_worker_run(void)
 {
     dataentry *entry;
-    hashentry *he;
 
     printf("... testing run of %d workers\n", NWORKERS);
 
@@ -93,17 +91,14 @@ static char
     unsigned xid = (unsigned int) lrand48();
 
     WRK_Start();
-    DATA_noMT_Register();
     for (int i = 0; i < 1024; i++) {
-        entry = DATA_noMT_Get();
+        entry = &dtbl.entry[i];
         CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-        he = HASH_Insert(++xid, entry, TIM_mono());
-        CHECK_OBJ_NOTNULL(he, HASH_MAGIC);
         entry->xid = xid;
         sprintf(entry->data, "XID=%d&foo=bar&baz=quux&record=%d", xid, i+1);
         entry->end = strlen(entry->data);
         entry->state = DATA_DONE;
-        HASH_Submit(he);
+        assert(SPMCQ_Enq(entry));
     }
     
     WRK_Halt();
