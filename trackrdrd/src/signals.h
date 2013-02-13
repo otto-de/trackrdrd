@@ -29,21 +29,25 @@
  *
  */
 
-
 PARENT(SIGTERM, terminate_action);
 PARENT(SIGINT, terminate_action);
 PARENT(SIGHUP, restart_action);
 PARENT(SIGUSR1, restart_action);
 PARENT(SIGUSR2, ignore_action);
+PARENT(SIGHUP, restart_action);
+#ifndef DISABLE_STACKTRACE
 PARENT(SIGABRT, stacktrace_action);
 PARENT(SIGSEGV, stacktrace_action);
 PARENT(SIGBUS, stacktrace_action);
+#endif
 
 CHILD(SIGTERM, terminate_action);
 CHILD(SIGINT, terminate_action);
 CHILD(SIGUSR1, dump_action);
 CHILD(SIGUSR2, ignore_action);
 CHILD(SIGHUP, ignore_action);
+#ifndef DISABLE_STACKTRACE
 CHILD(SIGABRT, stacktrace_action);
 CHILD(SIGSEGV, stacktrace_action);
 CHILD(SIGBUS, stacktrace_action);
+#endif
