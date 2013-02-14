@@ -136,7 +136,7 @@ struct hashtable_s {
 
     unsigned	occ_hi;		/* Occupancy high water mark */ 
     unsigned	occ_hi_this;	/* Occupancy high water mark this reporting
-                                   interval*/
+                                   interval */
 };
 
 typedef struct hashtable_s hashtable;
@@ -153,9 +153,6 @@ static hashtable htbl;
                 errno, 0);                                              \
     } while (0)
 
-static void assert_failure(const char *func, const char *file, int line,
-    const char *cond, int err, int xxx);
-
 static void
 entry_assert_failure(const char *func, const char *file, int line,
     const char *cond, hashentry *he, int err, int xxx)
@@ -170,24 +167,11 @@ entry_assert_failure(const char *func, const char *file, int line,
             (de), (de)->magic, (de)->state, (de)->xid, (de)->tid, (de)->end);
     else
         LOG_Log(LOG_ALERT, "Dataentry %p NULL!", (de));
-    assert_failure(func, file, line, cond, err, xxx);
+    ASRT_Fail(func, file, line, cond, err, xxx);
 }
 #endif
 
 /*--------------------------------------------------------------------*/
-
-static void
-assert_failure(const char *func, const char *file, int line, const char *cond,
-    int err, int xxx)
-{
-    (void) xxx;
-    
-    LOG_Log(LOG_ALERT, "Condition (%s) failed in %s(), %s line %d",
-        cond, func, file, line);
-    if (err)
-        LOG_Log(LOG_ALERT, "errno = %d (%s)", err, strerror(err));
-    abort();
-}
 
 static inline void
 check_entry(hashentry *he, unsigned xid, unsigned tid)

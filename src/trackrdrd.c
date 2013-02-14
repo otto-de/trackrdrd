@@ -72,18 +72,6 @@
 #include "revision.h"
 #include "usage.h"
 
-/* Hack, because we cannot have #ifdef in the macro definition SIGDISP */
-#define _UNDEFINED(SIG) ((#SIG)[0] == 0)
-#define UNDEFINED(SIG) _UNDEFINED(SIG)
-
-#define SIGDISP(SIG, action)						\
-    do { if (UNDEFINED(SIG)) break;					\
-	if (sigaction((SIG), (&action), NULL) != 0)			\
-             LOG_Log(LOG_ALERT,						\
-                 "Cannot install handler for " #SIG ": %s",		\
-                 strerror(errno));					\
-    } while(0)
-
 static volatile sig_atomic_t reload;
 
 static struct sigaction restart_action;
@@ -95,19 +83,6 @@ restart(int sig)
 {
     (void) sig;
     reload = 1;
-}
-
-static void
-assert_failure(const char *func, const char *file, int line, const char *cond,
-    int err, int xxx)
-{
-    (void) xxx;
-    
-    LOG_Log(LOG_ALERT, "Condition (%s) failed in %s(), %s line %d",
-        cond, func, file, line);
-    if (err)
-        LOG_Log(LOG_ALERT, "errno = %d (%s)", err, strerror(err));
-    abort();
 }
 
 /*--------------------------------------------------------------------*/
@@ -166,7 +141,11 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
     pid_t wpid;
 
     LOG_Log0(LOG_INFO, "Management process starting");
-    
+
+    restart_action.sa_handler = restart;
+    AZ(sigemptyset(&restart_action.sa_mask));
+    restart_action.sa_flags &= ~SA_RESTART;
+
     term = 0;
     reload = 0;
     /* install signal handlers */
@@ -340,7 +319,7 @@ main(int argc, char * const *argv)
             exit(EXIT_FAILURE);
         }
 
-        VAS_Fail = assert_failure;
+        VAS_Fail = ASRT_Fail;
         
         if (d_flag)
             LOG_SetLevel(LOG_DEBUG);
@@ -369,10 +348,6 @@ main(int argc, char * const *argv)
 	terminate_action.sa_handler = HNDL_Terminate;
 	AZ(sigemptyset(&terminate_action.sa_mask));
 	terminate_action.sa_flags &= ~SA_RESTART;
-
-	restart_action.sa_handler = restart;
-	AZ(sigemptyset(&restart_action.sa_mask));
-	restart_action.sa_flags &= ~SA_RESTART;
 
 	stacktrace_action.sa_handler = HNDL_Abort;
 
