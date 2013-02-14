@@ -19,7 +19,8 @@ trackrdrd_SOURCES = \
 	worker.c \
 	sandbox.c \
 	child.c \
-	handler.c
+	handler.c \
+	assert.c
 
 trackrdrd_LDADD = \
 	$(VARNISHSRC)/lib/libvarnishcompat/libvarnishcompat.la \
