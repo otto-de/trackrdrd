@@ -685,7 +685,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     (void) bitmap;
 
     if (term && htbl.open == 0)
-        return 1;
+        return 0;
 
     if (wrk_running < config.nworkers) {
         wrk_running = WRK_Running();
@@ -701,7 +701,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     
     switch (tag) {
     case SLT_ReqStart:
-        if (term) return(0);
+        if (term) return 0;
         
         htbl.seen++;
         err = Parse_ReqStart(ptr, len, &xid);
@@ -808,7 +808,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     }
     pptr = ptr;
 
-    return(0);
+    return 0;
 }
 
 /*--------------------------------------------------------------------*/
@@ -833,17 +833,14 @@ vsl_diag(void *priv, const char *fmt, ...)
     va_end(ap);
 }
 
-static void
-init_pthread_attrs(void)
+static const char *
+vsm_name(struct VSM_data *vd)
 {
-    AZ(pthread_mutexattr_init(&attr_lock));
-    AZ(pthread_condattr_init(&attr_cond));
-
-    // important to make mutex/cv efficient
-    AZ(pthread_mutexattr_setpshared(&attr_lock,
-	    PTHREAD_PROCESS_PRIVATE));
-    AZ(pthread_condattr_setpshared(&attr_cond,
-	    PTHREAD_PROCESS_PRIVATE)); 
+    const char * name = VSM_Name(vd);
+    if (name && *name)
+        return name;
+    else
+        return "default";
 }
 
 void
@@ -854,7 +851,12 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     pthread_t monitor;
     struct passwd *pw;
 
-    init_pthread_attrs();
+    AZ(pthread_mutexattr_init(&attr_lock));
+    AZ(pthread_condattr_init(&attr_cond));
+    // important to make mutex/cv efficient
+    AZ(pthread_mutexattr_setpshared(&attr_lock, PTHREAD_PROCESS_PRIVATE));
+    AZ(pthread_condattr_setpshared(&attr_cond,  PTHREAD_PROCESS_PRIVATE)); 
+
     MON_StatsInit();
         
     LOG_Log0(LOG_INFO, "Worker process starting");
@@ -902,6 +904,7 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     VSM_Diag(vd, vsl_diag, NULL);
     if (VSL_Open(vd, 1))
         exit(EXIT_FAILURE);
+    LOG_Log(LOG_INFO, "Reading varnish instance %s", vsm_name(vd));
 
     /* Only read the VSL tags relevant to tracking */
     assert(VSL_Arg(vd, 'i', TRACK_TAGS) > 0);
@@ -964,6 +967,11 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
             LOG_Log0(LOG_WARNING, "Log read interrupted, continuing");
             continue;
         }
+
+    if (term)
+        LOG_Log0(LOG_INFO, "Termination signal received");
+    else if (endless)
+        LOG_Log0(LOG_WARNING, "Varnish log closed");
 
     WRK_Halt();
     WRK_Shutdown();
