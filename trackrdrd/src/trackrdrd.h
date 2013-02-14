@@ -43,6 +43,11 @@
 #define MIN(x, y)	((x) < (y) ? (x) : (y))
 #define MAX(x, y)	((x) < (y) ? (y) : (x))
 
+/* assert.c */
+
+void ASRT_Fail(const char *func, const char *file, int line, const char *cond,
+    int err, int xxx);
+               
 /* handler.c */
 
 /* Hack, because we cannot have #ifdef in the macro definition SIGDISP */
