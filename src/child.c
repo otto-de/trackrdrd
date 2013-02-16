@@ -685,7 +685,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     (void) bitmap;
 
     if (term && htbl.open == 0)
-        return 0;
+        return 1;
 
     if (wrk_running < config.nworkers) {
         wrk_running = WRK_Running();
