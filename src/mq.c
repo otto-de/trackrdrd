@@ -51,6 +51,12 @@ MQ_Send(void *priv, const char *data, unsigned len)
 }
 
 const char *
+MQ_Version(void *priv, char *version)
+{
+    return AMQ_Version((AMQ_Worker *) priv, version);
+}
+
+const char *
 MQ_WorkerShutdown(void **priv)
 {
     const char *err = AMQ_WorkerShutdown((AMQ_Worker **) priv);
