@@ -30,6 +30,7 @@
  */
 
 #include <string.h>
+#include <stdbool.h>
 
 #include "minunit.h"
 
@@ -80,7 +81,7 @@ static char
     return NULL;
 }
 
-static char
+static const char
 *test_worker_run(void)
 {
     dataentry *entry;
@@ -91,6 +92,15 @@ static char
     unsigned xid = (unsigned int) lrand48();
 
     WRK_Start();
+    int wrk_running, wrk_wait = 0;
+    while ((wrk_running = WRK_Running()) < NWORKERS) {
+        if (wrk_wait++ > 10)
+            break;
+        TIM_sleep(1);
+    }
+    sprintf(errmsg, "%d of %d worker threads running", wrk_running, NWORKERS);
+    mu_assert(errmsg, wrk_running == NWORKERS);
+
     for (int i = 0; i < 1024; i++) {
         entry = &dtbl.entry[i];
         CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
@@ -98,7 +108,7 @@ static char
         sprintf(entry->data, "XID=%d&foo=bar&baz=quux&record=%d", xid, i+1);
         entry->end = strlen(entry->data);
         entry->state = DATA_DONE;
-        assert(SPMCQ_Enq(entry));
+        mu_assert("SPMCQ full", SPMCQ_Enq(entry) == true);
     }
     
     WRK_Halt();
