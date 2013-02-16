@@ -80,6 +80,23 @@ static const char
 }
 
 static const char
+*test_version(void)
+{
+    const char *err;
+    char version[BUFSIZ];
+
+    printf("... testing version info\n");
+
+    mu_assert("MQ_Version: worker is NULL before call", worker != NULL);
+    err = MQ_Version(worker, version);
+    sprintf(errmsg, "MQ_Version: %s", err);
+    mu_assert(errmsg, err == NULL);
+    mu_assert("MQ_Version: version is empty", version[0] != '\0');
+
+    return NULL;
+}
+
+static const char
 *test_send(void)
 {
     const char *err;
@@ -132,6 +149,7 @@ static const char
 {
     mu_run_test(test_global_init);
     mu_run_test(test_worker_init);
+    mu_run_test(test_version);
     mu_run_test(test_send);
     mu_run_test(test_worker_shutdown);
     mu_run_test(test_global_shutdown);
