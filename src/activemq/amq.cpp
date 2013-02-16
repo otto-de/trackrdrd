@@ -29,10 +29,13 @@
  *
  */
 
+#include <string.h>
+
 #include "amq.h"
 #include <activemq/library/ActiveMQCPP.h>
 #include <decaf/lang/exceptions/NullPointerException.h>
 #include <cms/IllegalStateException.h>
+#include <cms/ConnectionMetaData.h>
 
 #define CATCHALL                \
 catch (CMSException& cex) {     \
@@ -114,6 +117,14 @@ AMQ_Worker::send(std::string& text) {
     producer->send(msg);
 }
 
+std::string
+AMQ_Worker::getVersion() {
+    if (connection == NULL)
+        throw cms::IllegalStateException("Connection uninitialized");
+    const ConnectionMetaData *md = connection->getMetaData();
+    return md->getCMSProviderName() + " " + md->getProviderVersion();
+}
+
 const char *
 AMQ_GlobalInit(char *uri)
 {
@@ -148,6 +159,16 @@ AMQ_Send(AMQ_Worker *worker, const char *data, unsigned len)
             throw IllegalArgumentException(__FILE__, __LINE__, "Data NULL");
         string text (data, len);
         worker->send(text);
+        return NULL;
+    }
+    CATCHALL
+}
+
+const char *
+AMQ_Version(AMQ_Worker *worker, char *version)
+{
+    try {
+        strcpy(version, worker->getVersion().c_str());
         return NULL;
     }
     CATCHALL
