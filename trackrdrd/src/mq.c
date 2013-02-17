@@ -35,13 +35,13 @@
 const char *
 MQ_GlobalInit(void)
 {
-    return AMQ_GlobalInit(config.mq_uri);
+    return AMQ_GlobalInit();
 }
 
 const char *
-MQ_WorkerInit(void **priv)
+MQ_WorkerInit(void **priv, char *uri)
 {
-    return AMQ_WorkerInit((AMQ_Worker **) priv, config.mq_qname);
+    return AMQ_WorkerInit((AMQ_Worker **) priv, uri, config.mq_qname);
 }
 
 const char *
