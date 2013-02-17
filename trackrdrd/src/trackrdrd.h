@@ -151,7 +151,7 @@ int		spmcq_datawaiter;
 
 /* mq.c */
 const char *MQ_GlobalInit(void);
-const char *MQ_WorkerInit(void **priv);
+const char *MQ_WorkerInit(void **priv, char *uri);
 const char *MQ_Send(void *priv, const char *data, unsigned len);
 const char *MQ_Version(void *priv, char *version);
 const char *MQ_WorkerShutdown(void **priv);
@@ -305,7 +305,8 @@ struct config {
     unsigned	hash_mlt;
 #define DEF_HASH_MTL 5
 
-    char	mq_uri[BUFSIZ];
+    unsigned	n_mq_uris;
+    char	**mq_uri;
     char	mq_qname[BUFSIZ];
     unsigned	nworkers;
     unsigned	restarts;

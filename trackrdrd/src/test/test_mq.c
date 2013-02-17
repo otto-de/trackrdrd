@@ -50,7 +50,6 @@ static char
 
     printf("... testing MQ global initialization\n");
 
-    strcpy(config.mq_uri, "tcp://localhost:61616");
     err = MQ_GlobalInit();
     sprintf(errmsg, "MQ_GlobalInit: %s", err);
     mu_assert(errmsg, err == NULL);
@@ -62,11 +61,13 @@ static const char
 *test_worker_init(void)
 {
     const char *err;
+    char uri[sizeof("tcp://localhost:61616")];
 
     printf("... test worker init (including connect to ActiveMQ)\n");
 
+    strcpy(uri, "tcp://localhost:61616");
     strcpy(config.mq_qname, "lhoste/tracking/test");
-    err = MQ_WorkerInit(&worker);
+    err = MQ_WorkerInit(&worker, uri);
     if (err != NULL && strstr(err, "Connection refused") != NULL) {
         printf("Connection refused, ActiveMQ assumed not running\n");
         exit(EXIT_SKIPPED);
@@ -118,7 +119,7 @@ static const char
 
     printf("... testing worker shutdown\n");
 
-    mu_assert("MQ_WorkerShhutdown: worker is NULL before call", worker != NULL);
+    mu_assert("MQ_WorkerShutdown: worker is NULL before call", worker != NULL);
     err = MQ_WorkerShutdown(&worker);
     sprintf(errmsg, "MQ_WorkerShutdown: %s", err);
     mu_assert(errmsg, err == NULL);
