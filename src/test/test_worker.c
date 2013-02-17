@@ -63,8 +63,19 @@ static char
     config.maxopen_scale = 10;
     config.maxdone_scale = 10;
     config.nworkers = NWORKERS;
-    strcpy(config.mq_uri, "tcp://localhost:61616");
     strcpy(config.mq_qname, "lhoste/tracking/test");
+
+    config.n_mq_uris = 2;
+    config.mq_uri = (char **) malloc(2 * sizeof(char**));
+    AN(config.mq_uri);
+    config.mq_uri[0] = (char *) malloc(strlen("tcp://localhost:61616") + 1);
+    AN(config.mq_uri[0]);
+    strcpy(config.mq_uri[0], "tcp://localhost:61616");
+    config.mq_uri[1] = (char *)
+        malloc(strlen("tcp://localhost:61616?connection.sendTimeout=1000") + 1);
+    AN(config.mq_uri[1]);
+    strcpy(config.mq_uri[1],
+        "tcp://localhost:61616?connection.sendTimeout=1000");
     
     error = MQ_GlobalInit();
     sprintf(errmsg, "MQ_GlobalInit failed: %s", error);

@@ -124,7 +124,6 @@ CONF_Add(const char *lval, const char *rval)
     confString("log.file", log_file);
     confString("varnish.bindump", varnish_bindump);
     confString("processor.log", processor_log);
-    confString("mq.uri", mq_uri);
     confString("mq.qname", mq_qname);
 
     confUnsignedMinVal("maxopen.scale", maxopen_scale, MIN_MAXOPEN_SCALE);
@@ -178,6 +177,19 @@ CONF_Add(const char *lval, const char *rval)
         return(EINVAL);
     }
 
+    if (strcmp(lval, "mq.uri") == 0) {
+        int n = config.n_mq_uris++;
+        config.mq_uri = (char **) realloc(config.mq_uri,
+            config.n_mq_uris * sizeof(char **));
+        if (config.mq_uri == NULL)
+            return(errno);
+        config.mq_uri[n] = (char *) malloc(strlen(rval) + 1);
+        if (config.mq_uri[n] == NULL)
+            return(errno);
+        strcpy(config.mq_uri[n], rval);
+        return(0);
+    }
+
     return EINVAL;
 }
 
@@ -226,7 +238,9 @@ CONF_Init(void)
     config.hash_ttl = DEF_HASH_TTL;
     config.hash_mlt = DEF_HASH_MTL;
 
-    config.mq_uri[0] = '\0';
+    config.n_mq_uris = 0;
+    config.mq_uri = (char **) malloc (sizeof(char **));
+    AN(config.mq_uri);
     config.mq_qname[0] = '\0';
     config.nworkers = 1;
     config.restarts = 1;
@@ -326,8 +340,12 @@ CONF_Dump(void)
     confdump("hash_ttl = %u", config.hash_ttl);
     confdump("hash_mlt = %u", config.hash_mlt);
 
-
-    confdump("mq.uri = %s", config.mq_uri);
+    if (config.n_mq_uris > 0)
+        for (int i = 0; i < config.n_mq_uris; i++)
+            confdump("mq.uri = %s", config.mq_uri[i]);
+    else
+        LOG_Log0(LOG_DEBUG, "config: mq.uri = ");
+    
     confdump("mq.qname = %s", config.mq_qname);
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
