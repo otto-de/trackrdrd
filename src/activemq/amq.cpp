@@ -57,26 +57,30 @@ using namespace cms;
 using namespace decaf::lang;
 using namespace decaf::lang::exceptions;
 
-ActiveMQConnectionFactory* AMQ_Worker::factory = NULL;
-
-void
-AMQ_Worker::initConnectionFactory(const std::string& brokerURI) {
-    factory = new ActiveMQConnectionFactory(brokerURI);
-}
+std::vector<ActiveMQConnectionFactory*> AMQ_Worker::factories;
 
 void
 AMQ_Worker::shutdown() {
-    delete factory;
-    factory = NULL;
+    for (unsigned i = 0; i < factories.size(); i++)
+        delete factories[i];
+    factories.resize(0);
 }
     
-AMQ_Worker::AMQ_Worker(std::string& qName,
+AMQ_Worker::AMQ_Worker(std::string& brokerURI, std::string& qName,
     Session::AcknowledgeMode ackMode = Session::AUTO_ACKNOWLEDGE,
     int deliveryMode = DeliveryMode::NON_PERSISTENT) {
-    
-    if (factory == NULL)
-        throw cms::IllegalStateException("Connection factory not initialized");
-    
+
+    ActiveMQConnectionFactory* factory = NULL;
+    for (unsigned i = 0; i < factories.size(); i++)
+        if (factories[i]->getBrokerURI().toString().compare(brokerURI) == 0) {
+            factory = factories[i];
+            break;
+        }
+    if (factory == NULL) {
+        factory = new ActiveMQConnectionFactory(brokerURI);
+        factories.push_back(factory);
+    }
+       
     connection = factory->createConnection();
     connection->start();
     session = connection->createSession(ackMode);
@@ -100,15 +104,12 @@ AMQ_Worker::~AMQ_Worker() {
 	session = NULL;
     }
     if (connection != NULL) {
-#if 0	    
 	connection->close();
-#endif	    
 	delete connection;
 	connection = NULL;
     }
 }
 
-/* XXX: Timeout */
 void
 AMQ_Worker::send(std::string& text) {
     if (msg == NULL || producer == NULL)
@@ -126,23 +127,22 @@ AMQ_Worker::getVersion() {
 }
 
 const char *
-AMQ_GlobalInit(char *uri)
+AMQ_GlobalInit(void)
 {
-    activemq::library::ActiveMQCPP::initializeLibrary();
     try {
-        string brokerURI (uri);
-        AMQ_Worker::initConnectionFactory(brokerURI);
+        activemq::library::ActiveMQCPP::initializeLibrary();
         return NULL;
     }
     CATCHALL
 }
 
 const char *
-AMQ_WorkerInit(AMQ_Worker **worker, char *qName)
+AMQ_WorkerInit(AMQ_Worker **worker, char *uri, char *qName)
 {
     try {
+        string brokerURI (uri);
         string queueName (qName);
-        std::auto_ptr<AMQ_Worker> w (new AMQ_Worker(queueName));
+        std::auto_ptr<AMQ_Worker> w (new AMQ_Worker(brokerURI, queueName));
         *worker = w.release();
         return NULL;
     }
