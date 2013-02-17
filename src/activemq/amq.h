@@ -34,6 +34,8 @@
 
 #ifdef __cplusplus
 
+#include <vector>
+
 #include <activemq/core/ActiveMQConnectionFactory.h>
 #include <cms/Connection.h>
 #include <cms/Session.h>
@@ -45,7 +47,7 @@ using namespace cms;
 
 class AMQ_Worker {
 private:
-    static ActiveMQConnectionFactory* factory;
+    static std::vector<ActiveMQConnectionFactory*> factories;
     Connection* connection;
     Session* session;
     Queue* queue;
@@ -54,11 +56,10 @@ private:
     AMQ_Worker() {};
 
 public:
-    static void initConnectionFactory(const std::string& brokerURI);
     static void shutdown();
     
-    AMQ_Worker(std::string& qName, Session::AcknowledgeMode ackMode,
-        int deliveryMode);
+    AMQ_Worker(std::string& brokerURI, std::string& qName,
+        Session::AcknowledgeMode ackMode, int deliveryMode);
     virtual ~AMQ_Worker();
     void send(std::string& text);
     std::string getVersion();
@@ -71,8 +72,8 @@ typedef struct AMQ_Worker AMQ_Worker;
 extern "C" {
 #endif
 
-    const char *AMQ_GlobalInit(char *uri);
-    const char *AMQ_WorkerInit(AMQ_Worker **worker, char *qName);
+    const char *AMQ_GlobalInit(void);
+    const char *AMQ_WorkerInit(AMQ_Worker **worker, char *uri, char *qName);
     const char *AMQ_Send(AMQ_Worker *worker, const char *data, unsigned len);
     const char *AMQ_Version(AMQ_Worker *worker, char *version);
     const char *AMQ_WorkerShutdown(AMQ_Worker **worker);
