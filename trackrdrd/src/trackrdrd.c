@@ -184,7 +184,7 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
                 wpid, WEXITSTATUS(status));
         if (WIFSIGNALED(status))
             LOG_Log(LOG_WARNING,
-		"Worker process %d exited due to signal %d (%s)",
+                "Worker process %d exited due to signal %d (%s)",
                 wpid, WTERMSIG(status), strsignal(WTERMSIG(status)));
 
         if (wpid != child_pid)
@@ -210,169 +210,169 @@ usage(int status)
 int
 main(int argc, char * const *argv)
 {
-    	int c, d_flag = 0, D_flag = 0, endless = 1, err;
-	const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
-            *y_arg = NULL, *c_arg = NULL, *u_arg = NULL;
-	struct VSM_data *vd;
-        pid_t child_pid;
+    int c, d_flag = 0, D_flag = 0, endless = 1, err;
+    const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
+        *y_arg = NULL, *c_arg = NULL, *u_arg = NULL;
+    struct VSM_data *vd;
+    pid_t child_pid;
 
-	vd = VSM_New();
-	VSL_Setup(vd);
+    vd = VSM_New();
+    VSL_Setup(vd);
 
-        CONF_Init();
-        if ((err = CONF_ReadDefault()) != 0) {
-            if (err != -1)
-                LOG_Log(LOG_ALERT, "Cannot read %s: %s", DEFAULT_CONFIG,
-                    strerror(err));
-            exit(EXIT_FAILURE);
-        }
-        cli_config_filename[0] = '\0';
+    CONF_Init();
+    if ((err = CONF_ReadDefault()) != 0) {
+        if (err != -1)
+            LOG_Log(LOG_ALERT, "Cannot read %s: %s", DEFAULT_CONFIG,
+                strerror(err));
+        exit(EXIT_FAILURE);
+    }
+    cli_config_filename[0] = '\0';
 
-	while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:D")) != -1) {
-		switch (c) {
-		case 'P':
-                    P_arg = optarg;
-                    break;
-		case 'V':
-                    printf(PACKAGE_STRING " revision " REVISION "\n");
-                    exit(EXIT_SUCCESS);
-                case 'n':
-                    n_arg = optarg;
-                    break;
-                case 'l':
-                    l_arg = optarg;
-                    break;
-                case 'd':
-                    d_flag = 1;
-                    break;
-                case 'f':
-                    f_arg = optarg;
-                    break;
-                case 'y':
-                    y_arg = optarg;
-                    break;
-                case 'c':
-                    c_arg = optarg;
-                    break;
-                case 'D':
-                    D_flag = 1;
-                    break;
-                case 'u':
-                    u_arg = optarg;
-                    break;
-                case 'h':
-                    usage(EXIT_SUCCESS);
-		default:
-                    usage(EXIT_FAILURE);
-		}
-	}
-
-	if ((argc - optind) > 0)
+    while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:D")) != -1) {
+        switch (c) {
+        case 'P':
+            P_arg = optarg;
+            break;
+        case 'V':
+            printf(PACKAGE_STRING " revision " REVISION "\n");
+            exit(EXIT_SUCCESS);
+        case 'n':
+            n_arg = optarg;
+            break;
+        case 'l':
+            l_arg = optarg;
+            break;
+        case 'd':
+            d_flag = 1;
+            break;
+        case 'f':
+            f_arg = optarg;
+            break;
+        case 'y':
+            y_arg = optarg;
+            break;
+        case 'c':
+            c_arg = optarg;
+            break;
+        case 'D':
+            D_flag = 1;
+            break;
+        case 'u':
+            u_arg = optarg;
+            break;
+        case 'h':
+            usage(EXIT_SUCCESS);
+        default:
             usage(EXIT_FAILURE);
+        }
+    }
 
-        if (c_arg) {
-            strcpy(cli_config_filename, c_arg);
-            printf("Reading config from %s\n", c_arg);
-            if (CONF_ReadFile(c_arg) != 0)
-                exit(EXIT_FAILURE);
-        }
-        
-        if (f_arg && n_arg)
-            usage(EXIT_FAILURE);
-        if (l_arg && y_arg)
-            usage(EXIT_FAILURE);
-        
-        if (u_arg) {
-            err = CONF_Add("user", u_arg);
-            if (err) {
-                fprintf(stderr, "Unknown user: %s\n", u_arg);
-                exit(EXIT_FAILURE);
-            }
-        }
+    if ((argc - optind) > 0)
+        usage(EXIT_FAILURE);
 
-        if (y_arg) {
-            err = CONF_Add("syslog.facility", y_arg);
-            if (err) {
-                fprintf(stderr, "Unknown syslog facility: %s\n", y_arg);
-                exit(EXIT_FAILURE);
-            }
-        }
-        
-        if (P_arg)
-            strcpy(config.pid_file, P_arg);
-        if (n_arg)
-            strcpy(config.varnish_name, n_arg);
-        if (l_arg)
-            strcpy(config.log_file, l_arg);
-        if (f_arg) {
-            strcpy(config.varnish_bindump, f_arg);
-            endless = 0;
-        }
-        
-        if (f_arg && VSL_Arg(vd, 'r', f_arg) <= 0)
+    if (c_arg) {
+        strcpy(cli_config_filename, c_arg);
+        printf("Reading config from %s\n", c_arg);
+        if (CONF_ReadFile(c_arg) != 0)
             exit(EXIT_FAILURE);
-        else if (!EMPTY(config.varnish_name)
-                 && VSL_Arg(vd, 'n', config.varnish_name) <= 0)
-            exit(EXIT_FAILURE);
+    }
         
-        if (LOG_Open(PACKAGE_NAME) != 0) {
+    if (f_arg && n_arg)
+        usage(EXIT_FAILURE);
+    if (l_arg && y_arg)
+        usage(EXIT_FAILURE);
+        
+    if (u_arg) {
+        err = CONF_Add("user", u_arg);
+        if (err) {
+            fprintf(stderr, "Unknown user: %s\n", u_arg);
             exit(EXIT_FAILURE);
         }
+    }
 
-        VAS_Fail = ASRT_Fail;
-        
-        if (d_flag)
-            LOG_SetLevel(LOG_DEBUG);
-        LOG_Log0(LOG_INFO,
-            "initializing (v" PACKAGE_VERSION " revision " REVISION ")");
-
-        CONF_Dump();
-        
-	if (!EMPTY(config.pid_file)
-            && (pfh = VPF_Open(config.pid_file, 0644, NULL)) == NULL) {
-		LOG_Log(LOG_ERR, "Cannot write pid file %s: %s\n",
-                        config.pid_file, strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	if (!D_flag && varnish_daemon(0, 0) == -1) {
-		perror("daemon()");
-		if (pfh != NULL)
-			VPF_Remove(pfh);
-		exit(EXIT_FAILURE);
-	}
-
-	if (pfh != NULL)
-		VPF_Write(pfh);
-
-	terminate_action.sa_handler = HNDL_Terminate;
-	AZ(sigemptyset(&terminate_action.sa_mask));
-	terminate_action.sa_flags &= ~SA_RESTART;
-
-	stacktrace_action.sa_handler = HNDL_Abort;
-
-	ignore_action.sa_handler = SIG_IGN;
-	default_action.sa_handler = SIG_DFL;
-
-        if (!D_flag) {
-            child_pid = fork();
-            switch(child_pid) {
-            case -1:
-                LOG_Log(LOG_ALERT,
-                    "Cannot fork (%s), running as single process",
-                    strerror(errno));
-                CHILD_Main(vd, endless, 0);
-                break;
-            case 0:
-                CHILD_Main(vd, endless, 0);
-                break;
-            default:
-                parent_main(child_pid, vd, endless);
-                break;
-            }
+    if (y_arg) {
+        err = CONF_Add("syslog.facility", y_arg);
+        if (err) {
+            fprintf(stderr, "Unknown syslog facility: %s\n", y_arg);
+            exit(EXIT_FAILURE);
         }
-        else {
-            LOG_Log0(LOG_INFO, "Running as non-demon single process");
+    }
+        
+    if (P_arg)
+        strcpy(config.pid_file, P_arg);
+    if (n_arg)
+        strcpy(config.varnish_name, n_arg);
+    if (l_arg)
+        strcpy(config.log_file, l_arg);
+    if (f_arg) {
+        strcpy(config.varnish_bindump, f_arg);
+        endless = 0;
+    }
+        
+    if (f_arg && VSL_Arg(vd, 'r', f_arg) <= 0)
+        exit(EXIT_FAILURE);
+    else if (!EMPTY(config.varnish_name)
+        && VSL_Arg(vd, 'n', config.varnish_name) <= 0)
+        exit(EXIT_FAILURE);
+        
+    if (LOG_Open(PACKAGE_NAME) != 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    VAS_Fail = ASRT_Fail;
+        
+    if (d_flag)
+        LOG_SetLevel(LOG_DEBUG);
+    LOG_Log0(LOG_INFO,
+        "initializing (v" PACKAGE_VERSION " revision " REVISION ")");
+
+    CONF_Dump();
+        
+    if (!EMPTY(config.pid_file)
+        && (pfh = VPF_Open(config.pid_file, 0644, NULL)) == NULL) {
+        LOG_Log(LOG_ERR, "Cannot write pid file %s: %s\n",
+            config.pid_file, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    if (!D_flag && varnish_daemon(0, 0) == -1) {
+        perror("daemon()");
+        if (pfh != NULL)
+            VPF_Remove(pfh);
+        exit(EXIT_FAILURE);
+    }
+
+    if (pfh != NULL)
+        VPF_Write(pfh);
+
+    terminate_action.sa_handler = HNDL_Terminate;
+    AZ(sigemptyset(&terminate_action.sa_mask));
+    terminate_action.sa_flags &= ~SA_RESTART;
+
+    stacktrace_action.sa_handler = HNDL_Abort;
+
+    ignore_action.sa_handler = SIG_IGN;
+    default_action.sa_handler = SIG_DFL;
+
+    if (!D_flag) {
+        child_pid = fork();
+        switch(child_pid) {
+        case -1:
+            LOG_Log(LOG_ALERT,
+                "Cannot fork (%s), running as single process",
+                strerror(errno));
             CHILD_Main(vd, endless, 0);
+            break;
+        case 0:
+            CHILD_Main(vd, endless, 0);
+            break;
+        default:
+            parent_main(child_pid, vd, endless);
+            break;
         }
+    }
+    else {
+        LOG_Log0(LOG_INFO, "Running as non-demon single process");
+        CHILD_Main(vd, endless, 0);
+    }
 }

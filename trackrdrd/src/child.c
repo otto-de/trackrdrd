@@ -95,7 +95,7 @@ struct hashentry_s {
     float insert_time;
     VTAILQ_ENTRY(hashentry_s) insert_list;
     
-    dataentry	*de;
+    dataentry *de;
 };
 
 typedef struct hashentry_s hashentry;
@@ -144,7 +144,7 @@ typedef struct hashtable_s hashtable;
 static hashtable htbl;
 
 #ifdef WITHOUT_ASSERTS
-#define entry_assert(e, cond)       do { (void)(e);(void)(cond);} while(0)
+#define entry_assert(e, cond) do { (void)(e);(void)(cond);} while(0)
 #else /* WITH_ASSERTS */
 #define entry_assert(e, cond)						\
     do {								\
@@ -317,50 +317,50 @@ jenkmulvey2(uint32_t n)
 static uint32_t
 wang(uint32_t n)
 {
-  n  = ~n + (n << 15); // n = (n << 15) - n - 1;
-  n ^= rotr(n,12);
-  n += (n << 2);
-  n ^= rotr(n,4);
-  n  = (n + (n << 3)) + (n << 11);
-  n ^= rotr(n,16);
-  return n;
+    n  = ~n + (n << 15); // n = (n << 15) - n - 1;
+    n ^= rotr(n,12);
+    n += (n << 2);
+    n ^= rotr(n,4);
+    n  = (n + (n << 3)) + (n << 11);
+    n ^= rotr(n,16);
+    return n;
 }
 
 void
 HASH_Stats(void)
 {
     LOG_Log(LOG_INFO,
-	"Hash table: "
+        "Hash table: "
         "len=%u "
-	"seen=%u "
-	"drop_reqstart=%u "
-	"drop_vcl_log=%u "
-	"drop_reqend=%u "
-	"expired=%u "
-	"evacuated=%u "
-	"open=%u "
-	"load=%.2f "    
-	"collisions=%u "
-	"insert_probes=%u "
-	"find_probes=%u "
-	"fail=%u "
-	"occ_hi=%u "
-	"occ_hi_this=%u ",
+        "seen=%u "
+        "drop_reqstart=%u "
+        "drop_vcl_log=%u "
+        "drop_reqend=%u "
+        "expired=%u "
+        "evacuated=%u "
+        "open=%u "
+        "load=%.2f "    
+        "collisions=%u "
+        "insert_probes=%u "
+        "find_probes=%u "
+        "fail=%u "
+        "occ_hi=%u "
+        "occ_hi_this=%u ",
         htbl.len,
-	htbl.seen,
-	htbl.drop_reqstart,
-	htbl.drop_vcl_log,
-	htbl.drop_reqend,
-	htbl.expired,
-	htbl.evacuated,
-	htbl.open,
+        htbl.seen,
+        htbl.drop_reqstart,
+        htbl.drop_vcl_log,
+        htbl.drop_reqend,
+        htbl.expired,
+        htbl.evacuated,
+        htbl.open,
         100.0 * htbl.open / htbl.len,
-	htbl.collisions,
-	htbl.insert_probes,
-	htbl.find_probes,
-	htbl.fail,
-	htbl.occ_hi,
-	htbl.occ_hi_this);
+        htbl.collisions,
+        htbl.insert_probes,
+        htbl.find_probes,
+        htbl.fail,
+        htbl.occ_hi,
+        htbl.occ_hi_this);
 
     htbl.occ_hi_this = 0;
 }
@@ -400,7 +400,7 @@ hash_init(void)
 
     /* entries init */
     for (int i = 0; i < entries; i++) {
-	htbl.entry[i].magic = HASH_MAGIC;
+        htbl.entry[i].magic = HASH_MAGIC;
         htbl.entry[i].state = HASH_EMPTY;
     }
     atexit(hash_cleanup);
@@ -500,7 +500,7 @@ static hashentry
 
     he = &htbl.entry[INDEX(h)];
     if (he->state == HASH_EMPTY)
-	    goto ok;
+        goto ok;
 
     htbl.collisions++;
     oldest = he;
@@ -618,7 +618,7 @@ static inline dataentry
     sprintf(de->data, "XID=%d", xid);
     de->end = strlen(de->data);
     if (de->end > dtbl.w_stats.data_hi)
-	dtbl.w_stats.data_hi = de->end;
+        dtbl.w_stats.data_hi = de->end;
     MON_StatsUpdate(STATS_OCCUPANCY);
     
     return (de);
@@ -714,21 +714,21 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         AZ(err);
         LOG_Log(LOG_DEBUG, "%s: XID=%u", VSL_tags[tag], xid);
 
-	if (xid > last_start_xid)
+        if (xid > last_start_xid)
             last_start_xid = xid;
 
-	tim = TIM_mono();
+        tim = TIM_mono();
         if (! insert(xid, fd, tim)) {
-	    htbl.drop_reqstart++;
-	    break;
-	}
+            htbl.drop_reqstart++;
+            break;
+        }
 
-	/* configurable ? */
-	if ((tim - tim_exp_check) > 10) {
-		hash_exp(tim - htbl.ttl);
-		tim_exp_check = tim;
-	}
-	break;
+        /* configurable ? */
+        if ((tim - tim_exp_check) > 10) {
+            hash_exp(tim - htbl.ttl);
+            tim_exp_check = tim;
+        }
+        break;
 
     case SLT_VCL_Log:
         /* Skip VCL_Log entries without the "track " prefix. */
@@ -741,15 +741,15 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         LOG_Log(LOG_DEBUG, "%s: XID=%u, data=[%.*s]", VSL_tags[tag],
             xid, datalen, data);
 
-	he = hash_find(xid);
-	if (! he) {
-	    LOG_Log(LOG_WARNING, "%s: XID %d not found",
-		VSL_tags[tag], xid);
-	    htbl.drop_vcl_log++;
-	    break;
-	}
-	check_entry(he, xid, fd);
-	de = he->de;
+        he = hash_find(xid);
+        if (! he) {
+            LOG_Log(LOG_WARNING, "%s: XID %d not found",
+                VSL_tags[tag], xid);
+            htbl.drop_vcl_log++;
+            break;
+        }
+        check_entry(he, xid, fd);
+        de = he->de;
         append(de, tag, xid, data, datalen);
         de->hasdata = true;
         break;
@@ -761,21 +761,21 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         LOG_Log(LOG_DEBUG, "%s: XID=%u req_endt=%u.%09lu", VSL_tags[tag], xid,
             (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
 
-	if (xid > last_end_xid)
+        if (xid > last_end_xid)
             last_end_xid = xid;
 
-	xid_spread_sum += (last_end_xid - last_start_xid);
-	xid_spread_count++;
+        xid_spread_sum += (last_end_xid - last_start_xid);
+        xid_spread_count++;
 
-	he = hash_find(xid);
-	if (! he) {
-	    LOG_Log(LOG_WARNING, "%s: XID %d not found",
-		VSL_tags[tag], xid);
-	    htbl.drop_reqend++;
-	    break;
-	}
-	check_entry(he, xid, fd);
-	de = he->de;
+        he = hash_find(xid);
+        if (! he) {
+            LOG_Log(LOG_WARNING, "%s: XID %d not found",
+                VSL_tags[tag], xid);
+            htbl.drop_reqend++;
+            break;
+        }
+        check_entry(he, xid, fd);
+        de = he->de;
 
         sprintf(reqend_str, "%s=%u.%09lu", REQEND_T_VAR,
             (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
@@ -965,7 +965,6 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
         
     /* Main loop */
     term = 0;
-    /* XXX: Varnish restart? */
     /* XXX: TERM not noticed until request received */
     while (VSL_Dispatch(vd, OSL_Track, NULL) > 0)
         if (term || !endless)
@@ -984,7 +983,7 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     WRK_Shutdown();
     AZ(MQ_GlobalShutdown());
     if (config.monitor_interval > 0.0)
-	MON_StatusShutdown(monitor);
+        MON_StatusShutdown(monitor);
     LOG_Log0(LOG_INFO, "Worker process exiting");
     LOG_Close();
     exit(EXIT_SUCCESS);

@@ -50,26 +50,6 @@ spmcq_len(void)
     return UINT_MAX - spmcq.head + 1 + spmcq.tail;
 }
 
-#if 0
-/* 
- * this is only approximately correct and could even become negative when values
- * get updated while we read them!
- * 
- */
-int SPMCQ_Len(void) {
-    unsigned	l;
-
-    do {
-	l = spmcq_len();
-	if (l <= spmcq.mask + 1)
-	    break;
-	VRMB();
-    } while (1);
-
-    return (l);
-}
-#endif
-
 static void
 spmcq_cleanup(void)
 {

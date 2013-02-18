@@ -53,10 +53,10 @@ void ASRT_Fail(const char *func, const char *file, int line, const char *cond,
 
 #define SIGDISP(SIG, action)						\
     do { if (UNDEFINED(SIG)) break;					\
-	if (sigaction((SIG), (&action), NULL) != 0)			\
-             LOG_Log(LOG_ALERT,						\
-                 "Cannot install handler for " #SIG ": %s",		\
-                 strerror(errno));					\
+        if (sigaction((SIG), (&action), NULL) != 0)			\
+            LOG_Log(LOG_ALERT,						\
+                "Cannot install handler for " #SIG ": %s",		\
+                strerror(errno));					\
     } while(0)
 
 volatile sig_atomic_t term;
@@ -108,7 +108,7 @@ bool SPMCQ_StopWorker(int running);
 
 #define spmcq_wait(what)						\
     do {								\
-	AZ(pthread_mutex_lock(&spmcq_##what##waiter_lock));		\
+        AZ(pthread_mutex_lock(&spmcq_##what##waiter_lock));		\
         spmcq_##what##waiter++;                                         \
         AZ(pthread_cond_wait(&spmcq_##what##waiter_cond,		\
                 &spmcq_##what##waiter_lock));                           \
