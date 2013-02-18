@@ -1,10 +1,10 @@
 INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) @AMQ_CFLAGS@
 
-TESTS = test_parse test_data test_mq test_spmcq test_spmcq_loop.sh \
-	test_spmcq_len test_worker regress.sh
+TESTS = test_parse test_data test_hash test_mq test_spmcq		\
+	test_spmcq_loop.sh test_spmcq_len test_worker regress.sh
 
-check_PROGRAMS = test_parse test_data test_mq test_spmcq test_spmcq_len \
-	test_worker
+check_PROGRAMS = test_parse test_data test_hash test_mq test_spmcq	\
+	test_spmcq_len test_worker
 
 test_parse_SOURCES = \
 	minunit.h \
@@ -23,6 +23,30 @@ test_data_SOURCES = \
 test_data_LDADD = \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
 	../data.$(OBJEXT)
+
+test_hash_SOURCES = \
+	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
+	../child.c \
+	../trackrdrd.h
+
+test_hash_LDADD = \
+	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
+	$(VARNISHSRC)/lib/libvarnishapi/libvarnishapi.la \
+	../worker.$(OBJEXT) \
+	../log.$(OBJEXT) \
+	../mq.$(OBJEXT) \
+	../spmcq.$(OBJEXT) \
+	../amq.$(OBJEXT) \
+	../amq_connection.$(OBJEXT) \
+	../data.$(OBJEXT) \
+	../assert.$(OBJEXT) \
+	../monitor.$(OBJEXT) \
+	../parse.$(OBJEXT) \
+	../config.$(OBJEXT) \
+	../sandbox.$(OBJEXT) \
+	@AMQ_LIBS@
+
+test_hash_CFLAGS = -DTEST_DRIVER
 
 test_mq_SOURCES = \
 	minunit.h \
