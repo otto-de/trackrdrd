@@ -519,7 +519,7 @@ static hashentry
         h += n * n;
     } while (probes <= htbl.max_probes);
 
-    /* none eligable for evacuation */
+    /* none eligible for evacuation */
     if ((oldest->insert_time + htbl.mlt) > t) {
         htbl.fail++;
         htbl.insert_probes += probes;
@@ -676,7 +676,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     float tim, tim_exp_check = 0.0;
 
     /* wrap detection statistics */
-    static const char *pptr = (const char *)UINTPTR_MAX;
+    static const char *pptr = (const char *) UINTPTR_MAX;
 
     static unsigned wrap_start_xid = 0;
     static unsigned wrap_end_xid = 0;
@@ -715,7 +715,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         LOG_Log(LOG_DEBUG, "%s: XID=%u", VSL_tags[tag], xid);
 
 	if (xid > last_start_xid)
-		last_start_xid = xid;
+            last_start_xid = xid;
 
 	tim = TIM_mono();
         if (! insert(xid, fd, tim)) {
@@ -762,7 +762,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
             (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
 
 	if (xid > last_end_xid)
-		last_end_xid = xid;
+            last_end_xid = xid;
 
 	xid_spread_sum += (last_end_xid - last_start_xid);
 	xid_spread_count++;
@@ -792,25 +792,19 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     }
 
     /* 
-     * log when the vsl ptr wraps, so we can relate lost records, if
-     * applicable 
+     * log when the vsl ptr wraps, to try to monitor lost records
+     * XXX: this doesn't work when XIDs wrap at UINT_MAX
      */
     if (ptr < pptr) {
-	    LOG_Log(LOG_INFO, "VSL wrap at %u", xid);
-	    if (wrap_start_xid) {
-		    LOG_Log(LOG_INFO, "VSL wrap start xid %10u current %10u delta %10d",
-			wrap_start_xid, last_start_xid, (last_start_xid - wrap_start_xid));
-		    LOG_Log(LOG_INFO, "VSL wrap end   xid %10u current %10u delta %10d",
-			wrap_end_xid, last_end_xid, (last_end_xid - wrap_end_xid));
-		    /* AAARRRGLLL, I confess: yes, I am calculating an average here */
-		    LOG_Log(LOG_INFO, "VSL wrap xid spread is %u - avg xid spread is %f",
-			(last_start_xid - last_end_xid),
-			(1.0 * xid_spread_sum / xid_spread_count));
-		    xid_spread_count = xid_spread_sum = 0;
-	    }
-
-	    wrap_start_xid = last_start_xid;
-	    wrap_end_xid = last_end_xid;
+        if (wrap_start_xid) {
+            LOG_Log(LOG_INFO,
+                "VSL wrap: delta_start=%u delta_end=%u delta_avg=%f",
+                last_start_xid - wrap_start_xid, last_end_xid - wrap_end_xid,
+                1.0 * xid_spread_sum / xid_spread_count);
+            xid_spread_count = xid_spread_sum = 0;
+        }
+        wrap_start_xid = last_start_xid;
+        wrap_end_xid = last_end_xid;
     }
     pptr = ptr;
 
