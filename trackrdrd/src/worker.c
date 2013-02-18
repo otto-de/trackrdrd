@@ -54,12 +54,13 @@ typedef enum {
 } wrk_state_e;
 
 static const char* statename[WRK_STATE_E_LIMIT] = { 
-	[WRK_NOTSTARTED]       	= "not started",
-	[WRK_INITIALIZING]	= "initializing",
-	[WRK_RUNNING]		= "running",
-	[WRK_WAITING]		= "waiting",
-	[WRK_SHUTTINGDOWN]	= "shutting down",
-	[WRK_EXITED]		= "exited"};
+    [WRK_NOTSTARTED]       	= "not started",
+    [WRK_INITIALIZING]	= "initializing",
+    [WRK_RUNNING]		= "running",
+    [WRK_WAITING]		= "waiting",
+    [WRK_SHUTTINGDOWN]	= "shutting down",
+    [WRK_EXITED]		= "exited"
+};
 
 struct worker_data_s {
     unsigned magic;
@@ -121,9 +122,9 @@ wrk_send(void *amq_worker, dataentry *entry, worker_data_t *wrk)
     wrk->wrk_nfree++;
 
     if (dtbl.nfree == 0) {
-	    DATA_Return_Freelist(&wrk->wrk_freelist, wrk->wrk_nfree);
-	    wrk->wrk_nfree = 0;
-	    assert(VSTAILQ_EMPTY(&wrk->wrk_freelist));
+        DATA_Return_Freelist(&wrk->wrk_freelist, wrk->wrk_nfree);
+        wrk->wrk_nfree = 0;
+        assert(VSTAILQ_EMPTY(&wrk->wrk_freelist));
     }
 
     spmcq_signal(room);
@@ -168,48 +169,43 @@ static void
     LOG_Log(LOG_INFO, "Worker %d: running (%s)", wrk->id, version);
     
     while (run) {
-	entry = (dataentry *) SPMCQ_Deq();
-	if (entry != NULL) {
-	    wrk->deqs++;
+        entry = (dataentry *) SPMCQ_Deq();
+        if (entry != NULL) {
+            wrk->deqs++;
             wrk_send(amq_worker, entry, wrk);
 
-	    /* should we go to sleep ? */
-	    if (SPMCQ_StopWorker(running))
-		    goto sleep;
-	    
-	    continue;
+            if (!SPMCQ_StopWorker(running))
+                continue;
         }
 
-      sleep:
-	/* return space before sleeping */
-	if (wrk->wrk_nfree > 0) {
-		DATA_Return_Freelist(&wrk->wrk_freelist, wrk->wrk_nfree);
-		wrk->wrk_nfree = 0;
-	}
-
+        /* return space before sleeping */
+        if (wrk->wrk_nfree > 0) {
+            DATA_Return_Freelist(&wrk->wrk_freelist, wrk->wrk_nfree);
+            wrk->wrk_nfree = 0;
+        }
 
         /*
-	 * Queue is empty or we should backoff
-	 *
-	 * wait until data are available, or quit is signaled.
-	 *
-	 * Grab the CV lock, which also constitutes an implicit memory
+         * Queue is empty or we should backoff
+         *
+         * wait until data are available, or quit is signaled.
+         *
+         * Grab the CV lock, which also constitutes an implicit memory
          * barrier 
-	 */
+         */
         AZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
         /*
-	 * run is guaranteed to be fresh here
-	 *
-	 * also re-check the stop condition under the lock
-	 */
+         * run is guaranteed to be fresh here
+         *
+         * also re-check the stop condition under the lock
+         */
         if (run && ((! entry) || SPMCQ_StopWorker(running))) {
-		wrk->waits++;
-		spmcq_datawaiter++;
-		wrk->state = WRK_WAITING;
-		AZ(pthread_cond_wait(&spmcq_datawaiter_cond,
-			&spmcq_datawaiter_lock));
-		spmcq_datawaiter--;
-		wrk->state = WRK_RUNNING;
+            wrk->waits++;
+            spmcq_datawaiter++;
+            wrk->state = WRK_WAITING;
+            AZ(pthread_cond_wait(&spmcq_datawaiter_cond,
+                    &spmcq_datawaiter_lock));
+            spmcq_datawaiter--;
+            wrk->state = WRK_RUNNING;
         }
         AZ(pthread_mutex_unlock(&spmcq_datawaiter_lock));
     }
