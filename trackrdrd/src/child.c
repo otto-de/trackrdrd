@@ -493,17 +493,16 @@ static hashentry
     unsigned probes	= 0;
     uint32_t h  	= h1(xid);
 
-    const uint32_t h2	= h2(xid);
-
     he = &htbl.entry[INDEX(h)];
     if (he->state == HASH_EMPTY)
 	    goto ok;
 
     htbl.collisions++;
-    
     oldest = he;
+
+    h = h2(xid);
+    unsigned n = 0;
     do {
-        h += h2;
         he = &htbl.entry[INDEX(h)];
         probes++;
 
@@ -511,6 +510,8 @@ static hashentry
             goto ok;
         if (he->insert_time < oldest->insert_time)
             oldest = he;
+        n++;
+        h += n * n;
     } while (probes <= htbl.max_probes);
 
     /* none eligable for evacuation */
@@ -549,19 +550,20 @@ static hashentry
     unsigned probes	= 0;
     uint32_t h  	= h1(xid);
 
-    const uint32_t h2	= h2(xid);
-
     he = &htbl.entry[INDEX(h)];
     if (he->xid == xid)
         return (he);
 
+    h = h2(xid);
+    unsigned n = 0;
     do {
-        h += h2;
         he = &htbl.entry[INDEX(h)];
         probes++;
 
         if (he->xid == xid)
             break;
+        n++;
+        h += n * n;
     } while (probes <= htbl.max_probes);
 
     htbl.find_probes += probes;
@@ -578,7 +580,6 @@ hash_dump1(hashentry *entry, int i)
     LOG_Log(LOG_INFO, "Hash entry %d: XID=%d",
         i, entry->xid);
     DATA_Dump1(entry->de, 0);
-    assert(entry->xid == entry->de->xid);
 }
 
 static void
@@ -989,3 +990,160 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     LOG_Close();
     exit(EXIT_SUCCESS);
 }
+
+#ifdef TEST_DRIVER
+
+#include <float.h>
+
+#include "minunit.h"
+
+int tests_run = 0;
+static char errmsg[BUFSIZ];
+
+static char
+*test_hash_init(void)
+{
+    int err;
+
+    printf("... testing hash table initialization\n");
+    
+    config.maxopen_scale = 10;
+    config.maxdone = 1024;
+    /* Set max_probes to maximum for testing */
+    config.hash_max_probes = 1024;
+    /* Deactivates evacuation */
+    config.hash_mlt = UINT_MAX;
+    AZ(DATA_Init());
+    err = hash_init();
+    sprintf(errmsg, "hash init: %s", strerror(err));
+    mu_assert(errmsg, err == 0);
+
+    return NULL;
+}
+
+static const char
+*test_hash_insert(void)
+{
+    dataentry entry;
+    hashentry *he;
+
+    printf("... testing hash insert\n");
+
+    he = hash_insert(1234567890, &entry, FLT_MAX);
+    mu_assert("hash_insert returned NULL", he != NULL);
+    mu_assert("hash_insert: invalid magic number", he->magic == HASH_MAGIC);
+    mu_assert("hash_insert: entry not open", he->state == HASH_OPEN);
+    mu_assert("hash_insert: XID not set", he->xid == 1234567890);
+    mu_assert("hash_insert: insert time not set", he->insert_time == FLT_MAX);
+    mu_assert("hash_insert: data pointer not set", he->de == &entry);
+
+    /* Cleanup */
+    hash_free(he);
+    he->xid = 0;
+    mu_assert("hash_insert: open != 0 after freeing only insert",
+        htbl.open == 0);
+    
+    unsigned xid = 1234567890;
+    for (int i = 0; i < htbl.len; i++) {
+        he = hash_insert(xid, &entry, 0);
+        sprintf(errmsg, "hash_insert: failed at %u", xid);
+        mu_assert(errmsg, he != NULL);
+        xid++;
+    }
+
+    /* Cleanup */
+    for (int i = 0; i < htbl.len; i++)
+        hash_free(&htbl.entry[i]);
+    sprintf(errmsg, "hash_insert: open = %u after freeing all elements",
+        htbl.open);
+    mu_assert(errmsg, htbl.open == 0);
+    
+    return NULL;
+}
+
+static const char
+*test_hash_find(void)
+{
+    hashentry *entry1, *entry2;
+    dataentry data;
+    unsigned xid;
+
+    printf("... testing hash find\n");
+
+    data.magic = DATA_MAGIC;
+    data.state = DATA_OPEN;
+    
+    entry1 = hash_insert(1234567890, &data, FLT_MAX);
+    entry2 = hash_find(1234567890);
+    mu_assert("hash_find: returned NULL", entry2 != NULL);
+    mu_assert("hash_find: invalid magic number", entry2->magic == HASH_MAGIC);
+    mu_assert("hash_find: invalid data pointer", entry2->de == &data);
+    sprintf(errmsg, "hash_find: expected XID=1234567890, got %u", entry2->xid);
+    mu_assert(errmsg, entry2->xid == 1234567890);
+    sprintf(errmsg, "hash_find: expected insert time %f, got %f", FLT_MAX,
+        entry2->insert_time);
+    mu_assert(errmsg, entry2->insert_time == FLT_MAX);
+    /* Cleanup */
+    entry1->xid = 0;
+    hash_free(entry1);
+    mu_assert("hash_free: open != 0 after freeing only insert", htbl.open == 0);
+
+    entry2 = hash_find(1234567890);
+    mu_assert("hash_find: empty entry, expected NULL", entry2 == NULL);
+
+    xid = 1234567890;
+    for (int i = 0; i < htbl.len; i++) {
+        entry1 = hash_insert(xid++, &data, 0);
+        sprintf(errmsg, "hash_insert: failed at %u", xid - 1);
+        if (entry1 == NULL)
+            hash_dump();
+        mu_assert(errmsg, entry1 != NULL);
+    }
+    entry2 = hash_find(xid);
+    mu_assert("hash_find: non-existent XID, expected NULL", entry2 == NULL);
+
+    for (int i = 0; i < htbl.len; i++) {
+        entry2 = hash_find(1234567890 + i);
+        sprintf(errmsg, "hash_find: expected %u, returned NULL",
+            1234567890 + i);
+        mu_assert(errmsg, entry2 != NULL);
+    }
+
+    entry2 = hash_find(1234567890 + htbl.len);
+    mu_assert("hash_find: XID corner case, expected NULL", entry2 == NULL);
+    for (int i = 0; i < htbl.len/2; i++) {
+        entry1 = hash_find(1234567890 + i);
+        entry1->xid = 0;
+        hash_free(entry1);
+    }
+
+    for (int i = 0; i < htbl.len; i++) {
+        entry2 = hash_find(1234567890 + i);
+        if (i < htbl.len/2)
+            mu_assert("hash_find: emptied entry, expected NULL",
+                entry2 == NULL);
+        else {
+            sprintf(errmsg, "hash_find: expected %u, returned NULL",
+                1234567890 + i);
+            mu_assert(errmsg, entry2 != NULL);
+            sprintf(errmsg, "hash_find: expected %u, found %u", 1234567890 + i,
+                    entry2->xid);
+            mu_assert(errmsg, entry2->xid == 1234567890 + i);
+        }
+    }
+    
+    return NULL;
+}
+
+static const char
+*all_tests(void)
+{
+    mu_run_test(test_hash_init);
+    mu_run_test(test_hash_insert);
+    mu_run_test(test_hash_find);
+    return NULL;
+}
+
+TEST_RUNNER
+
+#endif
