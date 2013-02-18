@@ -51,38 +51,38 @@ log_output(void)
     
     LOG_Log(LOG_INFO,
         "Data table writer: "
-	"len=%u "
-	"nodata=%u "
-	"submitted=%u "
-	"wait_qfull=%u "
-	"wait_room=%u "
-	"data_hi=%u "
-	"data_overflows=%u ",
-	dtbl.len,
-	dtbl.w_stats.nodata,
-	dtbl.w_stats.submitted,
-	dtbl.w_stats.wait_qfull,
-	dtbl.w_stats.wait_room,
-	dtbl.w_stats.data_hi,
-	dtbl.w_stats.data_overflows);
+        "len=%u "
+        "nodata=%u "
+        "submitted=%u "
+        "wait_qfull=%u "
+        "wait_room=%u "
+        "data_hi=%u "
+        "data_overflows=%u ",
+        dtbl.len,
+        dtbl.w_stats.nodata,
+        dtbl.w_stats.submitted,
+        dtbl.w_stats.wait_qfull,
+        dtbl.w_stats.wait_room,
+        dtbl.w_stats.data_hi,
+        dtbl.w_stats.data_overflows);
 
     LOG_Log(LOG_INFO,
         "Data table reader: "
-	"done=%u "
-	"open=%u "
-	"load=%.2f "
-	"sent=%u "
-	"failed=%u "
-	"occ_hi=%u "
-	"occ_hi_this=%u ",
-	dtbl.r_stats.done,
-	dtbl.r_stats.open,
-	(100.0 * (1.0 * dtbl.r_stats.done + 1.0 * dtbl.r_stats.open) / dtbl.len),
-	dtbl.r_stats.sent,
-	dtbl.r_stats.failed,
-	dtbl.r_stats.occ_hi,
-	dtbl.r_stats.occ_hi_this
-	);
+        "done=%u "
+        "open=%u "
+        "load=%.2f "
+        "sent=%u "
+        "failed=%u "
+        "occ_hi=%u "
+        "occ_hi_this=%u ",
+        dtbl.r_stats.done,
+        dtbl.r_stats.open,
+        (100.0 * (1.0 * dtbl.r_stats.done + 1.0 * dtbl.r_stats.open) / dtbl.len),
+        dtbl.r_stats.sent,
+        dtbl.r_stats.failed,
+        dtbl.r_stats.occ_hi,
+        dtbl.r_stats.occ_hi_this
+            );
 
     /* locking would be overkill */
     dtbl.r_stats.occ_hi_this = 0;
@@ -118,7 +118,7 @@ void
         if (nanosleep(&t, NULL) != 0) {
             if (errno == EINTR) {
                 if (run == 0)
-		    break;
+    	    break;
                 LOG_Log0(LOG_INFO, "Monitoring thread interrupted");
                 continue;
             }
@@ -182,7 +182,7 @@ MON_StatsUpdate(stats_update_t update)
         break;
 
     case STATS_NODATA:
-	dtbl.w_stats.nodata++;
+        dtbl.w_stats.nodata++;
         dtbl.r_stats.done--;
         break;
         
