@@ -88,7 +88,7 @@ SPMCQ_Init(void)
 {
     void *buf;
     
-    size_t n = 1 << config.maxdone_scale;
+    size_t n = config.maxdone;
     buf = calloc(n, sizeof(void *));
     if (buf == NULL)
         return(errno);
@@ -101,7 +101,7 @@ SPMCQ_Init(void)
           .tail = 0 };
     memcpy(&spmcq, &q, sizeof(spmcq_t));
 
-    qlen_goal = 1 << config.qlen_goal_scale;
+    qlen_goal = config.qlen_goal;
     
     atexit(spmcq_cleanup);
     return(0);
@@ -174,7 +174,7 @@ main(int argc, char * const *argv)
     printf("\nTEST: %s\n", argv[0]);
     printf("... test SMPCQ enqueue at UINT_MAX overflow\n");
     
-    config.maxdone_scale = 10;
+    config.maxdone = 1024;
     SPMCQ_Init();
     spmcq.head = spmcq.tail = UINT_MAX - 2;
 
