@@ -65,7 +65,6 @@ struct worker_data_s {
     unsigned magic;
 #define WORKER_DATA_MAGIC 0xd8eef137
     unsigned id;
-    pthread_t tid;
     unsigned status;  /* exit status */
     wrk_state_e state;
 
@@ -142,7 +141,6 @@ static void
     LOG_Log(LOG_INFO, "Worker %d: starting", wrk->id);
     CHECK_OBJ_NOTNULL(wrk, WORKER_DATA_MAGIC);
     wrk->state = WRK_INITIALIZING;
-    wrk->tid = pthread_self();
 
     err = MQ_WorkerInit(&amq_worker);
     if (err != NULL) {
@@ -312,8 +310,8 @@ WRK_Stats(void)
     
     for (int i = 0; i < config.nworkers; i++) {
         wrk = thread_data[i].wrk_data;
-        LOG_Log(LOG_INFO, "Worker %d tid %u (%s): seen=%d waits=%d sent=%d failed=%d",
-            wrk->id, wrk->tid, statename[wrk->state], wrk->deqs, wrk->waits, wrk->sends,
+        LOG_Log(LOG_INFO, "Worker %d (%s): seen=%d waits=%d sent=%d failed=%d",
+            wrk->id, statename[wrk->state], wrk->deqs, wrk->waits, wrk->sends,
             wrk->fails);
     }
 }
