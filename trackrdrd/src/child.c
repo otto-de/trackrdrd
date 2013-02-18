@@ -475,7 +475,7 @@ submit(hashentry *he)
     hash_free(he);
 }
 
-/* like Submit, but for recrods in HASH_OPEN */
+/* like Submit, but for records in HASH_OPEN */
 static void
 hash_evacuate(hashentry *he)
 {
@@ -578,20 +578,14 @@ static hashentry
 }
 
 static void
-hash_dump1(hashentry *entry, int i)
-{
-    if (entry->state == HASH_EMPTY)
-        return;
-    LOG_Log(LOG_INFO, "Hash entry %d: XID=%d",
-        i, entry->xid);
-    DATA_Dump1(entry->de, 0);
-}
-
-static void
 hash_dump(void)
 {
-    for (int i = 0; i < htbl.len; i++)
-        hash_dump1(&htbl.entry[i], i);
+    for (int i = 0; i < htbl.len; i++) {
+        if (htbl.entry[i].state == HASH_EMPTY)
+            continue;
+        LOG_Log(LOG_INFO, "Hash entry %d: XID=%d", i, htbl.entry[i].xid);
+        DATA_Dump1(htbl.entry[i].de, 0);
+    }
 }
 
 /*--------------------------------------------------------------------*/
