@@ -44,7 +44,7 @@
 
 #define NCON 10
 
-#define MIN_TABLE_SCALE (MIN_MAXOPEN_SCALE + MIN_MAXDONE_SCALE)
+#define TABLE_SIZE ((1 << DEF_MAXOPEN_SCALE) + DEF_MAXDONE)
 
 int run;
 
@@ -65,7 +65,7 @@ typedef struct {
 int tests_run = 0;
 static char errmsg[BUFSIZ];
 
-static unsigned xids[1 << MIN_TABLE_SCALE];
+static unsigned xids[TABLE_SIZE];
 static prod_con_data_t proddata;
 static prod_con_data_t condata[NCON];
 
@@ -82,7 +82,7 @@ static void
     srand48(time(NULL));
     unsigned xid = (unsigned int) lrand48();
 
-    for (int i = 0; i < (1 << MIN_MAXOPEN_SCALE); i++) {
+    for (int i = 0; i < (1 << DEF_MAXOPEN_SCALE); i++) {
         xids[i] = xid;
         debug_print("Producer: enqueue %d (xid = %u)\n", ++enqs, xid);
         if (!SPMCQ_Enq(&xids[i])) {
@@ -173,8 +173,8 @@ static char
         return(errmsg);
     }
     
-    config.maxopen_scale = MIN_MAXOPEN_SCALE;
-    config.maxdone_scale = MIN_MAXDONE_SCALE;
+    config.maxopen_scale = DEF_MAXOPEN_SCALE;
+    config.maxdone = DEF_MAXDONE;
     err = SPMCQ_Init();
     sprintf(errmsg, "SPMCQ_Init: %s", strerror(err));
     mu_assert(errmsg, err == 0);

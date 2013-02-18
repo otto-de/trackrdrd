@@ -48,6 +48,9 @@
 
 #define NWORKERS 5
 
+#define URI1 "tcp://localhost:61616?wireFormat.maxInactivityDuration=0"
+#define URI2 "tcp://localhost:61616?connection.sendTimeout=1000&wireFormat.maxInactivityDuration=0"
+
 int tests_run = 0;
 static char errmsg[BUFSIZ];
 
@@ -61,24 +64,28 @@ static char
     printf("... testing worker initialization\n");
 
     config.maxopen_scale = 10;
-    config.maxdone_scale = 10;
+    config.maxdone = 1024;
+    config.maxdata = 1024;
     config.nworkers = NWORKERS;
     strcpy(config.mq_qname, "lhoste/tracking/test");
+    config.mq_pool_size = 2;
 
     config.n_mq_uris = 2;
     config.mq_uri = (char **) malloc(2 * sizeof(char**));
     AN(config.mq_uri);
-    config.mq_uri[0] = (char *) malloc(strlen("tcp://localhost:61616") + 1);
+    config.mq_uri[0] = (char *) malloc(strlen(URI1) + 1);
     AN(config.mq_uri[0]);
-    strcpy(config.mq_uri[0], "tcp://localhost:61616");
-    config.mq_uri[1] = (char *)
-        malloc(strlen("tcp://localhost:61616?connection.sendTimeout=1000") + 1);
+    strcpy(config.mq_uri[0], URI1);
+    config.mq_uri[1] = (char *) malloc(strlen(URI2) + 1);
     AN(config.mq_uri[1]);
-    strcpy(config.mq_uri[1],
-        "tcp://localhost:61616?connection.sendTimeout=1000");
+    strcpy(config.mq_uri[1], URI2);
     
     error = MQ_GlobalInit();
     sprintf(errmsg, "MQ_GlobalInit failed: %s", error);
+    mu_assert(errmsg, error == NULL);
+    
+    error = MQ_InitConnections();
+    sprintf(errmsg, "MQ_InitConnections failed: %s", error);
     mu_assert(errmsg, error == NULL);
     
     err = WRK_Init();
