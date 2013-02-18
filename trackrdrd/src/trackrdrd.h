@@ -255,7 +255,6 @@ struct config {
     char	syslog_facility_name[BUFSIZ];
     unsigned	monitor_interval;
     bool	monitor_workers;
-    char	processor_log[BUFSIZ];
 
     /* scale: unit is log(2,n), iow scale is taken to the power of 2 */
     unsigned	maxopen_scale;	/* max number of records in *_OPEN state */
