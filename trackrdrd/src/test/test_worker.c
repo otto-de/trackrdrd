@@ -85,6 +85,10 @@ static char
     mu_assert(errmsg, error == NULL);
     
     error = MQ_InitConnections();
+    if (error != NULL && strstr(error, "Connection refused") != NULL) {
+        printf("Connection refused, ActiveMQ assumed not running\n");
+        exit(EXIT_SKIPPED);
+    }
     sprintf(errmsg, "MQ_InitConnections failed: %s", error);
     mu_assert(errmsg, error == NULL);
     
