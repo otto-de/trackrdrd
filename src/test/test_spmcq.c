@@ -117,32 +117,32 @@ static void
     unsigned *xid;
 
     while (run) {
-	/* run may be stale at this point */
+        /* run may be stale at this point */
         debug_print("Consumer %d: attempt dequeue\n", id);
-	xid = (unsigned *) SPMCQ_Deq();
-	if (xid == NULL) {
-	    /* grab the CV lock, which also constitutes an implicit memory
+        xid = (unsigned *) SPMCQ_Deq();
+        if (xid == NULL) {
+            /* grab the CV lock, which also constitutes an implicit memory
                barrier */
-	    debug_print("Consumer %d: mutex\n", id);
-	    if (pthread_mutex_lock(&spmcq_datawaiter_lock) != 0)
-		consumer_exit(pcdata, CONSUMER_MUTEX);
-	    /* run is guaranteed to be fresh here */
-	    if (run) {
-		debug_print("Consumer %d: wait, run = %d\n", id, run);
-		if (pthread_cond_wait(&spmcq_datawaiter_cond,
-                                      &spmcq_datawaiter_lock) != 0)
-		    consumer_exit(pcdata, CONSUMER_WAIT);
-	    }
-	    debug_print("Consumer %d: unlock\n", id);
-	    if (pthread_mutex_unlock(&spmcq_datawaiter_lock) != 0)
-		consumer_exit(pcdata, CONSUMER_MUTEX);
-	    if (! run) {
-		debug_print("Consumer %d: quit signaled, run = %d\n", id, run);
-		break;
-	    }
-	} else {
-	    /* xid != NULL */
-	    debug_print("Consumer %d: dequeue %d (xid = %u)\n", id, ++deqs,
+            debug_print("Consumer %d: mutex\n", id);
+            if (pthread_mutex_lock(&spmcq_datawaiter_lock) != 0)
+                consumer_exit(pcdata, CONSUMER_MUTEX);
+            /* run is guaranteed to be fresh here */
+            if (run) {
+                debug_print("Consumer %d: wait, run = %d\n", id, run);
+                if (pthread_cond_wait(&spmcq_datawaiter_cond,
+                        &spmcq_datawaiter_lock) != 0)
+                    consumer_exit(pcdata, CONSUMER_WAIT);
+            }
+            debug_print("Consumer %d: unlock\n", id);
+            if (pthread_mutex_unlock(&spmcq_datawaiter_lock) != 0)
+                consumer_exit(pcdata, CONSUMER_MUTEX);
+            if (! run) {
+                debug_print("Consumer %d: quit signaled, run = %d\n", id, run);
+                break;
+            }
+        } else {
+            /* xid != NULL */
+            debug_print("Consumer %d: dequeue %d (xid = %u)\n", id, ++deqs,
                 *xid);
             pcdata->sum += *xid;
         }
