@@ -83,12 +83,12 @@ DATA_Init(void)
     dtbl.nfree  = 0;
 
     for (int i = 0; i < entries; i++) {
-	dtbl.entry[i].magic = DATA_MAGIC;
+        dtbl.entry[i].magic = DATA_MAGIC;
         dtbl.entry[i].state = DATA_EMPTY;
         dtbl.entry[i].hasdata = false;
         dtbl.entry[i].data = &dtbl.buf[i * bufsize];
-	VSTAILQ_INSERT_TAIL(&dtbl.freehead, &dtbl.entry[i], freelist);
-	dtbl.nfree++;
+        VSTAILQ_INSERT_TAIL(&dtbl.freehead, &dtbl.entry[i], freelist);
+        dtbl.nfree++;
     }
     assert(dtbl.nfree == entries);
     assert(VSTAILQ_FIRST(&dtbl.freehead));
@@ -105,10 +105,10 @@ DATA_Init(void)
 void
 DATA_Take_Freelist(struct freehead_s *dst)
 {
-	AZ(pthread_mutex_lock(&dtbl.freelist_lock));
-	VSTAILQ_CONCAT(dst, &dtbl.freehead);
-	dtbl.nfree = 0;
-	AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
+    AZ(pthread_mutex_lock(&dtbl.freelist_lock));
+    VSTAILQ_CONCAT(dst, &dtbl.freehead);
+    dtbl.nfree = 0;
+    AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
 }
 
 /*
@@ -119,25 +119,25 @@ DATA_Take_Freelist(struct freehead_s *dst)
 void
 DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned)
 {
-	AZ(pthread_mutex_lock(&dtbl.freelist_lock));
-	VSTAILQ_CONCAT(&dtbl.freehead, returned);
-	dtbl.nfree += nreturned;
-	AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
+    AZ(pthread_mutex_lock(&dtbl.freelist_lock));
+    VSTAILQ_CONCAT(&dtbl.freehead, returned);
+    dtbl.nfree += nreturned;
+    AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
 }
 
 void
 DATA_Dump1(dataentry *entry, int i)
 {
-        if (entry->state == DATA_EMPTY)
-		return;
-        LOG_Log(LOG_INFO, "Data entry %d: XID=%d tid=%d state=%s data=[%.*s]",
-            i, entry->xid, entry->tid, statename[entry->state], entry->end,
-            entry->data);
+    if (entry->state == DATA_EMPTY)
+        return;
+    LOG_Log(LOG_INFO, "Data entry %d: XID=%d tid=%d state=%s data=[%.*s]",
+        i, entry->xid, entry->tid, statename[entry->state], entry->end,
+        entry->data);
 }
 
 void
 DATA_Dump(void)
 {
-	for (int i = 0; i < dtbl.len; i++)
-		DATA_Dump1(&dtbl.entry[i], i);
+    for (int i = 0; i < dtbl.len; i++)
+        DATA_Dump1(&dtbl.entry[i], i);
 }

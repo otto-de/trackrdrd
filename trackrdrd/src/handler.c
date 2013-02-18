@@ -73,17 +73,17 @@ stacktrace(void)
 
     depth = backtrace (buf, MAX_STACK_DEPTH);
     if (depth == 0) {
-	LOG_Log0(LOG_ERR, "Stacktrace empty");
-	return;
+        LOG_Log0(LOG_ERR, "Stacktrace empty");
+        return;
     }
     strings = backtrace_symbols(buf, depth);
     if (strings == NULL) {
-	LOG_Log0(LOG_ERR, "Cannot retrieve symbols for stacktrace");
-	return;
+        LOG_Log0(LOG_ERR, "Cannot retrieve symbols for stacktrace");
+        return;
     }
     /* XXX: get symbol names from nm? cf. cache_panic.c/pan_backtrace */
     for (i = 0; i < depth; i++)
-	LOG_Log(LOG_ERR, "%s", strings[i]);
+        LOG_Log(LOG_ERR, "%s", strings[i]);
     
     free(strings);
 }
@@ -92,7 +92,7 @@ void
 HNDL_Abort(int sig)
 {
     LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
-	strsignal(sig));
+        strsignal(sig));
     stacktrace();
     AZ(sigaction(SIGABRT, &default_action, NULL));
     LOG_Log0(LOG_ALERT, "Aborting");
