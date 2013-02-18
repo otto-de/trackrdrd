@@ -15,6 +15,8 @@ trackrdrd_SOURCES = \
 	mq.c \
 	activemq/amq.h \
 	activemq/amq.cpp \
+	activemq/amq_connection.h \
+	activemq/amq_connection.cpp \
 	spmcq.c \
 	worker.c \
 	sandbox.c \

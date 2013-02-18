@@ -101,19 +101,6 @@ conf_getUnsignedInt(const char *rval, unsigned *i)
         return(0);                               \
     }
 
-#define confUnsignedMinVal(name,fld,min)	 \
-    if (strcmp(lval, name) == 0) {               \
-        unsigned int i;                          \
-        int err = conf_getUnsignedInt(rval, &i); \
-        if (err != 0)                            \
-            return err;                          \
-	if (i < min)				 \
-	    return (EINVAL);		         \
-        config.fld = i;                          \
-        return(0);                               \
-    }
-	
-
 int
 CONF_Add(const char *lval, const char *rval)
 {
@@ -126,14 +113,15 @@ CONF_Add(const char *lval, const char *rval)
     confString("processor.log", processor_log);
     confString("mq.qname", mq_qname);
 
-    confUnsignedMinVal("maxopen.scale", maxopen_scale, MIN_MAXOPEN_SCALE);
-    confUnsignedMinVal("maxdone.scale", maxdone_scale, MIN_MAXDONE_SCALE);
-    confUnsignedMinVal("maxdata.scale", maxdata_scale, MIN_MAXDATA_SCALE);
-    confUnsigned("qlen_goal.scale", qlen_goal_scale);
-    confUnsigned("hash_max_probes", hash_max_probes);
-    confUnsigned("hash_ttl", hash_ttl);
-    confUnsigned("hash_mlt", hash_mlt);
+    confUnsigned("maxopen.scale", maxopen_scale);
+    confUnsigned("maxdone", maxdone);
+    confUnsigned("maxdata", maxdata);
+    confUnsigned("qlen.goal", qlen_goal);
+    confUnsigned("hash.max_probes", hash_max_probes);
+    confUnsigned("hash.ttl", hash_ttl);
+    confUnsigned("hash.mlt", hash_mlt);
     confUnsigned("nworkers", nworkers);
+    confUnsigned("mq.pool_size", mq_pool_size);
     confUnsigned("restarts", restarts);
     confUnsigned("monitor.interval", monitor_interval);
 
@@ -230,18 +218,19 @@ CONF_Init(void)
     config.monitor_interval = 30;
     config.monitor_workers = false;
     config.processor_log[0] = '\0';
-    config.maxopen_scale = MIN_MAXOPEN_SCALE;
-    config.maxdone_scale = MIN_MAXDONE_SCALE;
-    config.maxdata_scale = MIN_MAXDATA_SCALE;
-    config.qlen_goal_scale = DEF_QLEN_GOAL_SCALE;
+    config.maxopen_scale = DEF_MAXOPEN_SCALE;
+    config.maxdone = DEF_MAXDONE;
+    config.maxdata = DEF_MAXDATA;
+    config.qlen_goal = DEF_QLEN_GOAL;
     config.hash_max_probes = DEF_HASH_MAX_PROBES;
     config.hash_ttl = DEF_HASH_TTL;
-    config.hash_mlt = DEF_HASH_MTL;
+    config.hash_mlt = DEF_HASH_MLT;
 
     config.n_mq_uris = 0;
     config.mq_uri = (char **) malloc (sizeof(char **));
     AN(config.mq_uri);
     config.mq_qname[0] = '\0';
+    config.mq_pool_size = 5;
     config.nworkers = 1;
     config.restarts = 1;
     
@@ -334,11 +323,12 @@ CONF_Dump(void)
     confdump("monitor.workers = %s", config.monitor_workers ? "true" : "false");
     confdump("processor.log = %s", config.processor_log);
     confdump("maxopen.scale = %u", config.maxopen_scale);
-    confdump("maxdata.scale = %u", config.maxdata_scale);
-    confdump("qlen_goal.scale = %u", config.qlen_goal_scale);
-    confdump("hash_max_probes = %u", config.hash_max_probes);
-    confdump("hash_ttl = %u", config.hash_ttl);
-    confdump("hash_mlt = %u", config.hash_mlt);
+    confdump("maxdone = %u", config.maxdone);
+    confdump("maxdata = %u", config.maxdata);
+    confdump("qlen.goal = %u", config.qlen_goal);
+    confdump("hash.max_probes = %u", config.hash_max_probes);
+    confdump("hash.ttl = %u", config.hash_ttl);
+    confdump("hash.mlt = %u", config.hash_mlt);
 
     if (config.n_mq_uris > 0)
         for (int i = 0; i < config.n_mq_uris; i++)
@@ -347,6 +337,7 @@ CONF_Dump(void)
         LOG_Log0(LOG_DEBUG, "config: mq.uri = ");
     
     confdump("mq.qname = %s", config.mq_qname);
+    confdump("mq.pool_size = %u", config.mq_pool_size);
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
     confdump("user = %s", config.user_name);
