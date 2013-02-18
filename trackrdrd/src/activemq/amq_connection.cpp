@@ -29,58 +29,67 @@
  *
  */
 
-#ifndef _AMQ_H
-#define _AMQ_H
-
 #include "amq_connection.h"
 
-#ifdef __cplusplus
+#define CATCHALL                \
+catch (CMSException& cex) {     \
+    return cex.what();          \
+ }                              \
+catch (Throwable& th) {         \
+    return th.what();           \
+ }                              \
+catch (std::exception& sex) {   \
+    return sex.what();          \
+ }                              \
+catch (...) {                   \
+     return "Unexpected error"; \
+ }
 
-#include <activemq/core/ActiveMQConnectionFactory.h>
-#include <cms/Connection.h>
-#include <cms/Session.h>
-#include <cms/Queue.h>
-#include <cms/MessageProducer.h>
-
+using namespace std;
 using namespace activemq::core;
 using namespace cms;
+using namespace decaf::lang;
 
-class AMQ_Worker {
-private:
-    Connection* connection;
-    Session* session;
-    Queue* queue;
-    MessageProducer* producer;
-    TextMessage* msg;
-    AMQ_Worker() {};
+ActiveMQConnectionFactory* AMQ_Connection::factory = NULL;
 
-public:
-    static void shutdown();
-    
-    AMQ_Worker(Connection* connection, std::string& qName,
-        Session::AcknowledgeMode ackMode, int deliveryMode);
-    virtual ~AMQ_Worker();
-    void send(std::string& text);
-    std::string getVersion();
-};
-#else
-typedef struct AMQ_Worker AMQ_Worker;
-#endif
-    
-#ifdef __cplusplus
-extern "C" {
-#endif
+AMQ_Connection::AMQ_Connection(std::string& brokerURI) {
 
-    const char *AMQ_GlobalInit(void);
-    const char *AMQ_WorkerInit(AMQ_Worker **worker, AMQ_Connection *connection,
-        char *qName);
-    const char *AMQ_Send(AMQ_Worker *worker, const char *data, unsigned len);
-    const char *AMQ_Version(AMQ_Worker *worker, char *version);
-    const char *AMQ_WorkerShutdown(AMQ_Worker **worker);
-    const char *AMQ_GlobalShutdown(void);
-
-#ifdef __cplusplus
+    factory = new ActiveMQConnectionFactory(brokerURI);
+       
+    connection = factory->createConnection();
+    connection->start();
 }
-#endif
 
-#endif /* _AMQ_H */
+Connection *
+AMQ_Connection::getConnection() {
+    return connection;
+}
+
+AMQ_Connection::~AMQ_Connection() {
+    if (connection != NULL) {
+	delete connection;
+	connection = NULL;
+    }
+}
+
+const char *
+AMQ_ConnectionInit(AMQ_Connection **cn, char *uri)
+{
+    try {
+        string brokerURI (uri);
+        auto_ptr<AMQ_Connection> c (new AMQ_Connection(brokerURI));
+        *cn = c.release();
+        return NULL;
+    }
+    CATCHALL
+}
+
+const char *
+AMQ_ConnectionShutdown(AMQ_Connection *cn)
+{
+    try {
+        delete cn;
+        return NULL;
+    }
+    CATCHALL
+}

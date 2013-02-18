@@ -50,7 +50,7 @@ static char
     printf("... testing data table initialization\n");
     
     config.maxopen_scale = 10;
-    config.maxdone_scale = 10;
+    config.maxdone = 1024;
     err = DATA_Init();
     sprintf(errmsg, "DATA_Init: %s", strerror(err));
     mu_assert(errmsg, err == 0);

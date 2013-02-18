@@ -137,15 +137,14 @@ static void
     void *amq_worker;
     dataentry *entry;
     const char *err;
-    char version[VERSION_LEN], *uri;
+    char version[VERSION_LEN];
 
     LOG_Log(LOG_INFO, "Worker %d: starting", wrk->id);
     CHECK_OBJ_NOTNULL(wrk, WORKER_DATA_MAGIC);
     wrk->state = WRK_INITIALIZING;
     wrk->tid = pthread_self();
-    uri = config.mq_uri[wrk->id % config.n_mq_uris];
 
-    err = MQ_WorkerInit(&amq_worker, uri);
+    err = MQ_WorkerInit(&amq_worker);
     if (err != NULL) {
         LOG_Log(LOG_ALERT, "Worker %d: Cannot initialize queue connection: %s",
             wrk->id, err);
@@ -168,7 +167,7 @@ static void
     running++;
     AZ(pthread_mutex_unlock(&running_lock));
 
-    LOG_Log(LOG_INFO, "Worker %d: running (%s, uri=%s)", wrk->id, version, uri);
+    LOG_Log(LOG_INFO, "Worker %d: running (%s)", wrk->id, version);
     
     while (run) {
 	entry = (dataentry *) SPMCQ_Deq();

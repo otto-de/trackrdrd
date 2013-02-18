@@ -31,8 +31,10 @@ test_mq_SOURCES = \
 
 test_mq_LDADD = \
 	-lm \
+	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
 	../mq.$(OBJEXT) \
 	../amq.$(OBJEXT) \
+	../amq_connection.$(OBJEXT) \
 	@AMQ_LIBS@
 
 test_spmcq_SOURCES = \
@@ -67,6 +69,7 @@ test_worker_LDADD = \
 	../mq.$(OBJEXT) \
 	../spmcq.$(OBJEXT) \
 	../amq.$(OBJEXT) \
+	../amq_connection.$(OBJEXT) \
 	../data.$(OBJEXT) \
 	@AMQ_LIBS@
 
