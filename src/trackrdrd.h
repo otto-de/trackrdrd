@@ -40,9 +40,6 @@
 #include "vqueue.h"
 #include "varnishapi.h"
 
-#define MIN(x, y)	((x) < (y) ? (x) : (y))
-#define MAX(x, y)	((x) < (y) ? (y) : (x))
-
 /* assert.c */
 
 void ASRT_Fail(const char *func, const char *file, int line, const char *cond,
