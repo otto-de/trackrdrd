@@ -53,13 +53,13 @@ DATA_Init(void)
     dataentry *entryptr;
     char *bufptr;
     
-    int bufsize = 1 << config.maxdata_scale;
+    int bufsize = config.maxdata;
     
     /*
      * we want enough space to accomodate all open and done records
      *
      */
-    int entries = (1 << config.maxopen_scale) + (1 << config.maxdone_scale);
+    int entries = (1 << config.maxopen_scale) + config.maxdone;
 
     entryptr = (dataentry *) calloc(entries, sizeof(dataentry));
     if (entryptr == NULL)
