@@ -90,7 +90,7 @@ static const char
 {
     const char *err;
 
-    printf("... test worker init (including connect to ActiveMQ)\n");
+    printf("... test worker init\n");
 
     err = MQ_WorkerInit(&worker);
     sprintf(errmsg, "MQ_WorkerInit: %s", err);
