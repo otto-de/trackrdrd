@@ -105,6 +105,10 @@ int
 CONF_Add(const char *lval, const char *rval)
 {
     int ret;
+    static bool qlen_configured = false;
+
+    if (strcmp(lval, "qlen.goal") == 0)
+        qlen_configured = true;
     
     confString("pid.file", pid_file);
     confString("varnish.name", varnish_name);
@@ -114,7 +118,6 @@ CONF_Add(const char *lval, const char *rval)
     confString("mq.qname", mq_qname);
 
     confUnsigned("maxopen.scale", maxopen_scale);
-    confUnsigned("maxdone", maxdone);
     confUnsigned("maxdata", maxdata);
     confUnsigned("qlen.goal", qlen_goal);
     confUnsigned("hash.max_probes", hash_max_probes);
@@ -124,6 +127,17 @@ CONF_Add(const char *lval, const char *rval)
     confUnsigned("mq.pool_size", mq_pool_size);
     confUnsigned("restarts", restarts);
     confUnsigned("monitor.interval", monitor_interval);
+
+    if (strcmp(lval, "maxdone") == 0) {
+        unsigned int i;
+        int err = conf_getUnsignedInt(rval, &i);
+        if (err != 0)
+            return err;
+        config.maxdone = i;
+        if (!qlen_configured)
+            config.qlen_goal = config.maxdone >> 1;
+        return(0);
+    }
 
     if (strcmp(lval, "syslog.facility") == 0) {
         if ((ret = conf_getFacility(rval)) < 0)
