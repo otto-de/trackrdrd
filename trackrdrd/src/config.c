@@ -114,7 +114,6 @@ CONF_Add(const char *lval, const char *rval)
     confString("varnish.name", varnish_name);
     confString("log.file", log_file);
     confString("varnish.bindump", varnish_bindump);
-    confString("processor.log", processor_log);
     confString("mq.qname", mq_qname);
 
     confUnsigned("maxopen.scale", maxopen_scale);
@@ -231,7 +230,6 @@ CONF_Init(void)
     config.syslog_facility = LOG_LOCAL0;
     config.monitor_interval = 30;
     config.monitor_workers = false;
-    config.processor_log[0] = '\0';
     config.maxopen_scale = DEF_MAXOPEN_SCALE;
     config.maxdone = DEF_MAXDONE;
     config.maxdata = DEF_MAXDATA;
@@ -335,7 +333,6 @@ CONF_Dump(void)
     confdump("syslog.facility = %s", config.syslog_facility_name);
     confdump("monitor.interval = %u", config.monitor_interval);
     confdump("monitor.workers = %s", config.monitor_workers ? "true" : "false");
-    confdump("processor.log = %s", config.processor_log);
     confdump("maxopen.scale = %u", config.maxopen_scale);
     confdump("maxdone = %u", config.maxdone);
     confdump("maxdata = %u", config.maxdata);
