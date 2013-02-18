@@ -624,7 +624,7 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
 {
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     /* Data overflow */
-    if (entry->end + datalen + 1 > (1 << (config.maxdata_scale))) {
+    if (entry->end + datalen + 1 > config.maxdata) {
         LOG_Log(LOG_ALERT,
             "%s: Data too long, XID=%d, current length=%d, "
             "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
@@ -924,6 +924,13 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     errmsg = MQ_GlobalInit();
     if (errmsg != NULL) {
         LOG_Log(LOG_ERR, "Cannot initialize message broker access: %s", errmsg);
+        exit(EXIT_FAILURE);
+    }
+
+    errmsg = MQ_InitConnections();
+    if (errmsg != NULL) {
+        LOG_Log(LOG_ERR, "Cannot initialize message broker connections: %s",
+            errmsg);
         exit(EXIT_FAILURE);
     }
 
