@@ -29,8 +29,20 @@
  *
  */
 
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+
 #include "trackrdrd.h"
 #include "activemq/amq.h"
+#include "activemq/amq_connection.h"
+#include "vas.h"
+
+static AMQ_Connection **connections;
+static unsigned nconnections;
+static pthread_mutex_t connection_lock = PTHREAD_MUTEX_INITIALIZER;
+static unsigned connection = 0;
 
 const char *
 MQ_GlobalInit(void)
@@ -39,9 +51,37 @@ MQ_GlobalInit(void)
 }
 
 const char *
-MQ_WorkerInit(void **priv, char *uri)
+MQ_InitConnections(void)
 {
-    return AMQ_WorkerInit((AMQ_Worker **) priv, uri, config.mq_qname);
+    AMQ_Connection *conn;
+    const char *err;
+
+    if (config.n_mq_uris == 0)
+        return NULL;
+    
+    nconnections = config.n_mq_uris * config.mq_pool_size;
+    connections = (AMQ_Connection **) calloc(sizeof(AMQ_Connection *),
+                                             nconnections);
+    if (connections == NULL)
+        return strerror(errno);
+    for (int i = 0; i < config.n_mq_uris; i++)
+        for (int j = 0; j < config.mq_pool_size; j++) {
+            err = AMQ_ConnectionInit(&conn, config.mq_uri[i]);
+            if (err != NULL)
+                return err;
+            connections[i*config.mq_pool_size + j] = conn;
+        }
+    return NULL;
+}
+
+const char *
+MQ_WorkerInit(void **priv)
+{
+    AN(nconnections);
+    AZ(pthread_mutex_lock(&connection_lock));
+    AMQ_Connection *conn = connections[connection++ % nconnections];
+    AZ(pthread_mutex_unlock(&connection_lock));
+    return AMQ_WorkerInit((AMQ_Worker **) priv, conn, config.mq_qname);
 }
 
 const char *
@@ -69,6 +109,11 @@ MQ_WorkerShutdown(void **priv)
 const char *
 MQ_GlobalShutdown(void)
 {
+    const char *err;
+
+    for (int i; i < config.n_mq_uris; i++)
+        if ((err = AMQ_ConnectionShutdown(connections[i])) != NULL)
+            return err;
     return AMQ_GlobalShutdown();
 }
 

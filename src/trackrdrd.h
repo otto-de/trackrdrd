@@ -151,7 +151,8 @@ int		spmcq_datawaiter;
 
 /* mq.c */
 const char *MQ_GlobalInit(void);
-const char *MQ_WorkerInit(void **priv, char *uri);
+const char *MQ_InitConnections(void);
+const char *MQ_WorkerInit(void **priv);
 const char *MQ_Send(void *priv, const char *data, unsigned len);
 const char *MQ_Version(void *priv, char *version);
 const char *MQ_WorkerShutdown(void **priv);
@@ -261,23 +262,25 @@ struct config {
 
     /* scale: unit is log(2,n), iow scale is taken to the power of 2 */
     unsigned	maxopen_scale;	/* max number of records in *_OPEN state */
-#define MIN_MAXOPEN_SCALE 10
-    unsigned	maxdone_scale;	/* max number of records in *_DONE state */
-#define MIN_MAXDONE_SCALE 10
-    unsigned	maxdata_scale;  /* scale for char data buffer */
-#define MIN_MAXDATA_SCALE 10
+#define DEF_MAXOPEN_SCALE 10
+    
+    unsigned	maxdone;	/* max number of records in *_DONE state */
+#define DEF_MAXDONE 1024
+    
+    unsigned	maxdata;  	/* size of char data buffer */
+#define DEF_MAXDATA 1024
 
     /*
-     * scale of queue-length goal:
+     * queue-length goal:
      *
-     * we scale te number of running workers dynamically propotionally to the
-     * queue length.
+     * we scale the number of running workers dynamically propotionally to
+     * the queue length.
      *
-     * this scale (log(2,n)) specifies the queue length at which all workers
-     * should be running
+     * this specifies the queue length at which all workers should be
+     * running
      */
-    unsigned	qlen_goal_scale;
-#define DEF_QLEN_GOAL_SCALE 10
+    unsigned	qlen_goal;
+#define DEF_QLEN_GOAL 1024
 
     /* max number of probes for insert/lookup */
     unsigned	hash_max_probes;
@@ -289,25 +292,27 @@ struct config {
      * entries which are older than this ttl _may_ get expired from the
      * trackrdrd state.
      *
-     * set to a value significantly longer than your maximum session lifetime in
-     * varnish.
+     * set to a value significantly longer than your maximum session
+     * lifetime in varnish.
      */
     unsigned	hash_ttl;
 #define DEF_HASH_TTL 120
 
     /*
-     * hash_mlt: min lifetime for entries in HASH_OPEN before they could get evacuated
+     * hash_mlt: min lifetime for entries in HASH_OPEN before they could
+     * get evacuated
      *
      * entries are guaranteed to remain in trackrdrd for this duration.
-     * once the mlt is reached, they _may_ get expired if trackrdrd needs space
-     * in the hash
+     * once the mlt is reached, they _may_ get expired if trackrdrd needs
+     * space in the hash
      */
     unsigned	hash_mlt;
-#define DEF_HASH_MTL 5
+#define DEF_HASH_MLT 5
 
     unsigned	n_mq_uris;
     char	**mq_uri;
     char	mq_qname[BUFSIZ];
+    unsigned	mq_pool_size;
     unsigned	nworkers;
     unsigned	restarts;
     char	user_name[BUFSIZ];
