@@ -33,6 +33,7 @@
 
 #include "amq.h"
 #include <activemq/library/ActiveMQCPP.h>
+#include <activemq/core/ActiveMQConnection.h>
 #include <decaf/lang/exceptions/NullPointerException.h>
 #include <cms/IllegalStateException.h>
 #include <cms/ConnectionMetaData.h>
@@ -57,32 +58,11 @@ using namespace cms;
 using namespace decaf::lang;
 using namespace decaf::lang::exceptions;
 
-std::vector<ActiveMQConnectionFactory*> AMQ_Worker::factories;
-
-void
-AMQ_Worker::shutdown() {
-    for (unsigned i = 0; i < factories.size(); i++)
-        delete factories[i];
-    factories.resize(0);
-}
-    
-AMQ_Worker::AMQ_Worker(std::string& brokerURI, std::string& qName,
+AMQ_Worker::AMQ_Worker(Connection* cn, std::string& qName,
     Session::AcknowledgeMode ackMode = Session::AUTO_ACKNOWLEDGE,
     int deliveryMode = DeliveryMode::NON_PERSISTENT) {
 
-    ActiveMQConnectionFactory* factory = NULL;
-    for (unsigned i = 0; i < factories.size(); i++)
-        if (factories[i]->getBrokerURI().toString().compare(brokerURI) == 0) {
-            factory = factories[i];
-            break;
-        }
-    if (factory == NULL) {
-        factory = new ActiveMQConnectionFactory(brokerURI);
-        factories.push_back(factory);
-    }
-       
-    connection = factory->createConnection();
-    connection->start();
+    connection = cn;
     session = connection->createSession(ackMode);
     queue = session->createQueue(qName);
     producer = session->createProducer(queue);
@@ -102,11 +82,6 @@ AMQ_Worker::~AMQ_Worker() {
     if (session != NULL) {
 	delete session;
 	session = NULL;
-    }
-    if (connection != NULL) {
-	connection->close();
-	delete connection;
-	connection = NULL;
     }
 }
 
@@ -137,12 +112,12 @@ AMQ_GlobalInit(void)
 }
 
 const char *
-AMQ_WorkerInit(AMQ_Worker **worker, char *uri, char *qName)
+AMQ_WorkerInit(AMQ_Worker **worker, AMQ_Connection *cn, char *qName)
 {
     try {
-        string brokerURI (uri);
+        Connection *conn = cn->getConnection();
         string queueName (qName);
-        std::auto_ptr<AMQ_Worker> w (new AMQ_Worker(brokerURI, queueName));
+        std::auto_ptr<AMQ_Worker> w (new AMQ_Worker(conn, queueName));
         *worker = w.release();
         return NULL;
     }
@@ -188,7 +163,6 @@ const char *
 AMQ_GlobalShutdown()
 {
     try {
-        AMQ_Worker::shutdown();
         activemq::library::ActiveMQCPP::shutdownLibrary();
         return NULL;
     }
