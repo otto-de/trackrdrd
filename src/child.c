@@ -499,37 +499,37 @@ static hashentry
     uint32_t h  	= h1(xid);
 
     he = &htbl.entry[INDEX(h)];
-    if (he->state == HASH_EMPTY)
-        goto ok;
+    if (he->state != HASH_EMPTY) {
+        htbl.collisions++;
+        oldest = he;
 
-    htbl.collisions++;
-    oldest = he;
+        h = h2(xid);
+        unsigned n = 0;
+        do {
+            he = &htbl.entry[INDEX(h)];
+            probes++;
+            
+            if (he->state == HASH_EMPTY)
+                break;
+            if (he->insert_time < oldest->insert_time)
+                oldest = he;
+            n++;
+            h += n * n;
+        } while (probes <= htbl.max_probes);
 
-    h = h2(xid);
-    unsigned n = 0;
-    do {
-        he = &htbl.entry[INDEX(h)];
-        probes++;
+        /* none eligible for evacuation */
+        if (he->state != HASH_EMPTY) {
+            if ((oldest->insert_time + htbl.mlt) > t) {
+                htbl.fail++;
+                htbl.insert_probes += probes;
+                return (NULL);
+            }
 
-        if (he->state == HASH_EMPTY)
-            goto ok;
-        if (he->insert_time < oldest->insert_time)
-            oldest = he;
-        n++;
-        h += n * n;
-    } while (probes <= htbl.max_probes);
-
-    /* none eligible for evacuation */
-    if ((oldest->insert_time + htbl.mlt) > t) {
-        htbl.fail++;
-        htbl.insert_probes += probes;
-        return (NULL);
+            hash_evacuate(oldest);
+            he = oldest;
+        }
     }
 
-    hash_evacuate(oldest);
-    he = oldest;
-
-  ok:
     htbl.insert_probes += probes;
 
     he->state		= HASH_OPEN;
