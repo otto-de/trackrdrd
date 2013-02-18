@@ -105,7 +105,7 @@ VTAILQ_HEAD(insert_head_s, hashentry_s);
 struct hashtable_s {
     unsigned	magic;
 #define HASHTABLE_MAGIC	0x89ea1d00
-    unsigned	len;
+    const unsigned	len;
     hashentry	*entry;
 
     struct insert_head_s	insert_head;
@@ -382,16 +382,21 @@ hash_init(void)
     if (entryptr == NULL)
         return(errno);
 
-    memset(&htbl, 0, sizeof(hashtable));
-    htbl.magic	= HASHTABLE_MAGIC;
-    htbl.len	= entries;
-    htbl.entry	= entryptr;
+    /* Struct initializer makes it possible to set len as a const field;
+       trying to hint the compiler to use a constant when translating the
+       INDEX() code.
+    */
+    hashtable init_tbl
+        = { .magic = HASHTABLE_MAGIC, .len = entries, .entry = entryptr,
+            .max_probes = config.hash_max_probes, .ttl = config.hash_ttl,
+            .mlt = config.hash_mlt, .seen = 0, .drop_reqstart = 0,
+            .drop_vcl_log = 0, .drop_reqend = 0, .expired = 0,
+            .evacuated = 0, .open = 0, .collisions = 0, .insert_probes = 0,
+            .find_probes = 0, .fail = 0, .occ_hi = 0, .occ_hi_this = 0
+    };
+    memcpy(&htbl, &init_tbl, sizeof(hashtable));
 
     VTAILQ_INIT(&htbl.insert_head);
-
-    htbl.max_probes = config.hash_max_probes;
-    htbl.ttl = config.hash_ttl;
-    htbl.mlt = config.hash_mlt;
 
     /* entries init */
     for (int i = 0; i < entries; i++) {
