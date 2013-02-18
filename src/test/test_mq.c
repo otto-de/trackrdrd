@@ -34,6 +34,7 @@
 #include "minunit.h"
 
 #include "../trackrdrd.h"
+#include "vas.h"
 
 /* Automake exit code for "skipped" in make check */
 #define EXIT_SKIPPED 77
@@ -57,21 +58,41 @@ static char
     return NULL;
 }
 
-static const char
-*test_worker_init(void)
+static char
+*test_init_connection(void)
 {
     const char *err;
-    char uri[sizeof("tcp://localhost:61616")];
 
-    printf("... test worker init (including connect to ActiveMQ)\n");
+    printf("... testing MQ connection initialization\n");
 
-    strcpy(uri, "tcp://localhost:61616");
+    config.n_mq_uris = 1;
+    config.mq_uri = (char **) malloc(sizeof(char **));
+    AN(config.mq_uri);
+    config.mq_uri[0] = (char *) malloc(strlen("tcp://localhost:61616") + 1);
+    AN(config.mq_uri[0]);
+    strcpy(config.mq_uri[0], "tcp://localhost:61616");
+    
     strcpy(config.mq_qname, "lhoste/tracking/test");
-    err = MQ_WorkerInit(&worker, uri);
+    config.mq_pool_size = 1;
+    err = MQ_InitConnections();
     if (err != NULL && strstr(err, "Connection refused") != NULL) {
         printf("Connection refused, ActiveMQ assumed not running\n");
         exit(EXIT_SKIPPED);
     }
+    sprintf(errmsg, "MQ_InitConnections: %s", err);
+    mu_assert(errmsg, err == NULL);
+
+    return NULL;
+}
+
+static const char
+*test_worker_init(void)
+{
+    const char *err;
+
+    printf("... test worker init (including connect to ActiveMQ)\n");
+
+    err = MQ_WorkerInit(&worker);
     sprintf(errmsg, "MQ_WorkerInit: %s", err);
     mu_assert(errmsg, err == NULL);
 
@@ -149,6 +170,7 @@ static const char
 *all_tests(void)
 {
     mu_run_test(test_global_init);
+    mu_run_test(test_init_connection);
     mu_run_test(test_worker_init);
     mu_run_test(test_version);
     mu_run_test(test_send);
