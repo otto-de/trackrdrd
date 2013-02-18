@@ -50,24 +50,14 @@ log_output(void)
 #endif
     
     LOG_Log(LOG_INFO,
-        "Data table writer: "
+        "Data table: "
         "len=%u "
         "nodata=%u "
         "submitted=%u "
         "wait_qfull=%u "
         "wait_room=%u "
         "data_hi=%u "
-        "data_overflows=%u ",
-        dtbl.len,
-        dtbl.w_stats.nodata,
-        dtbl.w_stats.submitted,
-        dtbl.w_stats.wait_qfull,
-        dtbl.w_stats.wait_room,
-        dtbl.w_stats.data_hi,
-        dtbl.w_stats.data_overflows);
-
-    LOG_Log(LOG_INFO,
-        "Data table reader: "
+        "data_overflows=%u "
         "done=%u "
         "open=%u "
         "load=%.2f "
@@ -75,6 +65,13 @@ log_output(void)
         "failed=%u "
         "occ_hi=%u "
         "occ_hi_this=%u ",
+        dtbl.len,
+        dtbl.w_stats.nodata,
+        dtbl.w_stats.submitted,
+        dtbl.w_stats.wait_qfull,
+        dtbl.w_stats.wait_room,
+        dtbl.w_stats.data_hi,
+        dtbl.w_stats.data_overflows,
         dtbl.r_stats.done,
         dtbl.r_stats.open,
         (100.0 * (1.0 * dtbl.r_stats.done + 1.0 * dtbl.r_stats.open) / dtbl.len),
