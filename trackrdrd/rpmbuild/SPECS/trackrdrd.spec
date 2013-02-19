@@ -1,7 +1,7 @@
 Summary: Varnish log tracking reader demon
 Name: trackrdrd
 Version: %{?version}
-Release: build%{?build_number}_rev%{?revision}
+Release: %{?build_number}_rev%{?revision}
 Vendor: Otto Gmbh & Co KG
 License: BSD
 Group: System Environment/Daemons
