@@ -517,9 +517,9 @@ static hashentry
             h += n * n;
         } while (probes <= htbl.max_probes);
 
-        /* none eligible for evacuation */
         if (he->state != HASH_EMPTY) {
             if ((oldest->insert_time + htbl.mlt) > t) {
+                /* none eligible for evacuation */
                 htbl.fail++;
                 htbl.insert_probes += probes;
                 return (NULL);
