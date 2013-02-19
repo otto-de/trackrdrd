@@ -22,7 +22,8 @@ cd $WORKSPACE/trackrdrd
 ./autogen.sh
 [[ $? -ne 0 ]] && exit 1
 
-CFLAGS=-m64 CXXFLAGS=-m64 LDFLAGS=-Wl,-rpath=$LHOTSE_VARNISH_PREFIX/lib/varnish:$LHOTSE_VARNISH_PREFIX/lib ./configure --prefix=$LHOTSE_TRACKING_PREFIX --enable-debugging-symbols VARNISHSRC=$WORKSPACE/lhotse-varnish-cache
+APR_CFLAGS=$(pkg-config --cflags apr-1)
+CFLAGS=-m64 CXXFLAGS="-m64 $APR_CFLAGS" LDFLAGS=-Wl,-rpath=$LHOTSE_VARNISH_PREFIX/lib/varnish:$LHOTSE_VARNISH_PREFIX/lib ./configure --prefix=$LHOTSE_TRACKING_PREFIX --enable-debugging-symbols VARNISHSRC=$WORKSPACE/lhotse-varnish-cache
 [[ $? -ne 0 ]] && exit 1
 
 make clean
