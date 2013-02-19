@@ -26,7 +26,8 @@ CMD="${TRACKRDRD_BIN}"
 
 # Child process stops after receiving a request
 CURL=/usr/bin/curl
-URL=http://localhost/ts-rcv?testSession=true
+VARNISH_PORT=81
+URL=http://localhost:${VARNISH_PORT}/ts-rcv?testSession=true
 
 START_RETRIES=5
 
