@@ -45,7 +45,7 @@ REVISION=$(git show -s --pretty=format:%h)
 
 BUILDPATH=$WORKSPACE/trackrdrd/rpmbuild/BUILD
 BUILDROOTPREFIX=$WORKSPACE/trackrdrd/rpmbuild/BUILDROOT
-PKGNAME=trackrdrd-$VERSION-build$BUILD_NUMBER_rev${REVISION}.$(uname -m)
+PKGNAME=trackrdrd-$VERSION-${BUILD_NUMBER}_rev${REVISION}.$(uname -m)
 BUILDROOTPATH=$BUILDROOTPREFIX/$PKGNAME
 DESTDIR=$BUILDPATH make install
 [[ $? -ne 0 ]] && exit 1
