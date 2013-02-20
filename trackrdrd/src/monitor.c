@@ -135,6 +135,12 @@ void
 }
 
 void
+MON_Output(void)
+{
+    log_output();
+}
+
+void
 MON_StatusShutdown(pthread_t monitor)
 {
     run = 0;
