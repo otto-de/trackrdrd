@@ -91,10 +91,11 @@ stacktrace(void)
 void
 HNDL_Abort(int sig)
 {
+    AZ(sigaction(SIGABRT, &default_action, NULL));
     LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
         strsignal(sig));
     stacktrace();
-    AZ(sigaction(SIGABRT, &default_action, NULL));
+    MON_Output();
     LOG_Log0(LOG_ALERT, "Aborting");
     abort();
 }
