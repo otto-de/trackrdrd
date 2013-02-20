@@ -62,6 +62,7 @@ public:
     virtual ~AMQ_Worker();
     void send(std::string& text);
     std::string getVersion();
+    std::string getClientID();
 };
 #else
 typedef struct AMQ_Worker AMQ_Worker;
@@ -76,6 +77,7 @@ extern "C" {
         char *qName);
     const char *AMQ_Send(AMQ_Worker *worker, const char *data, unsigned len);
     const char *AMQ_Version(AMQ_Worker *worker, char *version);
+    const char *AMQ_ClientID(AMQ_Worker *worker, char *clientID);
     const char *AMQ_WorkerShutdown(AMQ_Worker **worker);
     const char *AMQ_GlobalShutdown(void);
 
