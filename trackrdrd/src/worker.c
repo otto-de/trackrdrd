@@ -40,6 +40,7 @@
 #include "miniobj.h"
 
 #define VERSION_LEN 64
+#define CLIENT_ID_LEN 80
 
 static int running = 0;
 
@@ -137,7 +138,7 @@ static void
     void *amq_worker;
     dataentry *entry;
     const char *err;
-    char version[VERSION_LEN];
+    char version[VERSION_LEN], clientID[CLIENT_ID_LEN];
 
     LOG_Log(LOG_INFO, "Worker %d: starting", wrk->id);
     CHECK_OBJ_NOTNULL(wrk, WORKER_DATA_MAGIC);
@@ -158,6 +159,12 @@ static void
         version[0] = '\0';
     }
 
+    err = MQ_ClientID(amq_worker, clientID);
+    if (err != NULL) {
+        LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ client ID", wrk->id, err);
+        clientID[0] = '\0';
+    }
+
     VSTAILQ_INIT(&wrk->wrk_freelist);
     wrk->wrk_nfree = 0;
 
@@ -166,7 +173,8 @@ static void
     running++;
     AZ(pthread_mutex_unlock(&running_lock));
 
-    LOG_Log(LOG_INFO, "Worker %d: running (%s)", wrk->id, version);
+    LOG_Log(LOG_INFO, "Worker %d: running (%s, id = %s)", wrk->id, version,
+            clientID);
     
     while (run) {
         entry = (dataentry *) SPMCQ_Deq();

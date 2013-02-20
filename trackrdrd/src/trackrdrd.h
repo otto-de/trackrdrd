@@ -152,6 +152,7 @@ const char *MQ_InitConnections(void);
 const char *MQ_WorkerInit(void **priv);
 const char *MQ_Send(void *priv, const char *data, unsigned len);
 const char *MQ_Version(void *priv, char *version);
+const char *MQ_ClientID(void *priv, char *clientID);
 const char *MQ_WorkerShutdown(void **priv);
 const char *MQ_GlobalShutdown(void);
 
