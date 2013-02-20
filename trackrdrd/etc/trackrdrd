@@ -29,7 +29,7 @@ CURL=/usr/bin/curl
 VARNISH_PORT=81
 URL=http://localhost:${VARNISH_PORT}/ts-rcv?testSession=true
 
-START_RETRIES=5
+START_RETRIES=10
 
 if [ ! -e ${TRACKRDRD_BIN} ]; then
     echo "${TRACKRDRD_BIN} not installed"
