@@ -357,6 +357,7 @@ typedef enum {
 } stats_update_t;
 
 void *MON_StatusThread(void *arg);
+void MON_Output(void);
 void MON_StatusShutdown(pthread_t monitor);
 void MON_StatsInit(void);
 void MON_StatsUpdate(stats_update_t update);

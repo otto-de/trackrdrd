@@ -54,12 +54,12 @@ typedef enum {
 } wrk_state_e;
 
 static const char* statename[WRK_STATE_E_LIMIT] = { 
-    [WRK_NOTSTARTED]       	= "not started",
+    [WRK_NOTSTARTED]    = "not started",
     [WRK_INITIALIZING]	= "initializing",
-    [WRK_RUNNING]		= "running",
-    [WRK_WAITING]		= "waiting",
+    [WRK_RUNNING]	= "running",
+    [WRK_WAITING]	= "waiting",
     [WRK_SHUTTINGDOWN]	= "shutting down",
-    [WRK_EXITED]		= "exited"
+    [WRK_EXITED]	= "exited"
 };
 
 struct worker_data_s {
