@@ -119,6 +119,23 @@ static const char
 }
 
 static const char
+*test_clientID(void)
+{
+    const char *err;
+    char clientID[BUFSIZ];
+
+    printf("... testing client ID info\n");
+
+    mu_assert("MQ_ClientID: worker is NULL before call", worker != NULL);
+    err = MQ_ClientID(worker, clientID);
+    sprintf(errmsg, "MQ_Version: %s", err);
+    mu_assert(errmsg, err == NULL);
+    mu_assert("MQ_Version: client ID is empty", clientID[0] != '\0');
+
+    return NULL;
+}
+
+static const char
 *test_send(void)
 {
     const char *err;
@@ -173,6 +190,7 @@ static const char
     mu_run_test(test_init_connection);
     mu_run_test(test_worker_init);
     mu_run_test(test_version);
+    mu_run_test(test_clientID);
     mu_run_test(test_send);
     mu_run_test(test_worker_shutdown);
     mu_run_test(test_global_shutdown);
