@@ -97,6 +97,12 @@ MQ_Version(void *priv, char *version)
 }
 
 const char *
+MQ_ClientID(void *priv, char *clientID)
+{
+    return AMQ_ClientID((AMQ_Worker *) priv, clientID);
+}
+
+const char *
 MQ_WorkerShutdown(void **priv)
 {
     const char *err = AMQ_WorkerShutdown((AMQ_Worker **) priv);
