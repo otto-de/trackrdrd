@@ -101,6 +101,13 @@ AMQ_Worker::getVersion() {
     return md->getCMSProviderName() + " " + md->getProviderVersion();
 }
 
+std::string
+AMQ_Worker::getClientID() {
+    if (connection == NULL)
+        throw cms::IllegalStateException("Connection uninitialized");
+    return connection->getClientID();
+}
+
 const char *
 AMQ_GlobalInit(void)
 {
@@ -144,6 +151,16 @@ AMQ_Version(AMQ_Worker *worker, char *version)
 {
     try {
         strcpy(version, worker->getVersion().c_str());
+        return NULL;
+    }
+    CATCHALL
+}
+
+const char *
+AMQ_ClientID(AMQ_Worker *worker, char *clientID)
+{
+    try {
+        strcpy(clientID, worker->getClientID().c_str());
         return NULL;
     }
     CATCHALL
