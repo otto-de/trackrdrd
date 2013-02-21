@@ -232,11 +232,7 @@ data_submit(dataentry *de)
         return;
     }
 
-    while (!SPMCQ_Enq((void *) de)) {
-        dtbl.w_stats.wait_qfull++;
-        LOG_Log(LOG_ALERT, "%s", "Internal queue full, waiting for dequeue");
-        spmcq_wait(room);
-    }
+    SPMCQ_Enq(de);
     dtbl.w_stats.submitted++;
 
     /* should we wake up another worker? */
