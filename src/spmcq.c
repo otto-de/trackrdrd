@@ -94,7 +94,9 @@ void
 SPMCQ_Enq(dataentry *ptr)
 {
     AZ(pthread_mutex_lock(&spmcq_lock));
+#if 0
     assert(enqs - deqs < config.maxdone);
+#endif
     enqs++;
     VSTAILQ_INSERT_TAIL(&enq_head, ptr, spmcq);
     if (VSTAILQ_EMPTY(&spmcq_head))
