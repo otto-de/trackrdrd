@@ -177,7 +177,7 @@ static void
             clientID);
     
     while (run) {
-        entry = (dataentry *) SPMCQ_Deq();
+        entry = SPMCQ_Deq();
         if (entry != NULL) {
             wrk->deqs++;
             wrk_send(amq_worker, entry, wrk);
@@ -206,6 +206,7 @@ static void
          *
          * also re-check the stop condition under the lock
          */
+        SPMCQ_Drain();
         if (run && ((! entry) || SPMCQ_StopWorker(running))) {
             wrk->waits++;
             spmcq_datawaiter++;
@@ -221,7 +222,7 @@ static void
     wrk->state = WRK_SHUTTINGDOWN;
     
     /* Prepare to exit, drain the queue */
-    while ((entry = (dataentry *) SPMCQ_Deq()) != NULL) {
+    while ((entry = SPMCQ_Deq()) != NULL) {
         wrk->deqs++;
         wrk_send(amq_worker, entry, wrk);
     }
@@ -335,6 +336,7 @@ WRK_Halt(void)
      * waiting _after_ we have broadcasted and so miss the event.
      */
     AZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
+    SPMCQ_Drain();
     run = 0;
     AZ(pthread_cond_broadcast(&spmcq_datawaiter_cond));
     AZ(pthread_mutex_unlock(&spmcq_datawaiter_lock));
