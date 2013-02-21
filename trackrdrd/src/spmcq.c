@@ -27,6 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * Single producer multiple consumer bounded FIFO queue
  */
 
 #include <stdlib.h>
@@ -37,77 +38,98 @@
 
 #include "trackrdrd.h"
 #include "vas.h"
-#include "vmb.h"
+#include "vqueue.h"
 
+#if 0
+typedef struct {
+    unsigned magic;
+#define SPMCQ_MAGIC 0xe9a5d0a8
+    const unsigned mask;
+    void **data;
+    volatile unsigned head;
+    volatile unsigned tail;
+} spmcq_t;
+
+spmcq_t spmcq;
+#endif
+
+static volatile unsigned long enqs = 0, deqs = 0;
+static pthread_mutex_t spmcq_lock;
 static pthread_mutex_t spmcq_deq_lock;
 static unsigned qlen_goal;
+
+VSTAILQ_HEAD(spmcq_s, dataentry_s);
+struct spmcq_s spmcq_head = VSTAILQ_HEAD_INITIALIZER(spmcq_head);
+struct spmcq_s enq_head = VSTAILQ_HEAD_INITIALIZER(enq_head);
+struct spmcq_s deq_head = VSTAILQ_HEAD_INITIALIZER(deq_head);
 
 static inline unsigned
 spmcq_len(void)
 {
-    if (spmcq.tail >= spmcq.head)
-        return spmcq.tail - spmcq.head;
-    return UINT_MAX - spmcq.head + 1 + spmcq.tail;
+    return enqs - deqs;
 }
 
 static void
 spmcq_cleanup(void)
 {
-    free(spmcq.data);
+    AZ(pthread_mutex_destroy(&spmcq_lock));
     AZ(pthread_mutex_destroy(&spmcq_deq_lock));
-}
-
-static inline int
-spmcq_wrk_len_ratio(int working, int running)
-{
-    return working * qlen_goal / running;
 }
 
 int
 SPMCQ_Init(void)
 {
-    void *buf;
-    
-    size_t n = config.maxdone;
-    buf = calloc(n, sizeof(void *));
-    if (buf == NULL)
+    if (pthread_mutex_init(&spmcq_lock, &attr_lock) != 0)
         return(errno);
-
-    if (pthread_mutex_init(&spmcq_deq_lock, NULL) != 0)
+    if (pthread_mutex_init(&spmcq_deq_lock, &attr_lock) != 0)
         return(errno);
     
-    spmcq_t q =
-        { .magic = SPMCQ_MAGIC, .mask = n - 1, .data = buf, .head = 0,
-          .tail = 0 };
-    memcpy(&spmcq, &q, sizeof(spmcq_t));
-
     qlen_goal = config.qlen_goal;
     
     atexit(spmcq_cleanup);
     return(0);
 }
 
-bool
-SPMCQ_Enq(void *ptr)
+void
+SPMCQ_Enq(dataentry *ptr)
 {
-    if (spmcq_len() > spmcq.mask)
-        return false;
-    spmcq.data[spmcq.tail++ & spmcq.mask] = ptr;
-    return true;
+    AZ(pthread_mutex_lock(&spmcq_lock));
+    assert(enqs - deqs < config.maxdone);
+    enqs++;
+    VSTAILQ_INSERT_TAIL(&enq_head, ptr, spmcq);
+    if (VSTAILQ_EMPTY(&spmcq_head))
+        VSTAILQ_CONCAT(&spmcq_head, &enq_head);
+    AZ(pthread_mutex_unlock(&spmcq_lock));
 }
 
-void
+dataentry
 *SPMCQ_Deq(void)
 {
     void *ptr;
 
     AZ(pthread_mutex_lock(&spmcq_deq_lock));
-    if (spmcq_len() == 0)
+    if (VSTAILQ_EMPTY(&deq_head)) {
+        AZ(pthread_mutex_lock(&spmcq_lock));
+        VSTAILQ_CONCAT(&deq_head, &spmcq_head);
+        AZ(pthread_mutex_unlock(&spmcq_lock));
+    }
+    if (VSTAILQ_EMPTY(&deq_head))        
         ptr = NULL;
-    else
-        ptr = spmcq.data[spmcq.head++ & spmcq.mask];
+    else {
+        ptr = VSTAILQ_FIRST(&deq_head);
+        VSTAILQ_REMOVE_HEAD(&deq_head, spmcq);
+        deqs++;
+    }
     AZ(pthread_mutex_unlock(&spmcq_deq_lock));
     return ptr;
+}
+
+void
+SPMCQ_Drain(void)
+{
+    AZ(pthread_mutex_lock(&spmcq_lock));
+    VSTAILQ_CONCAT(&spmcq_head, &enq_head);
+    AZ(pthread_mutex_unlock(&spmcq_lock));
 }
 
 /*
@@ -127,6 +149,12 @@ void
  * Q_Len > working * qlen_goal / max_workers
  */
 
+static inline int
+spmcq_wrk_len_ratio(int working, int running)
+{
+    return working * qlen_goal / running;
+}
+
 bool
 SPMCQ_NeedWorker(int running)
 {
@@ -144,30 +172,3 @@ SPMCQ_StopWorker(int running)
     return spmcq_len() < spmcq_wrk_len_ratio(running - spmcq_datawaiter - 1,
                                              running);
 }
-
-#ifdef TEST_DRIVER
-int
-main(int argc, char * const *argv)
-{
-    (void) argc;
-
-    printf("\nTEST: %s\n", argv[0]);
-    printf("... test SMPCQ enqueue at UINT_MAX overflow\n");
-    
-    config.maxdone = 1024;
-    SPMCQ_Init();
-    spmcq.head = spmcq.tail = UINT_MAX - 2;
-
-    assert(SPMCQ_Enq(NULL));
-    assert(SPMCQ_Enq(NULL));
-    assert(SPMCQ_Enq(NULL));
-    assert(SPMCQ_Enq(NULL));
-    assert(SPMCQ_Enq(NULL));
-    assert(SPMCQ_Enq(NULL));
-    assert(SPMCQ_Enq(NULL));
-    assert(spmcq_len() == 7);
-
-    printf("%s: 1 test run\n", argv[0]);
-    exit(0);
-}
-#endif
