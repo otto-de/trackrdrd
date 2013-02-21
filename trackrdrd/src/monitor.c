@@ -54,7 +54,6 @@ log_output(void)
         "len=%u "
         "nodata=%u "
         "submitted=%u "
-        "wait_qfull=%u "
         "wait_room=%u "
         "data_hi=%u "
         "data_overflows=%u "
@@ -68,7 +67,6 @@ log_output(void)
         dtbl.len,
         dtbl.w_stats.nodata,
         dtbl.w_stats.submitted,
-        dtbl.w_stats.wait_qfull,
         dtbl.w_stats.wait_room,
         dtbl.w_stats.data_hi,
         dtbl.w_stats.data_overflows,
