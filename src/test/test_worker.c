@@ -130,7 +130,7 @@ static const char
         sprintf(entry->data, "XID=%d&foo=bar&baz=quux&record=%d", xid, i+1);
         entry->end = strlen(entry->data);
         entry->state = DATA_DONE;
-        mu_assert("SPMCQ full", SPMCQ_Enq(entry) == true);
+        SPMCQ_Enq(entry);
     }
     
     WRK_Halt();

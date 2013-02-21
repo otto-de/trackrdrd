@@ -50,7 +50,6 @@ int run;
 
 typedef enum {
     SUCCESS = 0,
-    PRODUCER_QFULL,
     PRODUCER_BCAST,
     CONSUMER_MUTEX,
     CONSUMER_WAIT,
@@ -65,7 +64,7 @@ typedef struct {
 int tests_run = 0;
 static char errmsg[BUFSIZ];
 
-static unsigned xids[TABLE_SIZE];
+static dataentry entries[TABLE_SIZE];
 static prod_con_data_t proddata;
 static prod_con_data_t condata[NCON];
 
@@ -83,12 +82,9 @@ static void
     unsigned xid = (unsigned int) lrand48();
 
     for (int i = 0; i < (1 << DEF_MAXOPEN_SCALE); i++) {
-        xids[i] = xid;
+        entries[i].xid = xid;
         debug_print("Producer: enqueue %d (xid = %u)\n", ++enqs, xid);
-        if (!SPMCQ_Enq(&xids[i])) {
-            proddata.fail = PRODUCER_QFULL;
-            pthread_exit(&proddata);
-        }
+        SPMCQ_Enq(&entries[i]);
         debug_print("%s\n", "Producer: broadcast");
         if (pthread_cond_broadcast(&spmcq_datawaiter_cond) != 0) {
             proddata.fail = PRODUCER_BCAST;
@@ -114,13 +110,13 @@ static void
     prod_con_data_t *pcdata = &condata[id-1];
     pcdata->sum = 0;
     pcdata->fail = SUCCESS;
-    unsigned *xid;
+    dataentry *entry;
 
     while (run) {
         /* run may be stale at this point */
         debug_print("Consumer %d: attempt dequeue\n", id);
-        xid = (unsigned *) SPMCQ_Deq();
-        if (xid == NULL) {
+        entry = SPMCQ_Deq();
+        if (entry == NULL) {
             /* grab the CV lock, which also constitutes an implicit memory
                barrier */
             debug_print("Consumer %d: mutex\n", id);
@@ -141,16 +137,17 @@ static void
                 break;
             }
         } else {
-            /* xid != NULL */
+            /* entry != NULL */
             debug_print("Consumer %d: dequeue %d (xid = %u)\n", id, ++deqs,
-                *xid);
-            pcdata->sum += *xid;
+                entry->xid);
+            pcdata->sum += entry->xid;
         }
     }
     debug_print("Consumer %d: drain queue, run = %d\n", id, run);
-    while ((xid = (unsigned *) SPMCQ_Deq()) != NULL) {
-        debug_print("Consumer %d: dequeue %d (xid = %u)\n", id, ++deqs, *xid);
-        pcdata->sum += *xid;
+    while ((entry = SPMCQ_Deq()) != NULL) {
+        debug_print("Consumer %d: dequeue %d (xid = %u)\n", id, ++deqs,
+            entry->xid);
+        pcdata->sum += entry->xid;
     }
     debug_print("Consumer %d: exit\n", id);
     pthread_exit((void *) pcdata);
@@ -185,17 +182,18 @@ static char
 static const char
 *test_spmcq_enq_deq(void)
 {
-    bool r;
-    unsigned xid = 1234567890, *xid2;
+#define XID 1234567890
+    dataentry entry1, *entry2;
 
     printf("... testing SPMCQ enqueue and dequeue\n");
-    
-    r = SPMCQ_Enq(&xid);
-    mu_assert("SPMCQ_Enq failed", r);
 
-    xid2 = SPMCQ_Deq();
-    sprintf(errmsg, "SMPCQ_Deq: expected %d, got %d", xid, *xid2);
-    mu_assert(errmsg, xid == *xid2);
+    entry1.xid = 1234567890;
+    SPMCQ_Enq(&entry1);
+
+    entry2 = SPMCQ_Deq();
+    mu_assert("SPMCQ_Deq: returned NULL from non-empty queue", entry2 != NULL);
+    sprintf(errmsg, "SMPCQ_Deq: expected %d, got %d", XID, entry2->xid);
+    mu_assert(errmsg, XID == entry2->xid);
     
     return NULL;
 }
@@ -232,6 +230,7 @@ static const char
      * waiting _after_ we have broadcasted and so miss the event.
      */
     MAZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
+    SPMCQ_Drain();
     run = 0;
     MAZ(pthread_cond_broadcast(&spmcq_datawaiter_cond));
     MAZ(pthread_mutex_unlock(&spmcq_datawaiter_lock));
@@ -244,9 +243,7 @@ static const char
     mu_assert(errmsg, err == 0);
 
     if (prod_data->fail != SUCCESS) {
-        if (prod_data->fail == PRODUCER_QFULL)
-            sprintf(errmsg, "Producer: queue full");
-        else if (prod_data->fail == PRODUCER_BCAST)
+        if (prod_data->fail == PRODUCER_BCAST)
             sprintf(errmsg, "Producer: broadcast failed");
         mu_assert(errmsg, prod_data->fail == SUCCESS);
     }
@@ -313,6 +310,7 @@ static const char
      * waiting _after_ we have broadcasted and so miss the event.
      */
     MAZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
+    SPMCQ_Drain();
     run = 0;
     MAZ(pthread_cond_broadcast(&spmcq_datawaiter_cond));
     MAZ(pthread_mutex_unlock(&spmcq_datawaiter_lock));
@@ -324,9 +322,7 @@ static const char
     }
     
     if (prod_fail != SUCCESS) {
-        if (prod_fail == PRODUCER_QFULL)
-            sprintf(errmsg, "Producer: queue full");
-        else if (prod_fail == PRODUCER_BCAST)
+        if (prod_fail == PRODUCER_BCAST)
             sprintf(errmsg, "Producer: broadcast failed");
         else
             sprintf(errmsg, "Producer: unknown error %d", prod_fail);

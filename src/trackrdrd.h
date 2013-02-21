@@ -86,23 +86,97 @@ int WRK_Running(void);
 void WRK_Halt(void);
 void WRK_Shutdown(void);
 
+/* mq.c */
+const char *MQ_GlobalInit(void);
+const char *MQ_InitConnections(void);
+const char *MQ_WorkerInit(void **priv);
+const char *MQ_Send(void *priv, const char *data, unsigned len);
+const char *MQ_Version(void *priv, char *version);
+const char *MQ_ClientID(void *priv, char *clientID);
+const char *MQ_WorkerShutdown(void **priv);
+const char *MQ_GlobalShutdown(void);
+
+/* data.c */
+typedef enum {
+    DATA_EMPTY = 0,
+    /* OPEN when the main thread is filling data, ReqEnd not yet seen. */
+    DATA_OPEN,
+    /* DONE when ReqEnd has been seen, data have not yet been submitted. */
+    DATA_DONE
+} data_state_e;
+
+struct dataentry_s {
+    unsigned 			magic;
+#define DATA_MAGIC 0xb41cb1e1
+    VSTAILQ_ENTRY(dataentry_s)	freelist;
+    VSTAILQ_ENTRY(dataentry_s)	spmcq;
+
+    data_state_e		state;
+    unsigned 			xid;
+    unsigned 			tid;	/* 'Thread ID', fd in the callback */
+    unsigned			end;	/* End of string index in data */
+    bool			hasdata;
+    
+    bool		        incomplete; /* expired or evacuated */
+    char			*data;
+};
+typedef struct dataentry_s dataentry;
+
+VSTAILQ_HEAD(freehead_s, dataentry_s);
+
+/* stats owned by VSL thread */
+struct data_writer_stats_s {
+    unsigned		nodata;		/* Not submitted, no data */
+    unsigned		submitted;	/* Submitted to worker threads */
+    unsigned		wait_room;	/* waits for space in dtbl */
+    unsigned		data_hi;	/* max string length of entry->data */
+    unsigned		data_overflows; /* config.maxdata exceeded */
+};
+
+/* stats protected by mutex */
+struct data_reader_stats_s {
+    pthread_mutex_t	mutex;
+    unsigned		done;
+    unsigned       	open;	
+    unsigned		sent;		/* Sent successfully to MQ */
+    unsigned		failed;		/* MQ send fails */
+    unsigned		occ_hi;		/* Occupancy high water mark */ 
+    unsigned		occ_hi_this;	/* Occupancy high water mark this reporting interval*/
+};
+
+struct datatable_s {
+    unsigned			magic;
+#define DATATABLE_MAGIC 	0xd3ef3bd4
+    unsigned			len;
+
+    /* protected by freelist_lock */
+    struct freehead_s		freehead;
+    pthread_mutex_t		freelist_lock;
+    unsigned			nfree;
+
+    dataentry			*entry;
+    char			*buf;
+
+    struct data_writer_stats_s	w_stats;
+    struct data_reader_stats_s	r_stats;
+};
+
+typedef struct datatable_s datatable;
+
+datatable dtbl;
+
+int DATA_Init(void);
+void DATA_Take_Freelist(struct freehead_s *dst);
+void DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned);
+void DATA_Dump1(dataentry *entry, int i);
+void DATA_Dump(void);
+
 /* spmcq.c */
 
-/* Single producer multiple consumer bounded FIFO queue */
-typedef struct {
-    unsigned magic;
-#define SPMCQ_MAGIC 0xe9a5d0a8
-    const unsigned mask;
-    void **data;
-    volatile unsigned head;
-    volatile unsigned tail;
-} spmcq_t;
-
-spmcq_t spmcq;
-
 int SPMCQ_Init(void);
-bool SPMCQ_Enq(void *ptr);
-void *SPMCQ_Deq(void);
+void SPMCQ_Enq(dataentry *ptr);
+dataentry *SPMCQ_Deq(void);
+void SPMCQ_Drain(void);
 bool SPMCQ_NeedWorker(int running);
 bool SPMCQ_StopWorker(int running);
 
@@ -145,95 +219,6 @@ int		spmcq_roomwaiter;
 pthread_cond_t  spmcq_datawaiter_cond;
 pthread_mutex_t spmcq_datawaiter_lock;
 int		spmcq_datawaiter;
-
-/* mq.c */
-const char *MQ_GlobalInit(void);
-const char *MQ_InitConnections(void);
-const char *MQ_WorkerInit(void **priv);
-const char *MQ_Send(void *priv, const char *data, unsigned len);
-const char *MQ_Version(void *priv, char *version);
-const char *MQ_ClientID(void *priv, char *clientID);
-const char *MQ_WorkerShutdown(void **priv);
-const char *MQ_GlobalShutdown(void);
-
-/* data.c */
-typedef enum {
-    DATA_EMPTY = 0,
-    /* OPEN when the main thread is filling data, ReqEnd not yet seen. */
-    DATA_OPEN,
-    /* DONE when ReqEnd has been seen, data have not yet been submitted. */
-    DATA_DONE
-} data_state_e;
-
-struct dataentry_s {
-    unsigned 			magic;
-#define DATA_MAGIC 0xb41cb1e1
-    VSTAILQ_ENTRY(dataentry_s)	freelist;
-
-    data_state_e		state;
-    unsigned 			xid;
-    unsigned 			tid;	/* 'Thread ID', fd in the callback */
-    unsigned			end;	/* End of string index in data */
-    bool			hasdata;
-    
-    bool		        incomplete; /* expired or evacuated */
-    char			*data;
-};
-typedef struct dataentry_s dataentry;
-
-VSTAILQ_HEAD(freehead_s, dataentry_s);
-
-/* stats owned by VSL thread */
-struct data_writer_stats_s {
-    unsigned		nodata;		/* Not submitted, no data */
-    unsigned		submitted;	/* Submitted to worker threads */
-    unsigned		wait_qfull;	/* Waits for SPMCQ - should not happen */
-    unsigned		wait_room;	/* waits for space in dtbl */
-    unsigned		data_hi;	/* max string length of entry->data */
-
-#ifdef REMOVE
-    unsigned		len_overflows;
-#endif
-    unsigned		data_overflows;
-};
-
-/* stats protected by mutex */
-struct data_reader_stats_s {
-    pthread_mutex_t	mutex;
-    unsigned		done;
-    unsigned       	open;	
-    unsigned		sent;		/* Sent successfully to MQ */
-    unsigned		failed;		/* MQ send fails */
-    unsigned		occ_hi;		/* Occupancy high water mark */ 
-    unsigned		occ_hi_this;	/* Occupancy high water mark this reporting interval*/
-};
-
-struct datatable_s {
-    unsigned			magic;
-#define DATATABLE_MAGIC 	0xd3ef3bd4
-    unsigned			len;
-
-    /* protected by freelist_lock */
-    struct freehead_s		freehead;
-    pthread_mutex_t		freelist_lock;
-    unsigned			nfree;
-
-    dataentry			*entry;
-    char			*buf;
-
-    struct data_writer_stats_s	w_stats;
-    struct data_reader_stats_s	r_stats;
-};
-
-typedef struct datatable_s datatable;
-
-datatable dtbl;
-
-int DATA_Init(void);
-void DATA_Take_Freelist(struct freehead_s *dst);
-void DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned);
-void DATA_Dump1(dataentry *entry, int i);
-void DATA_Dump(void);
 
 /* trackrdrd.c */
 void HASH_Stats(void);
