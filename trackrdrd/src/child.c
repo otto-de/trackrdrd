@@ -590,7 +590,10 @@ static inline dataentry
 *insert(unsigned xid, unsigned fd, float tim)
 {
     dataentry *de = data_get();
+    CHECK_OBJ_NOTNULL(de, DATA_MAGIC);
+    assert(de->state == DATA_EMPTY);
     hashentry *he = hash_insert(xid, de, tim);
+    CHECK_OBJ(he, HASH_MAGIC);
 
     if (! he) {
         LOG_Log(LOG_WARNING, "Insert: Could not insert hash for XID %d",
