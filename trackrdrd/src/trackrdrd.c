@@ -354,6 +354,8 @@ main(int argc, char * const *argv)
     ignore_action.sa_handler = SIG_IGN;
     default_action.sa_handler = SIG_DFL;
 
+    HNDL_Init(argv[0]);
+    
     if (!D_flag) {
         child_pid = fork();
         switch(child_pid) {
