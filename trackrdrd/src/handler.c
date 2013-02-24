@@ -41,6 +41,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #ifndef HAVE_EXECINFO_H
 #include "compat/execinfo.h"
@@ -49,6 +50,7 @@
 #endif
 
 #include "vas.h"
+#include "vsb.h"
 
 #include "trackrdrd.h"
 
@@ -64,28 +66,116 @@ HNDL_Terminate(int sig)
     term = 1;
 }
 
+/*
+ * This hack is almost verbatim from varnishd.c -- attempt to run nm(1) on
+ * ourselves at startup to get a mapping from lib pointers to symbolic
+ * function names for stack traces.
+ *
+ * +1 to phk's rant in varnishd.c about the lack of a standard for this.
+ */
+
+struct symbols {
+    uintptr_t               a;
+    char                    *n;
+    VTAILQ_ENTRY(symbols)   list;
+};
+
+static VTAILQ_HEAD(,symbols) symbols = VTAILQ_HEAD_INITIALIZER(symbols);
+
+static int
+symbol_lookup(struct vsb *vsb, void *ptr)
+{
+    struct symbols *s, *s0;
+    uintptr_t pp;
+
+    pp = (uintptr_t)ptr;
+    s0 = NULL;
+    VTAILQ_FOREACH(s, &symbols, list) {
+        if (s->a > pp)
+            continue;
+        if (s0 == NULL || s->a > s0->a)
+            s0 = s;
+    }
+    if (s0 == NULL)
+        return (-1);
+    VSB_printf(vsb, "%p: %s+%jx", ptr, s0->n, (uintmax_t)pp - s0->a);
+    return (0);
+}
+
+static void
+symbol_hack(const char *a0)
+{
+    char buf[BUFSIZ], *p, *e;
+    FILE *fi;
+    uintptr_t a;
+    struct symbols *s;
+
+    sprintf(buf, "nm -an %s 2>/dev/null", a0);
+    fi = popen(buf, "r");
+    if (fi == NULL)
+        return;
+    while (fgets(buf, sizeof buf, fi)) {
+        if (buf[0] == ' ')
+            continue;
+        p = NULL;
+        a = strtoul(buf, &p, 16);
+        if (p == NULL)
+            continue;
+        if (a == 0)
+            continue;
+        if (*p++ != ' ')
+            continue;
+        p++;
+        if (*p++ != ' ')
+            continue;
+        if (*p <= ' ')
+            continue;
+        e = strchr(p, '\0');
+        AN(e);
+        while (e > p && isspace(e[-1]))
+            e--;
+        *e = '\0';
+        s = malloc(sizeof *s + strlen(p) + 1);
+        AN(s);
+        s->a = a;
+        s->n = (void*)(s + 1);
+        strcpy(s->n, p);
+        VTAILQ_INSERT_TAIL(&symbols, s, list);
+    }
+    (void)pclose(fi);
+}
+
 static void
 stacktrace(void)
 {
     void *buf[MAX_STACK_DEPTH];
     int depth, i;
-    char **strings;
+    struct vsb *sb = VSB_new_auto();
 
     depth = backtrace (buf, MAX_STACK_DEPTH);
     if (depth == 0) {
         LOG_Log0(LOG_ERR, "Stacktrace empty");
         return;
     }
-    strings = backtrace_symbols(buf, depth);
-    if (strings == NULL) {
-        LOG_Log0(LOG_ERR, "Cannot retrieve symbols for stacktrace");
-        return;
+    for (i = 0; i < depth; i++) {
+        VSB_clear(sb);
+        if (symbol_lookup(sb, buf[i]) < 0) {
+            char **strings;
+            strings = backtrace_symbols(&buf[i], 1);
+            if (strings != NULL && strings[0] != NULL)
+                VSB_printf(sb, "%p: %s", buf[i], strings[0]);
+            else
+                VSB_printf(sb, "%p: (?)", buf[i]);
+        }
+        VSB_finish(sb);
+        LOG_Log(LOG_ERR, "%s", VSB_data(sb));
     }
-    /* XXX: get symbol names from nm? cf. cache_panic.c/pan_backtrace */
-    for (i = 0; i < depth; i++)
-        LOG_Log(LOG_ERR, "%s", strings[i]);
-    
-    free(strings);
+}
+
+void
+HNDL_Init(const char *a0)
+{
+    symbol_hack(a0);
 }
 
 void
