@@ -40,19 +40,6 @@
 #include "vas.h"
 #include "vqueue.h"
 
-#if 0
-typedef struct {
-    unsigned magic;
-#define SPMCQ_MAGIC 0xe9a5d0a8
-    const unsigned mask;
-    void **data;
-    volatile unsigned head;
-    volatile unsigned tail;
-} spmcq_t;
-
-spmcq_t spmcq;
-#endif
-
 static volatile unsigned long enqs = 0, deqs = 0;
 static pthread_mutex_t spmcq_lock;
 static pthread_mutex_t spmcq_deq_lock;
