@@ -63,7 +63,8 @@ volatile sig_atomic_t term;
 
 struct sigaction terminate_action, ignore_action, stacktrace_action,
     default_action;
-    
+
+void HNDL_Init(const char *a0);
 void HNDL_Abort(int sig);
 void HNDL_Terminate(int sig);
 
