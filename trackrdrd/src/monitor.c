@@ -61,6 +61,7 @@ log_output(void)
         "open=%u "
         "load=%.2f "
         "sent=%u "
+        "reconnects=%u "
         "failed=%u "
         "occ_hi=%u "
         "occ_hi_this=%u ",
@@ -74,6 +75,7 @@ log_output(void)
         dtbl.r_stats.open,
         (100.0 * (1.0 * dtbl.r_stats.done + 1.0 * dtbl.r_stats.open) / dtbl.len),
         dtbl.r_stats.sent,
+        dtbl.r_stats.reconnects,
         dtbl.r_stats.failed,
         dtbl.r_stats.occ_hi,
         dtbl.r_stats.occ_hi_this
@@ -172,6 +174,10 @@ MON_StatsUpdate(stats_update_t update)
     case STATS_DONE:
         dtbl.r_stats.done++;
         dtbl.r_stats.open--;
+        break;
+
+    case STATS_RECONNECT:
+        dtbl.r_stats.reconnects++;
         break;
 
     case STATS_OCCUPANCY:

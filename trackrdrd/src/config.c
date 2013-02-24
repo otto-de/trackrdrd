@@ -123,7 +123,6 @@ CONF_Add(const char *lval, const char *rval)
     confUnsigned("hash.ttl", hash_ttl);
     confUnsigned("hash.mlt", hash_mlt);
     confUnsigned("nworkers", nworkers);
-    confUnsigned("mq.pool_size", mq_pool_size);
     confUnsigned("restarts", restarts);
     confUnsigned("monitor.interval", monitor_interval);
 
@@ -242,7 +241,6 @@ CONF_Init(void)
     config.mq_uri = (char **) malloc (sizeof(char **));
     AN(config.mq_uri);
     config.mq_qname[0] = '\0';
-    config.mq_pool_size = 5;
     config.nworkers = 1;
     config.restarts = 1;
     
@@ -348,7 +346,6 @@ CONF_Dump(void)
         LOG_Log0(LOG_DEBUG, "config: mq.uri = ");
     
     confdump("mq.qname = %s", config.mq_qname);
-    confdump("mq.pool_size = %u", config.mq_pool_size);
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
     confdump("user = %s", config.user_name);
