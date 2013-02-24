@@ -40,7 +40,6 @@
 #include "vas.h"
 
 static AMQ_Connection **connections;
-static unsigned nconnections;
 static pthread_mutex_t connection_lock = PTHREAD_MUTEX_INITIALIZER;
 static unsigned connection = 0;
 
@@ -59,27 +58,24 @@ MQ_InitConnections(void)
     if (config.n_mq_uris == 0)
         return NULL;
     
-    nconnections = config.n_mq_uris * config.mq_pool_size;
     connections = (AMQ_Connection **) calloc(sizeof(AMQ_Connection *),
-                                             nconnections);
+                                             config.nworkers);
     if (connections == NULL)
         return strerror(errno);
-    for (int i = 0; i < config.n_mq_uris; i++)
-        for (int j = 0; j < config.mq_pool_size; j++) {
-            err = AMQ_ConnectionInit(&conn, config.mq_uri[i]);
-            if (err != NULL)
-                return err;
-            connections[i*config.mq_pool_size + j] = conn;
-        }
+    for (int i = 0; i < config.nworkers; i++) {
+        err = AMQ_ConnectionInit(&conn, config.mq_uri[i % config.n_mq_uris]);
+        if (err != NULL)
+            return err;
+        connections[i] = conn;
+    }
     return NULL;
 }
 
 const char *
 MQ_WorkerInit(void **priv)
 {
-    AN(nconnections);
     AZ(pthread_mutex_lock(&connection_lock));
-    AMQ_Connection *conn = connections[connection++ % nconnections];
+    AMQ_Connection *conn = connections[connection++ % config.nworkers];
     AZ(pthread_mutex_unlock(&connection_lock));
     return AMQ_WorkerInit((AMQ_Worker **) priv, conn, config.mq_qname);
 }
@@ -88,6 +84,22 @@ const char *
 MQ_Send(void *priv, const char *data, unsigned len)
 {
     return AMQ_Send((AMQ_Worker *) priv, data, len);
+}
+
+const char *
+MQ_Reconnect(void **priv)
+{
+    const char *err;
+    AMQ_Connection *conn;
+
+    err = AMQ_WorkerShutdown((AMQ_Worker **) priv);
+    if (err != NULL)
+        return err;
+    err = AMQ_ConnectionInit(&conn,
+                             config.mq_uri[connection++ % config.n_mq_uris]);
+    if (err != NULL)
+        return err;
+    return AMQ_WorkerInit((AMQ_Worker **) priv, conn, config.mq_qname);
 }
 
 const char *
