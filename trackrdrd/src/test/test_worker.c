@@ -68,7 +68,6 @@ static char
     config.maxdata = 1024;
     config.nworkers = NWORKERS;
     strcpy(config.mq_qname, "lhoste/tracking/test");
-    config.mq_pool_size = 2;
 
     config.n_mq_uris = 2;
     config.mq_uri = (char **) malloc(2 * sizeof(char**));

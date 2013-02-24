@@ -79,6 +79,7 @@ struct worker_data_s {
     unsigned waits;
     unsigned sends;
     unsigned fails;
+    unsigned reconnects;
 };
 
 typedef struct worker_data_s worker_data_t;
@@ -93,8 +94,28 @@ static thread_data_t *thread_data;
 
 static pthread_mutex_t running_lock;
 
+static void
+wrk_log_connection(void *amq_worker, unsigned id)
+{
+    const char *err;
+    char version[VERSION_LEN], clientID[CLIENT_ID_LEN];
+
+    err = MQ_Version(amq_worker, version);
+    if (err != NULL) {
+        LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ version", id, err);
+        version[0] = '\0';
+    }
+    err = MQ_ClientID(amq_worker, clientID);
+    if (err != NULL) {
+        LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ client ID", id, err);
+        clientID[0] = '\0';
+    }
+    LOG_Log(LOG_INFO, "Worker %d: connected (%s, id = %s)", id, version,
+            clientID);
+}
+
 static inline void
-wrk_send(void *amq_worker, dataentry *entry, worker_data_t *wrk)
+wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
 {
     const char *err;
     
@@ -103,16 +124,35 @@ wrk_send(void *amq_worker, dataentry *entry, worker_data_t *wrk)
     AN(amq_worker);
 
     /* XXX: report entry->incomplete to backend ? */
-    err = MQ_Send(amq_worker, entry->data, entry->end);
+    err = MQ_Send(*amq_worker, entry->data, entry->end);
     if (err != NULL) {
-        /* XXX: error recovery? reconnect? preserve the data? */
-        wrk->fails++;
         LOG_Log(LOG_ALERT, "Worker %d: Failed to send data: %s", wrk->id, err);
-        LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
-            entry->end, entry->data);
-        MON_StatsUpdate(STATS_FAILED);
+        LOG_Log(LOG_INFO, "Worker %d: Reconnecting", wrk->id);
+        err = MQ_Reconnect(amq_worker);
+        if (err != NULL) {
+            amq_worker = NULL;
+            LOG_Log(LOG_ALERT, "Worker %d: Reconnect failed (%s)", wrk->id,
+                err);
+            LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
+                entry->end, entry->data);
+        }
+        else {
+            wrk->reconnects++;
+            wrk_log_connection(*amq_worker, wrk->id);
+            MON_StatsUpdate(STATS_RECONNECT);
+            err = MQ_Send(*amq_worker, entry->data, entry->end);
+            if (err != NULL) {
+                wrk->fails++;
+                LOG_Log(LOG_ALERT,
+                    "Worker %d: Failed to send data after reconnect: %s",
+                    wrk->id, err);
+                LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
+                    entry->end, entry->data);
+                MON_StatsUpdate(STATS_FAILED);
+            }
+        }
     }
-    else {
+    if (err == NULL) {
         wrk->sends++;
         MON_StatsUpdate(STATS_SENT);
         LOG_Log(LOG_DEBUG, "Worker %d: Successfully sent data [%.*s]", wrk->id,
@@ -138,7 +178,6 @@ static void
     void *amq_worker;
     dataentry *entry;
     const char *err;
-    char version[VERSION_LEN], clientID[CLIENT_ID_LEN];
 
     LOG_Log(LOG_INFO, "Worker %d: starting", wrk->id);
     CHECK_OBJ_NOTNULL(wrk, WORKER_DATA_MAGIC);
@@ -153,18 +192,7 @@ static void
         pthread_exit((void *) wrk);
     }
 
-    err = MQ_Version(amq_worker, version);
-    if (err != NULL) {
-        LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ version", wrk->id, err);
-        version[0] = '\0';
-    }
-
-    err = MQ_ClientID(amq_worker, clientID);
-    if (err != NULL) {
-        LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ client ID", wrk->id, err);
-        clientID[0] = '\0';
-    }
-
+    wrk_log_connection(amq_worker, wrk->id);
     VSTAILQ_INIT(&wrk->wrk_freelist);
     wrk->wrk_nfree = 0;
 
@@ -173,15 +201,14 @@ static void
     running++;
     AZ(pthread_mutex_unlock(&running_lock));
 
-    LOG_Log(LOG_INFO, "Worker %d: running (%s, id = %s)", wrk->id, version,
-            clientID);
-    
     while (run) {
         entry = SPMCQ_Deq();
         if (entry != NULL) {
             wrk->deqs++;
-            wrk_send(amq_worker, entry, wrk);
+            wrk_send(&amq_worker, entry, wrk);
 
+            if (amq_worker == NULL)
+                break;
             if (!SPMCQ_StopWorker(running))
                 continue;
         }
@@ -220,21 +247,28 @@ static void
     }
 
     wrk->state = WRK_SHUTTINGDOWN;
-    
-    /* Prepare to exit, drain the queue */
-    while ((entry = SPMCQ_Deq()) != NULL) {
-        wrk->deqs++;
-        wrk_send(amq_worker, entry, wrk);
-    }
 
-    wrk->status = EXIT_SUCCESS;
-    err = MQ_WorkerShutdown(&amq_worker);
-    if (err != NULL) {
-        LOG_Log(LOG_ALERT, "Worker %d: MQ worker shutdown failed: %s",
-            wrk->id, err);
-        wrk->status = EXIT_FAILURE;
+    if (amq_worker != NULL) {
+        /* Prepare to exit, drain the queue */
+        while ((entry = SPMCQ_Deq()) != NULL) {
+            wrk->deqs++;
+            wrk_send(&amq_worker, entry, wrk);
+        }
+
+        wrk->status = EXIT_SUCCESS;
+        err = MQ_WorkerShutdown(&amq_worker);
+        if (err != NULL) {
+            LOG_Log(LOG_ALERT, "Worker %d: MQ worker shutdown failed: %s",
+                wrk->id, err);
+            wrk->status = EXIT_FAILURE;
+        }
     }
+    else
+        wrk->status = EXIT_FAILURE;
     
+    AZ(pthread_mutex_lock(&running_lock));
+    running--;
+    AZ(pthread_mutex_unlock(&running_lock));
     LOG_Log(LOG_INFO, "Worker %d: exiting", wrk->id);
     wrk->state = WRK_EXITED;
     pthread_exit((void *) wrk);
@@ -278,7 +312,7 @@ WRK_Init(void)
         worker_data_t *wrk = thread_data[i].wrk_data;
         wrk->magic = WORKER_DATA_MAGIC;
         wrk->id = i + 1;
-        wrk->deqs = wrk->waits = wrk->sends = wrk->fails = 0;
+        wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects = 0;
         wrk->state = WRK_NOTSTARTED;
     }
 
@@ -315,9 +349,10 @@ WRK_Stats(void)
     
     for (int i = 0; i < config.nworkers; i++) {
         wrk = thread_data[i].wrk_data;
-        LOG_Log(LOG_INFO, "Worker %d (%s): seen=%d waits=%d sent=%d failed=%d",
+        LOG_Log(LOG_INFO,
+            "Worker %d (%s): seen=%d waits=%d sent=%d reconnects=%d failed=%d",
             wrk->id, statename[wrk->state], wrk->deqs, wrk->waits, wrk->sends,
-            wrk->fails);
+            wrk->reconnects, wrk->fails);
     }
 }
 
