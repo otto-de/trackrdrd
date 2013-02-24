@@ -66,6 +66,7 @@ static char
     printf("... testing MQ connection initialization\n");
 
     config.n_mq_uris = 1;
+    config.nworkers = 1;
     config.mq_uri = (char **) malloc(sizeof(char **));
     AN(config.mq_uri);
     config.mq_uri[0] = (char *) malloc(strlen("tcp://localhost:61616") + 1);
@@ -73,7 +74,6 @@ static char
     strcpy(config.mq_uri[0], "tcp://localhost:61616");
     
     strcpy(config.mq_qname, "lhoste/tracking/test");
-    config.mq_pool_size = 1;
     err = MQ_InitConnections();
     if (err != NULL && strstr(err, "Connection refused") != NULL) {
         printf("Connection refused, ActiveMQ assumed not running\n");

@@ -93,6 +93,7 @@ const char *MQ_WorkerInit(void **priv);
 const char *MQ_Send(void *priv, const char *data, unsigned len);
 const char *MQ_Version(void *priv, char *version);
 const char *MQ_ClientID(void *priv, char *clientID);
+const char *MQ_Reconnect(void **priv);
 const char *MQ_WorkerShutdown(void **priv);
 const char *MQ_GlobalShutdown(void);
 
@@ -140,8 +141,10 @@ struct data_reader_stats_s {
     unsigned       	open;	
     unsigned		sent;		/* Sent successfully to MQ */
     unsigned		failed;		/* MQ send fails */
+    unsigned		reconnects;
     unsigned		occ_hi;		/* Occupancy high water mark */ 
-    unsigned		occ_hi_this;	/* Occupancy high water mark this reporting interval*/
+    unsigned		occ_hi_this;	/* Occupancy high water mark
+                                           this reporting interval*/
 };
 
 struct datatable_s {
@@ -294,7 +297,6 @@ struct config {
     unsigned	n_mq_uris;
     char	**mq_uri;
     char	mq_qname[BUFSIZ];
-    unsigned	mq_pool_size;
     unsigned	nworkers;
     unsigned	restarts;
     char	user_name[BUFSIZ];
@@ -334,6 +336,8 @@ typedef enum {
     STATS_SENT,
     /* Failed to send record to MQ */
     STATS_FAILED,
+    /* Reconnected to MQ */
+    STATS_RECONNECT,
     /* ReqStart seen, finished reading record from SHM log */
     STATS_DONE,
     /* Update occupancy high water mark */
