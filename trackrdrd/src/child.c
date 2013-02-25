@@ -735,10 +735,12 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
             xid, datalen, data);
 
         he = hash_find(xid);
-        if (! he) {
-            LOG_Log(LOG_WARNING, "%s: XID %d not found",
-                VSL_tags[tag], xid);
-            htbl.drop_vcl_log++;
+        if (he == NULL) {
+            if (!term) {
+                LOG_Log(LOG_WARNING, "%s: XID %d not found",
+                    VSL_tags[tag], xid);
+                htbl.drop_vcl_log++;
+            }
             break;
         }
         check_entry(he, xid, fd);
@@ -761,10 +763,12 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         xid_spread_count++;
 
         he = hash_find(xid);
-        if (! he) {
-            LOG_Log(LOG_WARNING, "%s: XID %d not found",
-                VSL_tags[tag], xid);
-            htbl.drop_reqend++;
+        if (he == NULL) {
+            if (!term) {
+                LOG_Log(LOG_WARNING, "%s: XID %d not found",
+                    VSL_tags[tag], xid);
+                htbl.drop_reqend++;
+            }
             break;
         }
         check_entry(he, xid, fd);
