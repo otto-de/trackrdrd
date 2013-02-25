@@ -121,6 +121,7 @@ case "$1" in
             exit 1
         fi
         kill -USR1 $(cat ${PIDFILE})
+        ${CURL} ${URL} >/dev/null 2&>1
         getstatus_trackrdrd
         exit 0
         ;;
