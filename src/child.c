@@ -666,7 +666,9 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     int err, datalen;
     char *data, reqend_str[strlen(REQEND_T_VAR)+22];
     struct timespec reqend_t;
-    float tim, tim_exp_check = 0.0;
+    float tim;
+
+    static float tim_exp_check = 0.0;
 
     /* wrap detection statistics */
     static const char *pptr = (const char *) UINTPTR_MAX;
