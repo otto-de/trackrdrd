@@ -174,7 +174,7 @@ entry_assert_failure(const char *func, const char *file, int line,
 /*--------------------------------------------------------------------*/
 
 static inline void
-check_entry(hashentry *he, unsigned xid, unsigned tid)
+check_entry(hashentry *he, unsigned xid)
 {
     dataentry *de;
     CHECK_OBJ_NOTNULL(he, HASH_MAGIC);
@@ -185,7 +185,6 @@ check_entry(hashentry *he, unsigned xid, unsigned tid)
     entry_assert(he, de != NULL);
     entry_assert(he, de->magic == DATA_MAGIC);
     entry_assert(he, de->xid == xid);
-    entry_assert(he, de->tid == tid);
 }
 
 /*--------------------------------------------------------------------*/
@@ -745,8 +744,16 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
             }
             break;
         }
-        check_entry(he, xid, fd);
+
+        check_entry(he, xid);
         de = he->de;
+        if (de->tid != fd) {
+            LOG_Log(LOG_ERR, "%s: fd mismatch, was %u, saw %u (XID=%u), "
+                "data DISCARDED [%.*s]",
+                VSL_tags[tag], de->tid, fd, xid, datalen, data);
+            htbl.drop_vcl_log++;
+        }
+
         append(de, tag, xid, data, datalen);
         de->hasdata = true;
         break;
@@ -773,8 +780,14 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
             }
             break;
         }
-        check_entry(he, xid, fd);
+        check_entry(he, xid);
         de = he->de;
+        if (de->tid != fd) {
+            LOG_Log(LOG_ERR, "%s: fd mismatch, was %u, saw %u (XID=%u), "
+                "data DISCARDED [%.*s]",
+                VSL_tags[tag], de->tid, fd, xid, datalen, data);
+            htbl.drop_reqend++;
+        }
 
         sprintf(reqend_str, "%s=%u.%09lu", REQEND_T_VAR,
             (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
