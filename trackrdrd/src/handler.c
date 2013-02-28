@@ -185,6 +185,7 @@ HNDL_Abort(int sig)
     LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
         strsignal(sig));
     stacktrace();
+    DATA_Dump();
     MON_Output();
     LOG_Log0(LOG_ALERT, "Aborting");
     abort();
