@@ -175,7 +175,7 @@ entry_assert_failure(const char *func, const char *file, int line,
 /*--------------------------------------------------------------------*/
 
 static inline void
-check_entry(hashentry *he, unsigned xid)
+check_entry(hashentry *he, unsigned xid, unsigned fd)
 {
     dataentry *de;
     CHECK_OBJ_NOTNULL(he, HASH_MAGIC);
@@ -186,6 +186,8 @@ check_entry(hashentry *he, unsigned xid)
     entry_assert(he, de != NULL);
     entry_assert(he, de->magic == DATA_MAGIC);
     entry_assert(he, de->xid == xid);
+    if (fd != (unsigned int) -1)
+        entry_assert(he, de->tid == fd);
 }
 
 /*--------------------------------------------------------------------*/
@@ -696,12 +698,13 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     }
     
     /* spec != 'c' */
-    if ((spec & VSL_S_CLIENT) == 0) {
+    if ((spec & VSL_S_CLIENT) == 0)
         LOG_Log(LOG_WARNING, "%s: Client bit ('c') not set [%.*s]",
             VSL_tags[tag], len, ptr);
-        /* This may signal that data are not fresh */
-        VRMB();
-    }
+
+    if (fd == (unsigned int) -1)
+        LOG_Log(LOG_WARNING, "%s: File descriptor not set [%.*s]",
+            VSL_tags[tag], len, ptr);
     
     switch (tag) {
     case SLT_ReqStart:
@@ -749,15 +752,8 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
             break;
         }
 
-        check_entry(he, xid);
+        check_entry(he, xid, fd);
         de = he->de;
-        if (de->tid != fd) {
-            LOG_Log(LOG_ERR, "%s: fd mismatch, was %u, saw %u (XID=%u), "
-                "data DISCARDED [%.*s]",
-                VSL_tags[tag], de->tid, fd, xid, datalen, data);
-            htbl.drop_vcl_log++;
-        }
-
         append(de, tag, xid, data, datalen);
         de->hasdata = true;
         break;
@@ -784,14 +780,8 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
             }
             break;
         }
-        check_entry(he, xid);
+        check_entry(he, xid, fd);
         de = he->de;
-        if (de->tid != fd) {
-            LOG_Log(LOG_ERR, "%s: fd mismatch, was %u, saw %u (XID=%u), "
-                "data DISCARDED [%.*s]",
-                VSL_tags[tag], de->tid, fd, xid, datalen, data);
-            htbl.drop_reqend++;
-        }
 
         sprintf(reqend_str, "%s=%u.%09lu", REQEND_T_VAR,
             (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
@@ -824,6 +814,9 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     }
     pptr = ptr;
 
+    if (WRK_Exited() > 0)
+        return 1;
+    
     return 0;
 }
 
@@ -985,6 +978,8 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     while (VSL_Dispatch(vd, OSL_Track, NULL) > 0)
         if (term || !endless)
             break;
+        else if (WRK_Exited() > 0)
+            WRK_Restart();
         else {
             LOG_Log0(LOG_WARNING, "Log read interrupted, continuing");
             continue;
