@@ -42,7 +42,7 @@
 #define VERSION_LEN 64
 #define CLIENT_ID_LEN 80
 
-static int running = 0;
+static int running = 0, exited = 0;
 
 typedef enum {
     WRK_NOTSTARTED = 0,
@@ -126,11 +126,12 @@ wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
     /* XXX: report entry->incomplete to backend ? */
     err = MQ_Send(*amq_worker, entry->data, entry->end);
     if (err != NULL) {
-        LOG_Log(LOG_ALERT, "Worker %d: Failed to send data: %s", wrk->id, err);
+        LOG_Log(LOG_WARNING, "Worker %d: Failed to send data: %s",
+            wrk->id, err);
         LOG_Log(LOG_INFO, "Worker %d: Reconnecting", wrk->id);
         err = MQ_Reconnect(amq_worker);
         if (err != NULL) {
-            amq_worker = NULL;
+            *amq_worker = NULL;
             LOG_Log(LOG_ALERT, "Worker %d: Reconnect failed (%s)", wrk->id,
                 err);
             LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
@@ -189,6 +190,7 @@ static void
             wrk->id, err);
         wrk->status = EXIT_FAILURE;
         wrk->state = WRK_EXITED;
+        exited++;
         pthread_exit((void *) wrk);
     }
 
@@ -248,7 +250,9 @@ static void
 
     wrk->state = WRK_SHUTTINGDOWN;
 
-    if (amq_worker != NULL) {
+    if (amq_worker == NULL)
+        wrk->status = EXIT_FAILURE;
+    else {
         /* Prepare to exit, drain the queue */
         while ((entry = SPMCQ_Deq()) != NULL) {
             wrk->deqs++;
@@ -263,11 +267,10 @@ static void
             wrk->status = EXIT_FAILURE;
         }
     }
-    else
-        wrk->status = EXIT_FAILURE;
     
     AZ(pthread_mutex_lock(&running_lock));
     running--;
+    exited++;
     AZ(pthread_mutex_unlock(&running_lock));
     LOG_Log(LOG_INFO, "Worker %d: exiting", wrk->id);
     wrk->state = WRK_EXITED;
@@ -341,6 +344,25 @@ WRK_Start(void)
 }
 
 void
+WRK_Restart(void)
+{
+    worker_data_t *wrk;
+    
+    for (int i = 0; i < config.nworkers; i++) {
+        CHECK_OBJ_NOTNULL(thread_data[i].wrk_data, WORKER_DATA_MAGIC);
+        wrk = thread_data[i].wrk_data;
+        if (wrk->state == WRK_EXITED) {
+            wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
+                = 0;
+            wrk->state = WRK_NOTSTARTED;
+            AZ(pthread_create(&thread_data[i].worker, NULL, wrk_main,
+                    thread_data[i].wrk_data));
+            exited--;
+        }
+    }
+}
+
+void
 WRK_Stats(void)
 {
     worker_data_t *wrk;
@@ -360,6 +382,12 @@ int
 WRK_Running(void)
 {
     return running;
+}
+
+int
+WRK_Exited(void)
+{
+    return exited;
 }
 
 void
