@@ -80,6 +80,7 @@ struct worker_data_s {
     unsigned sends;
     unsigned fails;
     unsigned reconnects;
+    unsigned restarts;
 };
 
 typedef struct worker_data_s worker_data_t;
@@ -315,7 +316,8 @@ WRK_Init(void)
         worker_data_t *wrk = thread_data[i].wrk_data;
         wrk->magic = WORKER_DATA_MAGIC;
         wrk->id = i + 1;
-        wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects = 0;
+        wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
+            = wrk->restarts = 0;
         wrk->state = WRK_NOTSTARTED;
     }
 
@@ -343,7 +345,7 @@ WRK_Start(void)
                 thread_data[i].wrk_data));
 }
 
-void
+int
 WRK_Restart(void)
 {
     worker_data_t *wrk;
@@ -352,14 +354,24 @@ WRK_Restart(void)
         CHECK_OBJ_NOTNULL(thread_data[i].wrk_data, WORKER_DATA_MAGIC);
         wrk = thread_data[i].wrk_data;
         if (wrk->state == WRK_EXITED) {
+            exited--;
+            AZ(pthread_detach(thread_data[i].worker));
             wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
                 = 0;
+            wrk->restarts++;
             wrk->state = WRK_NOTSTARTED;
-            AZ(pthread_create(&thread_data[i].worker, NULL, wrk_main,
-                    thread_data[i].wrk_data));
-            exited--;
+            if (pthread_create(&thread_data[i].worker, NULL, wrk_main, wrk)
+                != 0) {
+                /* EAGAIN means we've hit a system limit trying to restart
+                   threads, so it's time to give up. Any other errno is a
+                   programming error.
+                */
+                assert(errno == EAGAIN);
+                return errno;
+            }
         }
     }
+    return 0;
 }
 
 void
@@ -372,9 +384,10 @@ WRK_Stats(void)
     for (int i = 0; i < config.nworkers; i++) {
         wrk = thread_data[i].wrk_data;
         LOG_Log(LOG_INFO,
-            "Worker %d (%s): seen=%d waits=%d sent=%d reconnects=%d failed=%d",
+            "Worker %d (%s): seen=%u waits=%u sent=%u reconnects=%u "
+            "restarts=%u failed=%d",
             wrk->id, statename[wrk->state], wrk->deqs, wrk->waits, wrk->sends,
-            wrk->reconnects, wrk->fails);
+            wrk->reconnects, wrk->restarts, wrk->fails);
     }
 }
 
