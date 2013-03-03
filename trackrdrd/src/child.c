@@ -554,17 +554,16 @@ static hashentry
     uint32_t h  	= h1(xid);
 
     he = &htbl.entry[INDEX(h)];
-    if (he->xid == xid)
+    if (he->xid == xid && he->state == HASH_OPEN)
         return (he);
 
     h = h2(xid);
     unsigned n = 0;
     do {
         he = &htbl.entry[INDEX(h)];
-        probes++;
-
-        if (he->xid == xid)
+        if (he->xid == xid && he->state == HASH_OPEN)
             break;
+        probes++;
         n++;
         h += n * n;
     } while (probes <= htbl.max_probes);
