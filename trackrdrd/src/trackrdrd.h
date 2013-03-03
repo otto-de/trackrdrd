@@ -82,7 +82,7 @@ void PRIV_Sandbox(void);
  */
 int WRK_Init(void);
 void WRK_Start(void);
-void WRK_Restart(void);
+int WRK_Restart(void);
 void WRK_Stats(void);
 int WRK_Running(void);
 int WRK_Exited(void);
