@@ -693,7 +693,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     if (wrk_running < config.nworkers) {
         wrk_running = WRK_Running();
         if (wrk_running < config.nworkers)
-            LOG_Log(LOG_ALERT, "%d of %d workers running", wrk_running,
+            LOG_Log(LOG_WARNING, "%d of %d workers running", wrk_running,
                 config.nworkers);
     }
     
@@ -978,8 +978,13 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     while (VSL_Dispatch(vd, OSL_Track, NULL) > 0)
         if (term || !endless)
             break;
-        else if (WRK_Exited() > 0)
-            WRK_Restart();
+        else if (WRK_Exited() > 0) {
+            if ((errnum = WRK_Restart()) != 0) {
+                LOG_Log(LOG_ALERT, "Cannot restart worker threads, giving up "
+                    "(%s)", strerror(errnum));
+                break;
+            }
+        }
         else {
             LOG_Log0(LOG_WARNING, "Log read interrupted, continuing");
             continue;
