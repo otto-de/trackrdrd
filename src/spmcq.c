@@ -152,12 +152,3 @@ SPMCQ_NeedWorker(int running)
     return spmcq_len() > spmcq_wrk_len_ratio(running - spmcq_datawaiter,
                                              running);
 }
-
-bool
-SPMCQ_StopWorker(int running)
-{
-    if (running == 0)
-        return false;
-    return spmcq_len() < spmcq_wrk_len_ratio(running - spmcq_datawaiter - 1,
-                                             running);
-}
