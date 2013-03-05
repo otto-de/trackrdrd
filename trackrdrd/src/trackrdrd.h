@@ -184,7 +184,6 @@ void SPMCQ_Enq(dataentry *ptr);
 dataentry *SPMCQ_Deq(void);
 void SPMCQ_Drain(void);
 bool SPMCQ_NeedWorker(int running);
-bool SPMCQ_StopWorker(int running);
 
 #define spmcq_wait(what)						\
     do {								\
