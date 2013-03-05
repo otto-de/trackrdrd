@@ -191,7 +191,9 @@ static void
             wrk->id, err);
         wrk->status = EXIT_FAILURE;
         wrk->state = WRK_EXITED;
+        AZ(pthread_mutex_lock(&running_lock));
         exited++;
+        AZ(pthread_mutex_unlock(&running_lock));
         pthread_exit((void *) wrk);
     }
 
@@ -212,8 +214,7 @@ static void
 
             if (amq_worker == NULL)
                 break;
-            if (!SPMCQ_StopWorker(running))
-                continue;
+            continue;
         }
 
         /* return space before sleeping */
@@ -223,9 +224,8 @@ static void
         }
 
         /*
-         * Queue is empty or we should backoff
-         *
-         * wait until data are available, or quit is signaled.
+         * Queue is empty, wait until data are available, or quit is
+         * signaled.
          *
          * Grab the CV lock, which also constitutes an implicit memory
          * barrier 
@@ -233,11 +233,9 @@ static void
         AZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
         /*
          * run is guaranteed to be fresh here
-         *
-         * also re-check the stop condition under the lock
          */
         SPMCQ_Drain();
-        if (run && ((! entry) || SPMCQ_StopWorker(running))) {
+        if (run) {
             wrk->waits++;
             spmcq_datawaiter++;
             wrk->state = WRK_WAITING;
@@ -354,7 +352,9 @@ WRK_Restart(void)
         CHECK_OBJ_NOTNULL(thread_data[i].wrk_data, WORKER_DATA_MAGIC);
         wrk = thread_data[i].wrk_data;
         if (wrk->state == WRK_EXITED) {
+            AZ(pthread_mutex_lock(&running_lock));
             exited--;
+            AZ(pthread_mutex_unlock(&running_lock));
             AZ(pthread_detach(thread_data[i].worker));
             wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
                 = 0;
