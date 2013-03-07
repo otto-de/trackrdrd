@@ -609,7 +609,7 @@ static inline dataentry
     de->tid	= fd;
     de->hasdata	= false;
 
-    sprintf(de->data, "XID=%d", xid);
+    sprintf(de->data, "XID=%u", xid);
     de->end = strlen(de->data);
     if (de->end > dtbl.w_stats.data_hi)
         dtbl.w_stats.data_hi = de->end;
