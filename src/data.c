@@ -53,13 +53,13 @@ DATA_Init(void)
     dataentry *entryptr;
     char *bufptr;
     
-    int bufsize = config.maxdata;
+    unsigned bufsize = config.maxdata;
     
     /*
      * we want enough space to accomodate all open and done records
      *
      */
-    int entries = (1 << config.maxopen_scale) + config.maxdone;
+    unsigned entries = (1 << config.maxopen_scale) + config.maxdone;
 
     entryptr = (dataentry *) calloc(entries, sizeof(dataentry));
     if (entryptr == NULL)
@@ -82,7 +82,7 @@ DATA_Init(void)
     dtbl.buf	= bufptr;
     dtbl.nfree  = 0;
 
-    for (int i = 0; i < entries; i++) {
+    for (unsigned i = 0; i < entries; i++) {
         dtbl.entry[i].magic = DATA_MAGIC;
         dtbl.entry[i].state = DATA_EMPTY;
         dtbl.entry[i].hasdata = false;
