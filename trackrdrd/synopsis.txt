@@ -1,3 +1,4 @@
   trackrdrd [[-n varnish_name] | [-f varnishlog_bindump]]
+            [-c config_file] [-u user] [-P pid_file]
             [[-l log_file] | [-y syslog_facility]]
-            [-d] [-V] [-h]
+            [-D] [-d] [-V] [-h]
