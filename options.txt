@@ -1,25 +1,55 @@
     -n varnish_logfile
-        The 'varnish name' indicating the mmap'd log file used by
-        varnishd. By default, the host name is assumed (as with
-        varnishd).
+        Same as the -n option for varnishd and other Varnish binaries;
+        i.e. the 'varnish name' indicating the path of the mmap'd file
+        used by varnishd for the shared memory log. By default, the
+        host name is assumed (as with varnishd). Also set by the
+        config parameter 'varnish.name'. The -n and -f options are
+        mutually exclusive.
+
+    -c config_file
+        Path of a configuration file. If /etc/trackrdrd.conf exists
+        and is readable, then its values are read first. If a file is
+        specified by the -c option, then that file is read next, and
+        config values that it specifies override values specified in
+        /etc/trackrdrd.conf. Finally, config values specified on the
+        command line override values specified in any config file. If
+        no config files or other command line options are set, default
+        config values hold.
+
+    -u user
+        Owner of the child process. By default, the child process runs
+        as 'nobody'. Also set by the config parameter 'user'.
+
+    -P pid_file
+        Path of a file written by the management process that contains
+        its process ID. By default, no PID file is written. Also set
+        by the config parameter 'pid.file'.
 
     -l log_file
         Log file for status, warning, debug and error messages. If '-'
         is specified, then log messages are written to stdout. By
         default, syslog(3) is used for logging. Log levels correspond
-        to the 'priorities' defined by syslog(3).
+        to the 'priorities' defined by syslog(3). Also set by the config
+        parameter 'log.file'.
 
     -y syslog_facility
         Set the syslog facility; legal values are 'user' or 'local0'
         through 'local7', and the default is 'local0'. Options -y and
-        -l are mutually exclusive.
+        -l are mutually exclusive. Also set by the config parameter
+        'syslog.facility'.
+
+    -D
+        Run as a non-demon single process (for testing and
+        debugging). By default, trackrdrd runs as a demon with a
+        management (parent) process and worker (child) process.
 
     -f varnishlog_bindump
         A binary dump of the Varnish SHM log produced by 'varnishlog
         -w'. If this option is specified, trackrdrd reads from the
         dump instead of a live SHM log (useful for debugging and
         replaying traffic). The options -f and -n are mutually
-        exclusive; -n is the default.
+        exclusive; -n is the default. Also set by the config parameter
+        'varnish.bindump'.
 
     -d
        Sets the log level to LOG_DEBUG. The default log level is
