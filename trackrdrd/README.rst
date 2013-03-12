@@ -182,6 +182,37 @@ non-default locations, as in this example::
 
 	$ PKG_CONFIG_PATH=/usr/local/lib/pkgconfig ./configure #...
 
+STARTUP AND SHUTDOWN
+====================
+
+On startup (unless the ``-D`` option is chosen), ``trackrdrd`` reads
+any config files specified, and then demonizes, spawning a management
+process that in turn spawns a worker process.
+
+The management process runs with the privileges of the user who
+started ``trackrdrd``; these privileges must be sufficient to write
+the PID file and log file, if required by the configuration.
+
+The worker process is started (and may be restarted) by the management
+process, and runs with the privileges of the user specified by the
+``-u`` option or configuration parameter ``user``. This process does
+the work of reading the Varnish log, and creates the worker threads
+that send data to message brokers.
+
+To stop ``trackrdrd``, send the ``TERM`` signal to the management
+process (e.g. with ``kill(1)``); the management process in turn shuts
+down the worker process. Other responses to signals are detailed below
+in SIGNALS_. If the worker process stops without being directed by the
+management process, then the management process starts another one, up
+to the limit defined by the config parameter ``restarts``.
+
+After being instructed to terminate, the child process continues
+reading data from the Varnish log for open records (request records
+for which ``ReqEnd`` has not yet been read), and sends all pending
+messages to the message broker, but does not open any new records on
+reading ``ReqStart``. It stops when all open records are complete and
+have been sent to message brokers.
+
 CONFIGURATION
 =============
 
@@ -253,3 +284,104 @@ complete, but it has not yet been sent to a message broker. The fields
 ``occ_hi`` is monotonic increasing; the rest are cumulative counters:
 
 .. include:: datalog.rst
+
+If worker threads are monitored, then the running state if logged for
+each worker thread, one of:
+
+* ``not started``
+* ``initializing``
+* ``running``
+* ``waiting``
+* ``shutting down``
+* ``exited``
+
+In normal operation, the state should be either ``running``, when the
+thread is actively reading finished data records and sending them to
+message brokers, or ``waiting``, when the threads has exhausted all
+pending records, or has not yet been awakened to handle more records.
+
+The remaining fields in a log line for a worker thread are cumulative
+counters:
+
+.. include:: workerlog.rst
+
+SIGNALS
+=======
+
+The management and child process respond to the following signals (all
+other signals have the default handlers):
+
+.. include:: signals.rst
+
+Shutdown proceeds as described above in `STARTUP AND SHUTDOWN`_.
+
+When signaled for graceful restart, the management process stops the
+running worker process and starts another one. This has the effect
+that the first process finishes reading data for open requests, and
+the second one begins reading data for new requests, so that few or no
+records are lost. The new process reads the same config files as the
+original worker process, and retains any command-line configuration,
+unless these values are overridden by config files. This allows for
+configuration changes "on-the-fly".
+
+On receiving signal ``USR1``, the worker process writes the contents
+of all records in the "open" or "done" states to the log (syslog, or
+log file specified by config), for troubleshooting or debugging.
+
+Where "abort with stacktrace" is specified above, a process write a
+stack trace to the log (syslog or otherwise) before aborting
+execution; in addition, the worker process executes the following
+actions:
+
+* dump the current contents of the data table (as for the ``USR1`` signal)
+* emit the monitoring stats to the log
+
+RETURN VALUES
+=============
+
+Both the management and worker processes return 0 on normal
+termination, and non-zero on error. When the worker process stops, the
+management process records its return value in the log, as well as any
+signal the worker process may have received.
+
+SEE ALSO
+========
+
+* ``varnishd(1)``
+
+COPYRIGHT AND LICENCE
+=====================
+
+For both the software and this document are governed by a BSD 2-clause
+licence.
+
+
+| Copyright (c) 2012-2013 UPLEX Nils Goroll Systemoptimierung
+| Copyright (c) 2012-2013 Otto Gmbh & Co KG
+| All rights reserved
+| Use only with permission
+
+| Authors: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+|          Nils Goroll <nils.goroll@uplex.de>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
