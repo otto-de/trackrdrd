@@ -9,7 +9,7 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2013-03-11
+:Date:   2013-03-12
 :Version: 2.0
 :Manual section: 3
 
@@ -215,3 +215,41 @@ once. All other config parameters have default values, and some of
 them correspond to command-line options, as shown below.
 
 .. include:: config.rst
+
+LOGGING AND MONITORING
+======================
+
+By default, ``trackrdrd`` uses ``syslog(3)`` for logging with facility
+``local0`` (unless otherwise specified by configuration as shown
+above). In addition to informational, error and warning messages about
+the running processes, monitoring information is periodically emitted
+to the log (as configured with the parameter
+``monitor.interval``). The monitoring logs have this form (at the
+``info`` log level, with additional formatting of the log lines,
+depending on how syslog is configured)::
+
+ Hash table: len=16384 seen=23591972 drop_reqstart=0 drop_vcl_log=0 drop_reqend=0 expired=0 evacuated=0 open=0 load=0.00 collisions=58534 insert_probes=58974 find_probes=2625 fail=0 occ_hi=591 occ_hi_this=1 
+ Data table: len=116384 nodata=11590516 submitted=12001456 wait_room=0 data_hi=3187 data_overflows=0 done=0 open=0 load=0.00 sent=12001456 reconnects=17 failed=0 occ_hi=4345 occ_hi_this=1 
+
+If monitoring of worker threads is switched on, then monitoring logs
+such as this are emitted for each thread::
+
+ Worker 1 (waiting): seen=576414 waits=86682 sent=576414 reconnects=0 restarts=0 failed=0
+
+The line prefixed by ``Hash table`` describes the hash table for open
+records -- records for request XIDs for which ``ReqStart`` has been
+read, but not yet ``ReqEnd``. The fields ``open``, ``load`` and
+``occ_hi_this`` are gauges (expressing a current state), and
+``occ_hi`` is monotonic increasing; all other fields are cumulative
+counters:
+
+.. include:: hashlog.rst
+
+The line prefixed by ``Data table`` describes the table of request
+records, including records in the open and done states -- for "done"
+records, ``ReqEnd`` has been read for the XID and the record is
+complete, but it has not yet been sent to a message broker. The fields
+``open``, ``done``, ``load`` and ``occ_hi_this`` are gauges, and
+``occ_hi`` is monotonic increasing; the rest are cumulative counters:
+
+.. include:: datalog.rst
