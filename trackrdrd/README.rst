@@ -9,7 +9,7 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2013-03-12
+:Date:   2013-03-13
 :Version: 2.0
 :Manual section: 3
 
@@ -25,6 +25,63 @@ DESCRIPTION
 The ``trackrdrd`` demon reads from the shared memory log of a running
 instance of Varnish, collects data relevant to tracking for the Otto
 project, and forwards the data to ActiveMQ message brokers.
+
+``trackrdrd`` reads data from ``VCL_Log`` entries that are displayed
+in this format by the ``varnishlog`` tool::
+
+  <FD> VCL_Log      c track <XID> <DATA>
+
+* ``FD``: file descriptor of a client connection
+* ``XID``: XID (request identifier) assigned by Varnish
+* ``DATA``: data to be logged
+
+``VCL_Log`` entries result from use of the ``log()`` function provided
+by the standard vmod ``std`` distributed with Varnish. The ``log()``
+call must include the prefix ``track``, the XID and the data to be
+logged. These log entries can be created with VCL code such as::
+
+  import std;
+
+  sub vcl_recv {
+      /* ... */
+      std.log("track " + req.xid + " url=" + req.url);
+      std.log("track " + req.xid + " http_Host=" + req.http.Host);
+      /* ... */
+  }
+
+Thus the data to be logged can be any information available in VCL.
+
+``trackrdrd`` collects all data logged for each XID, and combines
+their data fields with the ampersand (``&``) character. Note that (in
+Varnish 3) the same XID is assigned to a request and all requests that
+it includes via ESI; so ``trackrdrd`` combines all logged data for a
+request and its ESI includes.
+
+When the request processing for an XID is complete (i.e. when
+``trackrdrd`` reads ``ReqEnd`` for that XID), the data record is
+complete and ready to be forwarded to ActiveMQ message
+brokers. ``trackrdrd`` comprises a reader thread, which reads from the
+shared memory log, and one or more worker threads, which send records
+to one or more message brokers.
+
+In addition to the data logged for an XID, ``trackrdrd`` prepends a
+field ``XID=<xid>`` to the data, and appends a field ``req_endt=<t>``
+containg the epoch time at which request processing ended (from the
+``ReqEnd`` entry).
+
+EXAMPLE
+=======
+
+The VCL example shown above may result in log entries such as these::
+
+   29 ReqEnd       c 881964201 1363144515.280081511 1363144515.284164190 0.052356958 0.003843069 0.000239611
+   29 VCL_Log      c track 881964202 url=/index.html
+   29 VCL_Log      c track 881964202 http_Host=foo.bar.org
+   29 ReqEnd       c 881964202 1363144515.433386803 1363144515.436567307 0.149222612 0.000135660 0.003044844
+
+In this case, ``trackrdrd`` send this data to a message broker::
+
+  XID=881964202&url=/index.html&http_Host=foo.bar.org&req_endt=1363144515.436567307
 
 OPTIONS
 =======
