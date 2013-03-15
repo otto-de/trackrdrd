@@ -30,6 +30,7 @@
  */
 
 #include "amq_connection.h"
+#include <decaf/lang/exceptions/NullPointerException.h>
 
 #define CATCHALL                \
 catch (CMSException& cex) {     \
@@ -49,14 +50,27 @@ using namespace std;
 using namespace activemq::core;
 using namespace cms;
 using namespace decaf::lang;
+using namespace decaf::lang::exceptions;
 
 ActiveMQConnectionFactory* AMQ_Connection::factory = NULL;
 
 AMQ_Connection::AMQ_Connection(std::string& brokerURI) {
 
+    if (brokerURI.length() == 0)
+        throw IllegalArgumentException(__FILE__, __LINE__,
+                                       "Broker URI is empty");
+    
     factory = new ActiveMQConnectionFactory(brokerURI);
+    if (factory == NULL)
+        throw NullPointerException(__FILE__, __LINE__,
+                                   "Factory created for %s is NULL",
+                                   brokerURI.c_str());
        
     connection = factory->createConnection();
+    if (connection == NULL)
+        throw NullPointerException(__FILE__, __LINE__,
+                                   "Connection created for %s is NULL",
+                                   brokerURI.c_str());
     connection->start();
 }
 
@@ -67,6 +81,8 @@ AMQ_Connection::getConnection() {
 
 AMQ_Connection::~AMQ_Connection() {
     if (connection != NULL) {
+        connection->stop();
+        connection->close();
 	delete connection;
 	connection = NULL;
     }
