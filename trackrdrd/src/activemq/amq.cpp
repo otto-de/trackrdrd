@@ -71,15 +71,16 @@ AMQ_Worker::AMQ_Worker(Connection* cn, std::string& qName,
 }
 
 AMQ_Worker::~AMQ_Worker() {
-    if (producer != NULL) {
-	delete producer;
-	producer = NULL;
-    }
     if (queue != NULL) {
 	delete queue;
 	queue = NULL;
     }
+    if (producer != NULL) {
+	delete producer;
+	producer = NULL;
+    }
     if (session != NULL) {
+        session->stop();
 	delete session;
 	session = NULL;
     }
