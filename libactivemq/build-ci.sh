@@ -24,7 +24,5 @@ BUILDROOTPATH=$BUILDROOTPREFIX/$PKGNAME
 
 cd $WORKSPACE/libactivemq/rpmbuild
 rpmbuild \
-    -vv --define '_topdir '$WORKSPACE/libactivemq/rpmbuild \
+    --define '_topdir '$WORKSPACE/libactivemq/rpmbuild \
     --buildroot $BUILDROOTPATH -bb SPECS/activemq-cpp.spec
-[[ $? -ne 0 ]] && exit 1
-
