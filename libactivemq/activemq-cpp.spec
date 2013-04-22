@@ -7,7 +7,7 @@ BuildRequires: automake
 BuildRequires: openldap2
 BuildRequires: openldap2-devel
 Name: activemq-cpp-library
-Version: 3.5.0
+Version: 3.6.0
 Source0: %{name}-%{version}-src.tar.bz2
 Release: 1
 Summary: A C++ library to interact with Apache ActiveMQ
@@ -64,7 +64,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-, root, root)
 %{_bindir}/activemqcpp-config
 
-%{_includedir}/activemq-cpp-3.5.0
+%{_includedir}/activemq-cpp-3.6.0
 %{_libdir}/pkgconfig/*.pc
 %{_libdir}/*.so
 
