@@ -1,7 +1,7 @@
 #/bin/sh
 
 GLOBAL_STATUS=0
-VERSION=3.5.0
+VERSION=3.6.0
 
 URL=http://apache.openmirror.de/activemq/activemq-cpp/source
 TARBALL=activemq-cpp-library-$VERSION-src.tar.bz2
