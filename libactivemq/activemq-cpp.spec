@@ -1,11 +1,20 @@
 BuildRequires: gcc-c++
-BuildRequires: libapr1-devel
-BuildRequires: libapr-util1-devel 
-BuildRequires: libuuid-devel
 BuildRequires: autoconf
 BuildRequires: automake
+BuildRequires: libuuid-devel
+%if "%{_vendor}" == "suse"
+BuildRequires: libapr1-devel
+BuildRequires: libapr-util1-devel 
 BuildRequires: openldap2
 BuildRequires: openldap2-devel
+%endif
+%if "%{_vendor}" == "redhat"
+BuildRequires: apr-devel
+BuildRequires: apr-util-devel
+BuildRequires: openldap
+BuildRequires: openldap-devel
+BuildRequires: openssl-devel
+%endif
 Name: activemq-cpp-library
 Version: 3.6.0
 Source0: %{name}-%{version}-src.tar.bz2
