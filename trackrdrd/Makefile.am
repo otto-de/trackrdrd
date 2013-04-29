@@ -2,8 +2,10 @@ ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = src src/test
 
+if HAVE_RST2MAN
 dist_man_MANS = trackrdrd.3
 MAINTAINERCLEANFILES = $(dist_man_MANS)
+endif
 
 trackrdrd.3: README.rst
 if HAVE_RST2MAN
