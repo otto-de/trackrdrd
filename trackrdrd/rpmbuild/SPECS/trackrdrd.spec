@@ -9,10 +9,15 @@ URL: https://qspa.otto.de/confluence/display/LHOT/C-Implementierung
 Packager: LHOTSE Operations <lhotse-ops@dv.otto.de>
 #Source0: git@git.lhotse.ov.otto.de:lhotse-tracking-varnish
 
-# Varnish dependency currently can't be resolved
+# Enforce dependencies on RedHat (don't bother with SuSE)
+%if "%{_vendor}" == "suse"
 AutoReqProv: no
-#Requires: varnish_bestats
-#Requires: libactivemq
+%endif
+%if "%{_vendor}" == "redhat"
+BuildRequires: activemq-cpp-library-devel
+Requires: lhotse-varnish
+Requires: libactivemq-cpp6
+%endif
 #Requires: logrotate
 #Requires(post): /sbin/chkconfig
 #Requires(preun): /sbin/chkconfig
@@ -41,10 +46,16 @@ rm -rf %{_builddir}/*
 %defattr(-,root,root,-)
 %{prefix}/bin/trackrdrd
 %config %{prefix}/etc/sample.conf
+# no rst2man on RedHat, so there's no man page
+%if "%{_vendor}" == "suse"
 %doc %{prefix}/share/man/man3/%{name}.3
+%endif
 %config(noreplace) %{_sysconfdir}/%{name}.conf
 %config(noreplace) %{_sysconfdir}/init.d/%{name}
 
 %changelog
+* Mon Apr 29 2013  Geoff Simmons <geoff@uplex.de> 1.0
+- Fix dependencies for RedHat
+
 * Tue Nov 27 2012  Geoff Simmons <geoff@uplex.de> 0.1
 - First RPM build
