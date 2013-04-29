@@ -63,6 +63,7 @@ log_output(void)
         "sent=%u "
         "reconnects=%u "
         "failed=%u "
+        "restarts=%u "
         "occ_hi=%u "
         "occ_hi_this=%u ",
         dtbl.len,
@@ -77,6 +78,7 @@ log_output(void)
         dtbl.r_stats.sent,
         dtbl.r_stats.reconnects,
         dtbl.r_stats.failed,
+        dtbl.r_stats.restarts,
         dtbl.r_stats.occ_hi,
         dtbl.r_stats.occ_hi_this
             );
@@ -191,6 +193,10 @@ MON_StatsUpdate(stats_update_t update)
     case STATS_NODATA:
         dtbl.w_stats.nodata++;
         dtbl.r_stats.done--;
+        break;
+
+    case STATS_RESTART:
+        dtbl.r_stats.restarts++;
         break;
         
     default:
