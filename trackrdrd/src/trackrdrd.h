@@ -144,7 +144,8 @@ struct data_reader_stats_s {
     unsigned       	open;	
     unsigned		sent;		/* Sent successfully to MQ */
     unsigned		failed;		/* MQ send fails */
-    unsigned		reconnects;
+    unsigned		reconnects;	/* Reconnects to MQ */
+    unsigned		restarts;	/* Worker thread restarts */
     unsigned		occ_hi;		/* Occupancy high water mark */ 
     unsigned		occ_hi_this;	/* Occupancy high water mark
                                            this reporting interval*/
@@ -346,6 +347,8 @@ typedef enum {
     STATS_OCCUPANCY,
     /* ReqEnd seen, no data in the record */
     STATS_NODATA,
+    /* Worker thread restarted */
+    STATS_RESTART,
 } stats_update_t;
 
 void *MON_StatusThread(void *arg);
