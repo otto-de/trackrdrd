@@ -9,10 +9,9 @@ trackrdrd.3: README.rst
 if HAVE_RST2MAN
 	${RST2MAN} README.rst $@
 else
-	@echo "========================================"
-	@echo "You need rst2man installed to make dist"
-	@echo "========================================"
-	@false
+	@echo "==========================================="
+	@echo "rst2man not installed, no man pages created"
+	@echo "==========================================="
 endif
 
 include doxygen-include.am
