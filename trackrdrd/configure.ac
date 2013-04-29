@@ -71,6 +71,8 @@ AC_CHECK_FILE([$VARNISHSRC/include/varnishapi.h],
 )
 
 PKG_CHECK_MODULES([AMQ], [activemq-cpp])
+PKG_CHECK_MODULES([APR], [apr-1])
+PKG_CHECK_MODULES([APU], [apr-util-1])
 
 # From Varnish configure.ac
 # Now that we're done using the compiler to look for functions and
