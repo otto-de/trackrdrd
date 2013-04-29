@@ -359,6 +359,7 @@ WRK_Restart(void)
             wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
                 = 0;
             wrk->restarts++;
+            MON_StatsUpdate(STATS_RESTART);
             wrk->state = WRK_NOTSTARTED;
             if (pthread_create(&thread_data[i].worker, NULL, wrk_main, wrk)
                 != 0) {
