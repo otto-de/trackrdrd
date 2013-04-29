@@ -1,4 +1,5 @@
-INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) @AMQ_CFLAGS@
+INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) @AMQ_CFLAGS@ @APR_CFLAGS@ \
+	@APU_CFLAGS@
 
 bin_PROGRAMS = trackrdrd
 
@@ -29,7 +30,9 @@ trackrdrd_LDADD = \
 	$(VARNISHSRC)/lib/libvarnishapi/libvarnishapi.la \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
 	${PTHREAD_LIBS} \
-	@AMQ_LIBS@
+	@AMQ_LIBS@ \
+	@APR_LIBS@ \
+	@APU_LIBS@
 
 BUILT_SOURCES = revision.h usage.h
 MAINTAINERCLEANFILES = revision.h usage.h
