@@ -690,9 +690,6 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         return 1;
 
     wrk_running = WRK_Running();
-    if (wrk_running < config.nworkers)
-        LOG_Log(LOG_WARNING, "%d of %d workers running", wrk_running,
-            config.nworkers);
     
     /* spec != 'c' */
     if ((spec & VSL_S_CLIENT) == 0)
