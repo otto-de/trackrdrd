@@ -86,7 +86,11 @@ log_output(void)
     /* locking would be overkill */
     dtbl.r_stats.occ_hi_this = 0;
 
-    if (config.monitor_workers)
+    if (config.monitor_workers) {
+        int wrk_running = WRK_Running();
+        if (wrk_running < config.nworkers)
+            LOG_Log(LOG_WARNING, "%d of %d workers running", wrk_running,
+                config.nworkers);
         WRK_Stats();
 }
 
