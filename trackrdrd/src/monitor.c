@@ -92,6 +92,7 @@ log_output(void)
             LOG_Log(LOG_WARNING, "%d of %d workers running", wrk_running,
                 config.nworkers);
         WRK_Stats();
+    }
 }
 
 static void
