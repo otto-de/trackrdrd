@@ -47,9 +47,7 @@ rm -rf %{_builddir}/*
 %{prefix}/bin/trackrdrd
 %config %{prefix}/etc/sample.conf
 # no rst2man on RedHat, so there's no man page
-%if "%{_vendor}" == "suse"
 %doc %{prefix}/share/man/man3/%{name}.3
-%endif
 %config(noreplace) %{_sysconfdir}/%{name}.conf
 %config(noreplace) %{_sysconfdir}/init.d/%{name}
 
