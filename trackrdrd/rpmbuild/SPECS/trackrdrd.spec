@@ -16,7 +16,7 @@ AutoReqProv: no
 %if "%{_vendor}" == "redhat"
 BuildRequires: activemq-cpp-library-devel
 Requires: lhotse-varnish
-Requires: libactivemq-cpp6
+#Requires: libactivemq-cpp6
 %endif
 #Requires: logrotate
 #Requires(post): /sbin/chkconfig
