@@ -16,7 +16,7 @@ BuildRequires: openldap-devel
 BuildRequires: openssl-devel
 %endif
 Name: activemq-cpp-library
-Version: 3.6.0
+Version: 3.7.1
 Source0: %{name}-%{version}-src.tar.bz2
 Release: 1
 Summary: A C++ library to interact with Apache ActiveMQ
@@ -37,7 +37,6 @@ A C++ library to interact with Apache ActiveMQ.
 
 %package devel
 Requires: gcc-c++
-Requires: libactivemq-cpp6 = %{version}-%{release}
 Requires: libuuid-devel
 Summary: A C++ library to interact with Apache ActiveMQ
 Group: Development/Libraries/C and C++
@@ -56,7 +55,7 @@ sh ./autogen.sh
 %install
 %makeinstall
 rm $RPM_BUILD_ROOT/%{_bindir}/example
-rm $RPM_BUILD_ROOT/%{_libdir}/*.*a
+rm $RPM_BUILD_ROOT/%{_libdir}/*.so
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -73,8 +72,9 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-, root, root)
 %{_bindir}/activemqcpp-config
 
-%{_includedir}/activemq-cpp-3.6.0
+%{_includedir}/activemq-cpp-3.7.1
 %{_libdir}/pkgconfig/*.pc
-%{_libdir}/*.so
+%{_libdir}/*.a
+%{_libdir}/*.la
 
 %changelog
