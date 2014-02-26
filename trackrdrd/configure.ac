@@ -83,8 +83,8 @@ DEVELOPER_CFLAGS="-Wall -Wstrict-prototypes -Wmissing-prototypes -Wpointer-arith
 
 # Added for compiling C++ for ActiveMQ.
 # -Wstrict-prototypes, -Wmissing-prototypes & -Wnested-externs invalid for C++
-# activemq-cpp fails on -Wshadow
-DEVELOPER_CXXFLAGS="-Wall -Wpointer-arith -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wredundant-decls -Wformat"
+# activemq-cpp fails on -Wshadow and -Wcast-qual
+DEVELOPER_CXXFLAGS="-Wall -Wpointer-arith -Wreturn-type -Wwrite-strings -Wswitch -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wredundant-decls -Wformat"
 
 # Additional flags for GCC 4
 EXTRA_DEVELOPER_CFLAGS="-Wextra -Wno-missing-field-initializers -Wno-sign-compare"
