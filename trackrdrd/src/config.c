@@ -124,6 +124,7 @@ CONF_Add(const char *lval, const char *rval)
     confUnsigned("hash.mlt", hash_mlt);
     confUnsigned("nworkers", nworkers);
     confUnsigned("restarts", restarts);
+    confUnsigned("thread.restarts", restarts);
     confUnsigned("monitor.interval", monitor_interval);
 
     if (strcmp(lval, "maxdone") == 0) {
@@ -243,6 +244,7 @@ CONF_Init(void)
     config.mq_qname[0] = '\0';
     config.nworkers = 1;
     config.restarts = 1;
+    config.thread_restarts = 1;
     
     pw = getpwnam(DEFAULT_USER);
     if (pw == NULL)
@@ -348,5 +350,6 @@ CONF_Dump(void)
     confdump("mq.qname = %s", config.mq_qname);
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
+    confdump("thread.restarts = %u", config.thread_restarts);
     confdump("user = %s", config.user_name);
 }

@@ -135,6 +135,7 @@ struct data_writer_stats_s {
     unsigned		wait_room;	/* waits for space in dtbl */
     unsigned		data_hi;	/* max string length of entry->data */
     unsigned		data_overflows; /* config.maxdata exceeded */
+    unsigned		abandoned;	/* Worker threads abandoned */
 };
 
 /* stats protected by mutex */
@@ -302,6 +303,7 @@ struct config {
     char	mq_qname[BUFSIZ];
     unsigned	nworkers;
     unsigned	restarts;
+    unsigned	thread_restarts;
     char	user_name[BUFSIZ];
     uid_t	uid;
     gid_t	gid;

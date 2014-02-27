@@ -40,12 +40,16 @@
 #include "vas.h"
 
 static AMQ_Connection **connections;
+static AMQ_Worker **workers;
 static pthread_mutex_t connection_lock = PTHREAD_MUTEX_INITIALIZER;
 static unsigned connection = 0;
 
 const char *
 MQ_GlobalInit(void)
 {
+    workers = (AMQ_Worker **) calloc(sizeof (AMQ_Worker *), config.nworkers);
+    if (workers == NULL)
+        return strerror(errno);
     return AMQ_GlobalInit();
 }
 
@@ -74,10 +78,22 @@ MQ_InitConnections(void)
 const char *
 MQ_WorkerInit(void **priv)
 {
+    int i;
+    const char *err = NULL;
+    
     AZ(pthread_mutex_lock(&connection_lock));
-    AMQ_Connection *conn = connections[connection++ % config.nworkers];
+    i = connection++ % config.nworkers;
     AZ(pthread_mutex_unlock(&connection_lock));
-    return AMQ_WorkerInit((AMQ_Worker **) priv, conn, config.mq_qname);
+    AMQ_Connection *conn = connections[i];
+    if (conn == NULL)
+        err = AMQ_ConnectionInit(&conn, config.mq_uri[i % config.n_mq_uris]);
+    if (err != NULL)
+        return err;
+    connections[i] = conn;
+    err = AMQ_WorkerInit((AMQ_Worker **) priv, conn, config.mq_qname);
+    if (err == NULL)
+        workers[i] = (AMQ_Worker *) *priv;
+    return err;
 }
 
 const char *
@@ -91,14 +107,24 @@ MQ_Reconnect(void **priv)
 {
     const char *err;
     AMQ_Connection *conn;
+    int wrk_num;
 
     err = AMQ_WorkerShutdown((AMQ_Worker **) priv);
     if (err != NULL)
         return err;
+    for (int i = 0; i < config.nworkers; i++)
+        if (workers[i] == (AMQ_Worker *) *priv) {
+            wrk_num = i;
+            break;
+        }
     err = AMQ_ConnectionInit(&conn,
                              config.mq_uri[connection++ % config.n_mq_uris]);
-    if (err != NULL)
+    if (err != NULL) {
+        connections[wrk_num] = NULL;
         return err;
+    }
+    else
+        connections[wrk_num] = conn;
     return AMQ_WorkerInit((AMQ_Worker **) priv, conn, config.mq_qname);
 }
 
@@ -130,7 +156,8 @@ MQ_GlobalShutdown(void)
     const char *err;
 
     for (int i; i < config.n_mq_uris; i++)
-        if ((err = AMQ_ConnectionShutdown(connections[i])) != NULL)
+        if (connections[i] != NULL
+            && (err = AMQ_ConnectionShutdown(connections[i])) != NULL)
             return err;
     return AMQ_GlobalShutdown();
 }
