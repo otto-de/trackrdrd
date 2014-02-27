@@ -51,6 +51,7 @@ typedef enum {
     WRK_WAITING,
     WRK_SHUTTINGDOWN,
     WRK_EXITED,
+    WRK_ABANDONED,
     WRK_STATE_E_LIMIT
 } wrk_state_e;
 
@@ -60,7 +61,8 @@ static const char* statename[WRK_STATE_E_LIMIT] = {
     [WRK_RUNNING]	= "running",
     [WRK_WAITING]	= "waiting",
     [WRK_SHUTTINGDOWN]	= "shutting down",
-    [WRK_EXITED]	= "exited"
+    [WRK_EXITED]	= "exited",
+    [WRK_ABANDONED]	= "abandoned"
 };
 
 struct worker_data_s {
@@ -352,6 +354,14 @@ WRK_Restart(void)
         CHECK_OBJ_NOTNULL(thread_data[i].wrk_data, WORKER_DATA_MAGIC);
         wrk = thread_data[i].wrk_data;
         if (wrk->state == WRK_EXITED) {
+            if (config.thread_restarts != 0
+                && wrk->restarts == config.thread_restarts) {
+                LOG_Log(LOG_ALERT, "Worker %d: too many restarts, abandoning",
+                    wrk->id);
+                dtbl.w_stats.abandoned++;
+                wrk->state = WRK_ABANDONED;
+                continue;
+            }
             AZ(pthread_mutex_lock(&running_lock));
             exited--;
             AZ(pthread_mutex_unlock(&running_lock));
