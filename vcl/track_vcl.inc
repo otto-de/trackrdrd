@@ -79,3 +79,55 @@ sub vcl_fetch_track {
         }
 }
 
+sub vcl_deliver_track {
+  if (req.http.X-Trackable) {
+    # Track the response code
+    std.log ("track " + req.xid + " http_RC=" + resp.status);
+
+    if (resp.http.Set-Cookie) {
+      # extract Set-Cookie key/values as for Cookie, see above
+      unset req.http.X-Tracking-Cookie;
+      unset req.http.X-Cookie-Extract;
+
+      # track Set-Cookie BrowserId
+      set req.http.X-Cookie-Extract
+        = header.get (resp.http.Set-Cookie, "BrowserId");
+      if (req.http.X-Cookie-Extract) {
+        set req.http.X-Tracking-Cookie
+          = regsub (req.http.X-Cookie-Extract,
+                    "^.*(BrowserId\s*=\s*[0-9a-f]+).*$", "\1");
+      }
+
+      # track Set-Cookie trackingDisabled
+      set req.http.X-Cookie-Extract
+        = header.get (resp.http.Set-Cookie, "trackingDisabled");
+      if (req.http.X-Cookie-Extract) {
+        if (req.http.X-Tracking-Cookie) {
+          set req.http.X-Tracking-Cookie = req.http.X-Tracking-Cookie + ";";
+        }
+        else {
+          set req.http.X-Tracking-Cookie = "";
+        }
+        set req.http.X-Tracking-Cookie = req.http.X-Tracking-Cookie
+          + regsub (req.http.X-Cookie-Extract,
+                    "^.*(trackingDisabled\s*=\s*[^;]+).*$", "\1");
+      }
+
+      if (req.http.X-Tracking-Cookie) {
+        std.log ("track " + req.xid + " http_Set-Cookie="
+                  + urlcode.encode (req.http.X-Tracking-Cookie));
+      }
+    }
+
+    if (resp.http.Cache-Control) {
+      std.log ("track " + req.xid + " http_Cache_Control="
+               + urlcode.encode (resp.http.Cache-Control));
+    }
+
+    if (resp.http.Expires) {
+      std.log ("track " + req.xid + " http_Expires="
+               + urlcode.encode (resp.http.Expires));
+    }
+  }
+}
+
