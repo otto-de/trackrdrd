@@ -849,7 +849,7 @@ vsm_name(struct VSM_data *vd)
 void
 CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
 {
-    int errnum;
+    int errnum, giveup = 0;;
     const char *errmsg;
     pthread_t monitor;
     struct passwd *pw;
@@ -972,10 +972,16 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     while (VSL_Dispatch(vd, OSL_Track, NULL) > 0)
         if (term || !endless)
             break;
-        else if (WRK_Exited() > 0) {
+        else if (dtbl.w_stats.abandoned == config.nworkers) {
+            LOG_Log0(LOG_ALERT, "All worker threads abandoned, giving up");
+            giveup = 1;
+            break;
+        }
+        else if (WRK_Exited() - dtbl.w_stats.abandoned > 0) {
             if ((errnum = WRK_Restart()) != 0) {
                 LOG_Log(LOG_ALERT, "Cannot restart worker threads, giving up "
                     "(%s)", strerror(errnum));
+                giveup = 1;
                 break;
             }
         }
@@ -986,6 +992,8 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
 
     if (term)
         LOG_Log0(LOG_INFO, "Termination signal received");
+    else if (giveup)
+        LOG_Log0(LOG_INFO, "Terminating due to worker thread failure");
     else if (endless)
         LOG_Log0(LOG_WARNING, "Varnish log closed");
 

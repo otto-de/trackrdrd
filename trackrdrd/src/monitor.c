@@ -64,6 +64,7 @@ log_output(void)
         "reconnects=%u "
         "failed=%u "
         "restarts=%u "
+        "abandoned=%u "
         "occ_hi=%u "
         "occ_hi_this=%u ",
         dtbl.len,
@@ -79,6 +80,7 @@ log_output(void)
         dtbl.r_stats.reconnects,
         dtbl.r_stats.failed,
         dtbl.r_stats.restarts,
+        dtbl.w_stats.abandoned,
         dtbl.r_stats.occ_hi,
         dtbl.r_stats.occ_hi_this
             );
