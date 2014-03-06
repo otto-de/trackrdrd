@@ -147,6 +147,7 @@ wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
             err = MQ_Send(*amq_worker, entry->data, entry->end);
             if (err != NULL) {
                 wrk->fails++;
+                *amq_worker = NULL;
                 LOG_Log(LOG_ALERT,
                     "Worker %d: Failed to send data after reconnect: %s",
                     wrk->id, err);
