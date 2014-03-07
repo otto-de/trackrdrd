@@ -808,7 +808,8 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     }
     pptr = ptr;
 
-    if (WRK_Exited() > 0)
+    if (WRK_Exited() - dtbl.w_stats.abandoned > 0
+        || (config.nworkers > 0 && dtbl.w_stats.abandoned == config.nworkers))
         return 1;
     
     return 0;
