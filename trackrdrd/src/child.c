@@ -1000,7 +1000,8 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
 
     WRK_Halt();
     WRK_Shutdown();
-    AZ(MQ_GlobalShutdown());
+    if ((errmsg = MQ_GlobalShutdown()) != NULL)
+        LOG_Log(LOG_ALERT, "Message queue shutdown failed: %s", errmsg);
     if (config.monitor_interval > 0.0)
         MON_StatusShutdown(monitor);
     LOG_Log0(LOG_INFO, "Worker process exiting");
