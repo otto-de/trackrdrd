@@ -1,4 +1,4 @@
-INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC)
+INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) -I$(top_srcdir)/include
 
 TESTS = test_parse test_data test_hash test_mq test_spmcq		\
 	test_spmcq_loop.sh test_worker regress.sh
@@ -41,6 +41,7 @@ test_hash_LDADD = \
 	../monitor.$(OBJEXT) \
 	../parse.$(OBJEXT) \
 	../config.$(OBJEXT) \
+	../config_common.$(OBJEXT) \
 	../sandbox.$(OBJEXT)
 
 test_hash_CFLAGS = -DTEST_DRIVER

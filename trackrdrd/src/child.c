@@ -64,6 +64,7 @@
 #include "miniobj.h"
 
 #include "trackrdrd.h"
+#include "config_common.h"
 
 #define TRACK_TAGS "ReqStart,VCL_log,ReqEnd"
 
@@ -875,7 +876,7 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
         if (! EMPTY(cli_config_filename))
             LOG_Log(LOG_INFO, "Reading config from %s", cli_config_filename);
             /* XXX: CONF_ReadFile prints err messages to stderr */
-            if (CONF_ReadFile(cli_config_filename) != 0) {
+        if (CONF_ReadFile(cli_config_filename, CONF_Add) != 0) {
                 LOG_Log(LOG_ERR, "Error reading config from %s",
                     cli_config_filename);
                 exit(EXIT_FAILURE);

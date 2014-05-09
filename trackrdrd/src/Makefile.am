@@ -1,4 +1,4 @@
-INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC)
+INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) -I$(top_srcdir)/include
 
 bin_PROGRAMS = trackrdrd
 
@@ -9,6 +9,8 @@ trackrdrd_SOURCES = \
 	trackrdrd.c \
 	parse.c \
 	log.c \
+	config_common.h \
+	config_common.c \
 	config.c \
 	data.c \
 	monitor.c \
