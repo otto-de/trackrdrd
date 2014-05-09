@@ -40,6 +40,30 @@
 #include "vqueue.h"
 #include "varnishapi.h"
 
+/* message queue methods, typedefs match the interface in mq.h */
+typedef const char *global_init_f(unsigned nworkers, unsigned n_mq_uris,
+                                  char **mq_uri, char *mq_name);
+typedef const char *init_connections_f(void);
+typedef const char *worker_init_f(void **priv);
+typedef const char *send_f(void *priv, const char *data, unsigned len);
+typedef const char *version_f(void *priv, char *version);
+typedef const char *client_id_f(void *priv, char *clientID);
+typedef const char *reconnect_f(void **priv);
+typedef const char *worker_shutdown_f(void **priv);
+typedef const char *global_shutdown_f(void);
+
+struct mqf {
+    global_init_f	*global_init;
+    init_connections_f	*init_connections;
+    worker_init_f	*worker_init;
+    send_f		*send;
+    version_f		*version;
+    client_id_f		*client_id;
+    reconnect_f		*reconnect;
+    worker_shutdown_f	*worker_shutdown;
+    global_shutdown_f	*global_shutdown;
+} mqf;
+
 /* assert.c */
 
 void ASRT_Fail(const char *func, const char *file, int line, const char *cond,
@@ -88,17 +112,6 @@ int WRK_Running(void);
 int WRK_Exited(void);
 void WRK_Halt(void);
 void WRK_Shutdown(void);
-
-/* mq.c */
-const char *MQ_GlobalInit(void);
-const char *MQ_InitConnections(void);
-const char *MQ_WorkerInit(void **priv);
-const char *MQ_Send(void *priv, const char *data, unsigned len);
-const char *MQ_Version(void *priv, char *version);
-const char *MQ_ClientID(void *priv, char *clientID);
-const char *MQ_Reconnect(void **priv);
-const char *MQ_WorkerShutdown(void **priv);
-const char *MQ_GlobalShutdown(void);
 
 /* data.c */
 typedef enum {
@@ -298,6 +311,7 @@ struct config {
     unsigned	hash_mlt;
 #define DEF_HASH_MLT 5
 
+    char	mq_module[BUFSIZ];
     unsigned	n_mq_uris;
     char	**mq_uri;
     char	mq_qname[BUFSIZ];

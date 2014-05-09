@@ -30,6 +30,7 @@
  */
 
 #include <string.h>
+#include <dlfcn.h>
 
 #include "minunit.h"
 
@@ -39,9 +40,43 @@
 /* Automake exit code for "skipped" in make check */
 #define EXIT_SKIPPED 77
 
+#define MQ_MODULE "../mq/activemq/.libs/libtrackrdr-activemq.so"
+
 int tests_run = 0;
 static char errmsg[BUFSIZ];
+static void *mqh;
 void *worker;
+
+static void
+init(void)
+{
+    char *err;
+
+    dlerror(); // to clear errors
+    mqh = dlopen(MQ_MODULE, RTLD_NOW);
+    if ((err = dlerror()) != NULL) {
+        fprintf(stderr, "error reading mq module %s: %s", MQ_MODULE, err);
+        exit(EXIT_FAILURE);
+    }
+
+#define METHOD(instm, intfm)                                            \
+    mqf.instm = dlsym(mqh, #intfm);                                     \
+    if ((err = dlerror()) != NULL) {                                    \
+        fprintf(stderr, "error loading mq method %s: %s", #intfm, err); \
+        exit(EXIT_FAILURE);                                             \
+    }
+#include "../methods.h"
+#undef METHOD
+}
+
+static void
+fini(void)
+{
+    if (dlclose(mqh) != 0) {
+        fprintf(stderr, "Error closing mq module %s: %s", MQ_MODULE, dlerror());
+        exit(EXIT_FAILURE);
+    }
+}
 
 /* N.B.: Always run the tests in this order */
 static char
@@ -51,7 +86,17 @@ static char
 
     printf("... testing MQ global initialization\n");
 
-    err = MQ_GlobalInit();
+    config.n_mq_uris = 1;
+    config.nworkers = 1;
+    config.mq_uri = (char **) malloc(sizeof(char **));
+    AN(config.mq_uri);
+    config.mq_uri[0] = (char *) malloc(strlen("tcp://localhost:61616") + 1);
+    AN(config.mq_uri[0]);
+    strcpy(config.mq_uri[0], "tcp://localhost:61616");
+    strcpy(config.mq_qname, "lhoste/tracking/test");
+
+    err = mqf.global_init(config.nworkers, config.n_mq_uris, config.mq_uri,
+                          config.mq_qname);
     sprintf(errmsg, "MQ_GlobalInit: %s", err);
     mu_assert(errmsg, err == NULL);
 
@@ -65,16 +110,7 @@ static char
 
     printf("... testing MQ connection initialization\n");
 
-    config.n_mq_uris = 1;
-    config.nworkers = 1;
-    config.mq_uri = (char **) malloc(sizeof(char **));
-    AN(config.mq_uri);
-    config.mq_uri[0] = (char *) malloc(strlen("tcp://localhost:61616") + 1);
-    AN(config.mq_uri[0]);
-    strcpy(config.mq_uri[0], "tcp://localhost:61616");
-    
-    strcpy(config.mq_qname, "lhoste/tracking/test");
-    err = MQ_InitConnections();
+    err = mqf.init_connections();
     if (err != NULL && strstr(err, "Connection refused") != NULL) {
         printf("Connection refused, ActiveMQ assumed not running\n");
         exit(EXIT_SKIPPED);
@@ -92,7 +128,7 @@ static const char
 
     printf("... test worker init\n");
 
-    err = MQ_WorkerInit(&worker);
+    err = mqf.worker_init(&worker);
     sprintf(errmsg, "MQ_WorkerInit: %s", err);
     mu_assert(errmsg, err == NULL);
 
@@ -110,7 +146,7 @@ static const char
     printf("... testing version info\n");
 
     mu_assert("MQ_Version: worker is NULL before call", worker != NULL);
-    err = MQ_Version(worker, version);
+    err = mqf.version(worker, version);
     sprintf(errmsg, "MQ_Version: %s", err);
     mu_assert(errmsg, err == NULL);
     mu_assert("MQ_Version: version is empty", version[0] != '\0');
@@ -127,7 +163,7 @@ static const char
     printf("... testing client ID info\n");
 
     mu_assert("MQ_ClientID: worker is NULL before call", worker != NULL);
-    err = MQ_ClientID(worker, clientID);
+    err = mqf.client_id(worker, clientID);
     sprintf(errmsg, "MQ_Version: %s", err);
     mu_assert(errmsg, err == NULL);
     mu_assert("MQ_Version: client ID is empty", clientID[0] != '\0');
@@ -143,7 +179,7 @@ static const char
     printf("... testing message send\n");
 
     mu_assert("MQ_Send: worker is NULL before call", worker != NULL);
-    err = MQ_Send(worker, "foo bar baz quux", 16);
+    err = mqf.send(worker, "foo bar baz quux", 16);
     sprintf(errmsg, "MQ_Send: %s", err);
     mu_assert(errmsg, err == NULL);
 
@@ -158,13 +194,13 @@ static const char
     printf("... testing worker shutdown\n");
 
     mu_assert("MQ_WorkerShutdown: worker is NULL before call", worker != NULL);
-    err = MQ_WorkerShutdown(&worker);
+    err = mqf.worker_shutdown(&worker);
     sprintf(errmsg, "MQ_WorkerShutdown: %s", err);
     mu_assert(errmsg, err == NULL);
 
     mu_assert("Worker not NULL after shutdown", worker == NULL);
     
-    err = MQ_Send(worker, "foo bar baz quux", 16);
+    err = mqf.send(worker, "foo bar baz quux", 16);
     mu_assert("No failure on MQ_Send after worker shutdown", err != NULL);
 
     return NULL;
@@ -176,7 +212,7 @@ static const char
     const char *err;
 
     printf("... testing global shutdown\n");
-    err = MQ_GlobalShutdown();
+    err = mqf.global_shutdown();
     sprintf(errmsg, "MQ_GlobalShutdown: %s", err);
     mu_assert(errmsg, err == NULL);
 
@@ -186,6 +222,7 @@ static const char
 static const char
 *all_tests(void)
 {
+    init();
     mu_run_test(test_global_init);
     mu_run_test(test_init_connection);
     mu_run_test(test_worker_init);
@@ -194,6 +231,7 @@ static const char
     mu_run_test(test_send);
     mu_run_test(test_worker_shutdown);
     mu_run_test(test_global_shutdown);
+    fini();
     return NULL;
 }
 

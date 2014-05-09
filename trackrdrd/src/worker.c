@@ -103,12 +103,12 @@ wrk_log_connection(void *amq_worker, unsigned id)
     const char *err;
     char version[VERSION_LEN], clientID[CLIENT_ID_LEN];
 
-    err = MQ_Version(amq_worker, version);
+    err = mqf.version(amq_worker, version);
     if (err != NULL) {
         LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ version", id, err);
         version[0] = '\0';
     }
-    err = MQ_ClientID(amq_worker, clientID);
+    err = mqf.client_id(amq_worker, clientID);
     if (err != NULL) {
         LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ client ID", id, err);
         clientID[0] = '\0';
@@ -127,12 +127,12 @@ wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
     AN(amq_worker);
 
     /* XXX: report entry->incomplete to backend ? */
-    err = MQ_Send(*amq_worker, entry->data, entry->end);
+    err = mqf.send(*amq_worker, entry->data, entry->end);
     if (err != NULL) {
         LOG_Log(LOG_WARNING, "Worker %d: Failed to send data: %s",
             wrk->id, err);
         LOG_Log(LOG_INFO, "Worker %d: Reconnecting", wrk->id);
-        err = MQ_Reconnect(amq_worker);
+        err = mqf.reconnect(amq_worker);
         if (err != NULL) {
             *amq_worker = NULL;
             LOG_Log(LOG_ALERT, "Worker %d: Reconnect failed (%s)", wrk->id,
@@ -144,7 +144,7 @@ wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
             wrk->reconnects++;
             wrk_log_connection(*amq_worker, wrk->id);
             MON_StatsUpdate(STATS_RECONNECT);
-            err = MQ_Send(*amq_worker, entry->data, entry->end);
+            err = mqf.send(*amq_worker, entry->data, entry->end);
             if (err != NULL) {
                 wrk->fails++;
                 *amq_worker = NULL;
@@ -188,7 +188,7 @@ static void
     CHECK_OBJ_NOTNULL(wrk, WORKER_DATA_MAGIC);
     wrk->state = WRK_INITIALIZING;
 
-    err = MQ_WorkerInit(&amq_worker);
+    err = mqf.worker_init(&amq_worker);
     if (err != NULL) {
         LOG_Log(LOG_ALERT, "Worker %d: Cannot initialize queue connection: %s",
             wrk->id, err);
@@ -262,7 +262,7 @@ static void
         }
 
         wrk->status = EXIT_SUCCESS;
-        err = MQ_WorkerShutdown(&amq_worker);
+        err = mqf.worker_shutdown(&amq_worker);
         if (err != NULL) {
             LOG_Log(LOG_ALERT, "Worker %d: MQ worker shutdown failed: %s",
                 wrk->id, err);
