@@ -325,7 +325,6 @@ struct config {
 
 void CONF_Init(void);
 int CONF_Add(const char *lval, const char *rval);
-int CONF_ReadFile(const char *file);
 int CONF_ReadDefault(void);
 void CONF_Dump(void);
 

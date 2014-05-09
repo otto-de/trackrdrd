@@ -69,6 +69,7 @@
 #include "miniobj.h"
 
 #include "trackrdrd.h"
+#include "config_common.h"
 #include "revision.h"
 #include "usage.h"
 
@@ -273,7 +274,7 @@ main(int argc, char * const *argv)
     if (c_arg) {
         strcpy(cli_config_filename, c_arg);
         printf("Reading config from %s\n", c_arg);
-        if (CONF_ReadFile(c_arg) != 0)
+        if (CONF_ReadFile(c_arg, CONF_Add) != 0)
             exit(EXIT_FAILURE);
     }
         
