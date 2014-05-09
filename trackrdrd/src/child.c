@@ -52,6 +52,7 @@
 #include <pwd.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <dlfcn.h>
 
 #include "vsb.h"
 #include "vpf.h"
@@ -854,6 +855,7 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     const char *errmsg;
     pthread_t monitor;
     struct passwd *pw;
+    void *mqh;
 
     AZ(pthread_mutexattr_init(&attr_lock));
     AZ(pthread_condattr_init(&attr_cond));
@@ -884,6 +886,28 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     pw = getpwuid(geteuid());
     AN(pw);
     LOG_Log(LOG_INFO, "Running as %s", pw->pw_name);
+
+    /* read messaging module */
+    if (config.mq_module[0] == '\0') {
+        LOG_Log0(LOG_ALERT, "mq.module not found in config (required)");
+        exit(EXIT_FAILURE);
+    }
+    dlerror(); // to clear errors
+    mqh = dlopen(config.mq_module, RTLD_NOW);
+    if ((errmsg = dlerror()) != NULL) {
+        LOG_Log(LOG_ALERT, "error reading mq module %s: %s", config.mq_module,
+                errmsg);
+        exit(EXIT_FAILURE);
+    }
+
+#define METHOD(instm, intfm)                                            \
+    mqf.instm = dlsym(mqh, #intfm);                                     \
+    if ((errmsg = dlerror()) != NULL) {                                 \
+        LOG_Log(LOG_ALERT, "error loading mq method %s: %s", #intfm, errmsg); \
+        exit(EXIT_FAILURE);                                             \
+    }
+#include "methods.h"
+#undef METHOD
 
     /* install signal handlers */
     dump_action.sa_handler = dump;
@@ -925,13 +949,14 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     else
         LOG_Log0(LOG_INFO, "Monitoring thread not running");
 
-    errmsg = MQ_GlobalInit();
+    errmsg = mqf.global_init(config.nworkers, config.n_mq_uris, config.mq_uri,
+                             config.mq_qname);
     if (errmsg != NULL) {
         LOG_Log(LOG_ERR, "Cannot initialize message broker access: %s", errmsg);
         exit(EXIT_FAILURE);
     }
 
-    errmsg = MQ_InitConnections();
+    errmsg = mqf.init_connections();
     if (errmsg != NULL) {
         LOG_Log(LOG_ERR, "Cannot initialize message broker connections: %s",
             errmsg);
@@ -1000,8 +1025,11 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
 
     WRK_Halt();
     WRK_Shutdown();
-    if ((errmsg = MQ_GlobalShutdown()) != NULL)
+    if ((errmsg = mqf.global_shutdown()) != NULL)
         LOG_Log(LOG_ALERT, "Message queue shutdown failed: %s", errmsg);
+    if (dlclose(mqh) != 0)
+        LOG_Log(LOG_ALERT, "Error closing mq module %s: %s", config.mq_module,
+                dlerror());
     if (config.monitor_interval > 0.0)
         MON_StatusShutdown(monitor);
     LOG_Log0(LOG_INFO, "Worker process exiting");

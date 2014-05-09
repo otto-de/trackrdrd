@@ -31,6 +31,7 @@
 
 #include <string.h>
 #include <stdbool.h>
+#include <dlfcn.h>
 
 #include "minunit.h"
 
@@ -48,11 +49,45 @@
 
 #define NWORKERS 5
 
+#define MQ_MODULE "../mq/activemq/.libs/libtrackrdr-activemq.so"
+
 #define URI1 "tcp://localhost:61616?wireFormat.maxInactivityDuration=0"
 #define URI2 "tcp://localhost:61616?connection.sendTimeout=1000&wireFormat.maxInactivityDuration=0"
 
 int tests_run = 0;
 static char errmsg[BUFSIZ];
+static void *mqh;
+
+static void
+init(void)
+{
+    char *err;
+
+    dlerror(); // to clear errors
+    mqh = dlopen(MQ_MODULE, RTLD_NOW);
+    if ((err = dlerror()) != NULL) {
+        fprintf(stderr, "error reading mq module %s: %s", MQ_MODULE, err);
+        exit(EXIT_FAILURE);
+    }
+
+#define METHOD(instm, intfm)                                            \
+    mqf.instm = dlsym(mqh, #intfm);                                     \
+    if ((err = dlerror()) != NULL) {                                    \
+        fprintf(stderr, "error loading mq method %s: %s", #intfm, err); \
+        exit(EXIT_FAILURE);                                             \
+    }
+#include "../methods.h"
+#undef METHOD
+}
+
+static void
+fini(void)
+{
+    if (dlclose(mqh) != 0) {
+        fprintf(stderr, "Error closing mq module %s: %s", MQ_MODULE, dlerror());
+        exit(EXIT_FAILURE);
+    }
+}
 
 /* N.B.: Always run this test first */
 static char
@@ -79,11 +114,12 @@ static char
     AN(config.mq_uri[1]);
     strcpy(config.mq_uri[1], URI2);
     
-    error = MQ_GlobalInit();
+    error = mqf.global_init(config.nworkers, config.n_mq_uris, config.mq_uri,
+                            config.mq_qname);
     sprintf(errmsg, "MQ_GlobalInit failed: %s", error);
     mu_assert(errmsg, error == NULL);
     
-    error = MQ_InitConnections();
+    error = mqf.init_connections();
     if (error != NULL && strstr(error, "Connection refused") != NULL) {
         printf("Connection refused, ActiveMQ assumed not running\n");
         exit(EXIT_SKIPPED);
@@ -135,7 +171,7 @@ static const char
     WRK_Halt();
     WRK_Shutdown();
 
-    AZ(MQ_GlobalShutdown());
+    AZ(mqf.global_shutdown());
     LOG_Close();
 
     return NULL;
@@ -144,8 +180,10 @@ static const char
 static const char
 *all_tests(void)
 {
+    init();
     mu_run_test(test_worker_init);
     mu_run_test(test_worker_run);
+    fini();
     return NULL;
 }
 
