@@ -44,6 +44,7 @@
 
 #include "trackrdrd.h"
 #include "libvarnish.h"
+#include "config_common.h"
 
 #define DEFAULT_USER "nobody"
 
@@ -195,30 +196,6 @@ CONF_Add(const char *lval, const char *rval)
     return EINVAL;
 }
 
-static int
-conf_ParseLine(char *ptr, char **lval, char **rval)
-{
-    char *endlval;
-    
-    *lval = ptr;
-    while(*++ptr && !isspace(*ptr) && *ptr != '=')
-        ;
-    if (*ptr == '\0')
-        return(1);
-    endlval = ptr;
-    while(isspace(*ptr) && *++ptr)
-        ;
-    if (ptr == '\0' || *ptr != '=')
-        return(1);
-    while(*++ptr && isspace(*ptr))
-        ;
-    if (ptr == '\0')
-        return(1);
-    *endlval = '\0';
-    *rval = ptr;
-    return(0);
-}
-
 void
 CONF_Init(void)
 {
@@ -257,56 +234,6 @@ CONF_Init(void)
     config.gid = pw->pw_gid;
 }
 
-int
-CONF_ReadFile(const char *file) {
-    FILE *in;
-    char line[BUFSIZ];
-    int linenum = 0;
-
-    in = fopen(file, "r");
-    if (in == NULL) {
-        perror(file);
-        return(-1);
-    }
-    
-    while (fgets(line, BUFSIZ, in) != NULL) {
-        char orig[BUFSIZ];
-        
-        linenum++;
-        char *comment = strchr(line, '#');
-        if (comment != NULL)
-            *comment = '\0';
-        if (strlen(line) == 0)
-            continue;
-    
-        char *ptr = line + strlen(line) - 1;
-        while (ptr != line && isspace(*ptr))
-            --ptr;
-        ptr[isspace(*ptr) ? 0 : 1] = '\0';
-        if (strlen(line) == 0)
-            continue;
-
-        ptr = line;
-        while (isspace(*ptr) && *++ptr)
-            ;
-        strcpy(orig, ptr);
-        char *lval, *rval;
-        if (conf_ParseLine(ptr, &lval, &rval) != 0) {
-            fprintf(stderr, "Cannot parse %s line %d: '%s'\n", file, linenum,
-                    orig);
-            return(-1);
-        }
-
-        int ret;
-        if ((ret = CONF_Add((const char *) lval, (const char *) rval)) != 0) {
-            fprintf(stderr, "Error in %s line %d (%s): '%s'\n", file, linenum,
-                strerror(ret), orig);
-            return(-1);
-        }
-    }
-    return(0);
-}
-
 /* XXX: stdout is /dev/null in child process */
 int
 CONF_ReadDefault(void)
@@ -315,7 +242,7 @@ CONF_ReadDefault(void)
         if (access(DEFAULT_CONFIG, R_OK) != 0)
             return(errno);
         printf("Reading config from %s\n", DEFAULT_CONFIG);
-        if (CONF_ReadFile(DEFAULT_CONFIG) != 0)
+        if (CONF_ReadFile(DEFAULT_CONFIG, CONF_Add) != 0)
             return -1;
     }
     return 0;
