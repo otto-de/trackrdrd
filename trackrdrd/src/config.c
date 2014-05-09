@@ -115,6 +115,7 @@ CONF_Add(const char *lval, const char *rval)
     confString("log.file", log_file);
     confString("varnish.bindump", varnish_bindump);
     confString("mq.qname", mq_qname);
+    confString("mq.module", mq_module);
 
     confUnsigned("maxopen.scale", maxopen_scale);
     confUnsigned("maxdata", maxdata);
@@ -238,6 +239,7 @@ CONF_Init(void)
     config.hash_ttl = DEF_HASH_TTL;
     config.hash_mlt = DEF_HASH_MLT;
 
+    config.mq_module[0] = '\0';
     config.n_mq_uris = 0;
     config.mq_uri = (char **) malloc (sizeof(char **));
     AN(config.mq_uri);
@@ -347,6 +349,7 @@ CONF_Dump(void)
     else
         LOG_Log0(LOG_DEBUG, "config: mq.uri = ");
     
+    confdump("mq.module = %s", config.mq_module);
     confdump("mq.qname = %s", config.mq_qname);
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
