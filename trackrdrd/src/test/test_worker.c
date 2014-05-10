@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -50,9 +50,7 @@
 #define NWORKERS 5
 
 #define MQ_MODULE "../mq/activemq/.libs/libtrackrdr-activemq.so"
-
-#define URI1 "tcp://localhost:61616?wireFormat.maxInactivityDuration=0"
-#define URI2 "tcp://localhost:61616?connection.sendTimeout=1000&wireFormat.maxInactivityDuration=0"
+#define MQ_CONFIG "activemq2.conf"
 
 int tests_run = 0;
 static char errmsg[BUFSIZ];
@@ -102,20 +100,9 @@ static char
     config.maxdone = 1024;
     config.maxdata = 1024;
     config.nworkers = NWORKERS;
-    strcpy(config.mq_qname, "lhoste/tracking/test");
+    strcpy(config.mq_config_file, MQ_CONFIG);
 
-    config.n_mq_uris = 2;
-    config.mq_uri = (char **) malloc(2 * sizeof(char**));
-    AN(config.mq_uri);
-    config.mq_uri[0] = (char *) malloc(strlen(URI1) + 1);
-    AN(config.mq_uri[0]);
-    strcpy(config.mq_uri[0], URI1);
-    config.mq_uri[1] = (char *) malloc(strlen(URI2) + 1);
-    AN(config.mq_uri[1]);
-    strcpy(config.mq_uri[1], URI2);
-    
-    error = mqf.global_init(config.nworkers, config.n_mq_uris, config.mq_uri,
-                            config.mq_qname);
+    error = mqf.global_init(config.nworkers, config.mq_config_file);
     sprintf(errmsg, "MQ_GlobalInit failed: %s", error);
     mu_assert(errmsg, error == NULL);
     

@@ -29,9 +29,7 @@
  *
  */
 
-/* XXX: should be: MQ_GlobalInit(unsigned nworkers, const char config_fname); */
-const char *MQ_GlobalInit(unsigned nworkers, unsigned n_mq_uris, char **mq_uri,
-    char *mq_qname);
+const char *MQ_GlobalInit(unsigned nworkers, const char *config_fname);
 const char *MQ_InitConnections(void);
 const char *MQ_WorkerInit(void **priv);
 const char *MQ_Send(void *priv, const char *data, unsigned len);

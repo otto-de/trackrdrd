@@ -41,6 +41,7 @@
 #define EXIT_SKIPPED 77
 
 #define MQ_MODULE "../mq/activemq/.libs/libtrackrdr-activemq.so"
+#define MQ_CONFIG "activemq.conf"
 
 int tests_run = 0;
 static char errmsg[BUFSIZ];
@@ -86,17 +87,9 @@ static char
 
     printf("... testing MQ global initialization\n");
 
-    config.n_mq_uris = 1;
     config.nworkers = 1;
-    config.mq_uri = (char **) malloc(sizeof(char **));
-    AN(config.mq_uri);
-    config.mq_uri[0] = (char *) malloc(strlen("tcp://localhost:61616") + 1);
-    AN(config.mq_uri[0]);
-    strcpy(config.mq_uri[0], "tcp://localhost:61616");
-    strcpy(config.mq_qname, "lhoste/tracking/test");
-
-    err = mqf.global_init(config.nworkers, config.n_mq_uris, config.mq_uri,
-                          config.mq_qname);
+    strcpy(config.mq_config_file, MQ_CONFIG);
+    err = mqf.global_init(config.nworkers, config.mq_config_file);
     sprintf(errmsg, "MQ_GlobalInit: %s", err);
     mu_assert(errmsg, err == NULL);
 
