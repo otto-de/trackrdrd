@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -29,6 +29,7 @@
  *
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
@@ -36,6 +37,7 @@
 #include <assert.h>
 
 #include "mq.h"
+#include "config_common.h"
 #include "amq.h"
 #include "amq_connection.h"
 
@@ -45,24 +47,46 @@ static pthread_mutex_t connection_lock = PTHREAD_MUTEX_INITIALIZER;
 static unsigned connection = 0;
 static unsigned nwrk = 0;
 
-/* XXX: Obtain from a config file for activemq */
-static unsigned n_uris;
+static unsigned n_uris = 0;
 static char **uri;
-static char *qname;
+static char qname[BUFSIZ];
+
+static int
+conf_add(const char *lval, const char *rval)
+{
+    if (strcmp(lval, "mq.qname") == 0) {
+        strcpy(qname, rval);
+        return(0);
+    }
+
+    if (strcmp(lval, "mq.uri") == 0) {
+        int n = n_uris++;
+        uri = (char **) realloc(uri, n_uris * sizeof(char **));
+        if (uri == NULL)
+            return(errno);
+        uri[n] = (char *) malloc(strlen(rval) + 1);
+        if (uri[n] == NULL)
+            return(errno);
+        strcpy(uri[n], rval);
+        return(0);
+    }
+
+    return EINVAL;
+}
 
 const char *
-MQ_GlobalInit(unsigned nworkers, unsigned n_mq_uris, char **mq_uri,
-    char *mq_qname)
+MQ_GlobalInit(unsigned nworkers, const char *config_fname)
 {
     workers = (AMQ_Worker **) calloc(sizeof (AMQ_Worker *), nworkers);
     if (workers == NULL)
         return strerror(errno);
     nwrk = nworkers;
 
-    /* XXX: read these from config file for activemq */
-    n_uris = n_mq_uris;
-    uri = mq_uri;
-    qname = mq_qname;
+    uri = (char **) malloc (sizeof(char **));
+    if (uri == NULL)
+        return strerror(errno);
+    if (CONF_ReadFile(config_fname, conf_add) != 0)
+        return "Error reading config file for ActiveMQ";
 
     return AMQ_GlobalInit();
 }

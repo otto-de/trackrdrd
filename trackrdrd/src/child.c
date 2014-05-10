@@ -950,8 +950,7 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     else
         LOG_Log0(LOG_INFO, "Monitoring thread not running");
 
-    errmsg = mqf.global_init(config.nworkers, config.n_mq_uris, config.mq_uri,
-                             config.mq_qname);
+    errmsg = mqf.global_init(config.nworkers, config.mq_config_file);
     if (errmsg != NULL) {
         LOG_Log(LOG_ERR, "Cannot initialize message broker access: %s", errmsg);
         exit(EXIT_FAILURE);

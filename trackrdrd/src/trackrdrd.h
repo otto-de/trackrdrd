@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -41,8 +41,7 @@
 #include "varnishapi.h"
 
 /* message queue methods, typedefs match the interface in mq.h */
-typedef const char *global_init_f(unsigned nworkers, unsigned n_mq_uris,
-                                  char **mq_uri, char *mq_name);
+typedef const char *global_init_f(unsigned nworkers, const char *config_fname);
 typedef const char *init_connections_f(void);
 typedef const char *worker_init_f(void **priv);
 typedef const char *send_f(void *priv, const char *data, unsigned len);
@@ -312,9 +311,7 @@ struct config {
 #define DEF_HASH_MLT 5
 
     char	mq_module[BUFSIZ];
-    unsigned	n_mq_uris;
-    char	**mq_uri;
-    char	mq_qname[BUFSIZ];
+    char	mq_config_file[BUFSIZ];
     unsigned	nworkers;
     unsigned	restarts;
     unsigned	thread_restarts;

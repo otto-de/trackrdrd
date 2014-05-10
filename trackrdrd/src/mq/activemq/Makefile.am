@@ -5,11 +5,13 @@ pkglib_LTLIBRARIES = libtrackrdr-activemq.la
 
 libtrackrdr_activemq_la_SOURCES = \
 	$(top_srcdir)/include/mq.h \
+	$(top_srcdir)/include/config_common.h \
 	mq.c \
 	amq.h \
 	amq.cpp \
 	amq_connection.h \
-	amq_connection.cpp
+	amq_connection.cpp \
+	$(top_srcdir)/src/config_common.c
 
 libtrackrdr_activemq_la_LIBADD = \
 	${PTHREAD_LIBS} \
@@ -17,4 +19,4 @@ libtrackrdr_activemq_la_LIBADD = \
 	@APR_LIBS@ \
 	@APU_LIBS@
 
-libtrackrdr_activemq_la_LDFLAGS = -version-info 0:0:0
+libtrackrdr_activemq_la_LDFLAGS = -version-info 1:0:0

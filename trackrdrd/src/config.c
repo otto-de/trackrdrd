@@ -115,8 +115,8 @@ CONF_Add(const char *lval, const char *rval)
     confString("varnish.name", varnish_name);
     confString("log.file", log_file);
     confString("varnish.bindump", varnish_bindump);
-    confString("mq.qname", mq_qname);
     confString("mq.module", mq_module);
+    confString("mq.config_file", mq_config_file);
 
     confUnsigned("maxopen.scale", maxopen_scale);
     confUnsigned("maxdata", maxdata);
@@ -180,19 +180,6 @@ CONF_Add(const char *lval, const char *rval)
         return(EINVAL);
     }
 
-    if (strcmp(lval, "mq.uri") == 0) {
-        int n = config.n_mq_uris++;
-        config.mq_uri = (char **) realloc(config.mq_uri,
-            config.n_mq_uris * sizeof(char **));
-        if (config.mq_uri == NULL)
-            return(errno);
-        config.mq_uri[n] = (char *) malloc(strlen(rval) + 1);
-        if (config.mq_uri[n] == NULL)
-            return(errno);
-        strcpy(config.mq_uri[n], rval);
-        return(0);
-    }
-
     return EINVAL;
 }
 
@@ -217,10 +204,7 @@ CONF_Init(void)
     config.hash_mlt = DEF_HASH_MLT;
 
     config.mq_module[0] = '\0';
-    config.n_mq_uris = 0;
-    config.mq_uri = (char **) malloc (sizeof(char **));
-    AN(config.mq_uri);
-    config.mq_qname[0] = '\0';
+    config.mq_config_file[0] = '\0';
     config.nworkers = 1;
     config.restarts = 1;
     config.thread_restarts = 1;
@@ -270,14 +254,8 @@ CONF_Dump(void)
     confdump("hash.ttl = %u", config.hash_ttl);
     confdump("hash.mlt = %u", config.hash_mlt);
 
-    if (config.n_mq_uris > 0)
-        for (int i = 0; i < config.n_mq_uris; i++)
-            confdump("mq.uri = %s", config.mq_uri[i]);
-    else
-        LOG_Log0(LOG_DEBUG, "config: mq.uri = ");
-    
     confdump("mq.module = %s", config.mq_module);
-    confdump("mq.qname = %s", config.mq_qname);
+    confdump("mq.config_file = %s", config.mq_config_file);
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
     confdump("thread.restarts = %u", config.thread_restarts);
