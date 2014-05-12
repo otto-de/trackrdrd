@@ -192,11 +192,13 @@ MQ_WorkerShutdown(void **priv)
 const char *
 MQ_GlobalShutdown(void)
 {
-    const char *err;
-
-    for (int i; i < n_uris; i++)
-        if (connections[i] != NULL
-            && (err = AMQ_ConnectionShutdown(connections[i])) != NULL)
-            return err;
+    if (n_uris > 0) {
+        const char *err;
+        for (int i = 0; i < n_uris; i++)
+            if (connections[i] != NULL
+                && (err = AMQ_ConnectionShutdown(connections[i])) != NULL)
+                return err;
+        free(connections);
+    }
     return AMQ_GlobalShutdown();
 }
