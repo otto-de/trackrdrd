@@ -16,7 +16,7 @@ AutoReqProv: no
 %if "%{_vendor}" == "redhat"
 BuildRequires: activemq-cpp-library-devel
 Requires: lhotse-varnish
-#Requires: libactivemq-cpp6
+Requires: libtrackrdr-activemq
 %endif
 #Requires: logrotate
 #Requires(post): /sbin/chkconfig
@@ -28,6 +28,15 @@ This is the Varnish log tracking reader demon, which reads data
 intended for tracking from the Varnish shared memory log, collects all
 data for each XID, and sends each data record to an ActiveMQ message
 broker.
+
+%package -n libtrackrdr-activemq
+Summary: ActiveMQ implementation of the trackrdrd MQ interface
+Group: System Environment/Libraries
+Requires: libactivemq-cpp6
+
+%description -n libtrackrdr-activemq
+ActiveMQ implementation of the messaging interface for the Varnish log
+tracking reader
 
 %prep
 #Empty section.
@@ -51,7 +60,18 @@ rm -rf %{_builddir}/*
 %config(noreplace) %{_sysconfdir}/%{name}.conf
 %config(noreplace) %{_sysconfdir}/init.d/%{name}
 
+%post -n libtrackrdr-activemq -p /sbin/ldconfig
+
+%postun -n libtrackrdr-activemq -p /sbin/ldconfig
+
+%files -n libtrackrdr-activemq
+%defattr(-,root,root,-)
+%{prefix}/lib/trackrdrd/*
+
 %changelog
+* Mon May 12 2014  Geoff Simmons <groff@uplex.de> 3.0
+- Add package libtrackrdr-activemq, and adjust dependencies
+
 * Mon Apr 29 2013  Geoff Simmons <geoff@uplex.de> 1.0
 - Fix dependencies for RedHat
 
