@@ -4,9 +4,6 @@ GLOBAL_STATUS=0
 LHOTSE_VARNISH_PREFIX=/var/opt/varnish
 LHOTSE_TRACKING_PREFIX=/var/opt/varnish_tracking
 
-## required for static build
-export AMQ_LIBS=" -lpthread -ldl -luuid -lssl -lstdc++ -lapr-1 /usr/lib64/libactivemq-cpp.a "
-
 if [ ! -d "$WORKSPACE/lhotse-varnish-cache" ]; then
   git clone git@git.lhotse.ov.otto.de:lhotse-varnish-cache
 fi
