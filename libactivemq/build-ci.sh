@@ -1,9 +1,9 @@
 #/bin/sh
 
 GLOBAL_STATUS=0
-VERSION=3.8.1
+VERSION=3.8.2
 
-URL=http://apache.openmirror.de/activemq/activemq-cpp/source
+URL=http://apache.openmirror.de/activemq/activemq-cpp/$VERSION
 TARBALL=activemq-cpp-library-$VERSION-src.tar.bz2
 
 for DIR in BUILD BUILDROOT RPMS SOURCES SRPMS SPECS
@@ -25,4 +25,6 @@ BUILDROOTPATH=$BUILDROOTPREFIX/$PKGNAME
 cd $WORKSPACE/libactivemq/rpmbuild
 rpmbuild \
     --define '_topdir '$WORKSPACE/libactivemq/rpmbuild \
+    --define 'version '$VERSION \
+    --define 'build_number '$BUILD_NUMBER \
     --buildroot $BUILDROOTPATH -bb SPECS/activemq-cpp.spec
