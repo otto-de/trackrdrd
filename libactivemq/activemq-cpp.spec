@@ -55,7 +55,6 @@ sh ./autogen.sh
 %install
 %makeinstall
 rm $RPM_BUILD_ROOT/%{_bindir}/example
-rm $RPM_BUILD_ROOT/%{_libdir}/*.so
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -66,7 +65,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files -n libactivemq-cpp6
 %defattr(-, root, root)
-%{_libdir}/*.so.*
+%{_libdir}/*.so*
 
 %files devel
 %defattr(-, root, root)
