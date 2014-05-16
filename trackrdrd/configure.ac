@@ -144,5 +144,6 @@ AC_CONFIG_FILES([
 	src/Makefile
         src/test/Makefile
         src/mq/activemq/Makefile
+        src/mq/activemq/test/Makefile
 ])
 AC_OUTPUT
