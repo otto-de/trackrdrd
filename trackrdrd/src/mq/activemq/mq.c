@@ -124,14 +124,18 @@ MQ_WorkerInit(void **priv)
     ret = pthread_mutex_unlock(&connection_lock);
     assert(ret == 0);
     AMQ_Connection *conn = connections[i];
-    if (conn == NULL)
+    if (conn == NULL) {
         err = AMQ_ConnectionInit(&conn, uri[i % n_uris]);
-    if (err != NULL)
-        return err;
-    connections[i] = conn;
-    err = AMQ_WorkerInit((AMQ_Worker **) priv, conn, qname);
+        if (err != NULL)
+            return err;
+        else
+            connections[i] = conn;
+    }
+    err = AMQ_WorkerInit((AMQ_Worker **) priv, conn, qname, i);
     if (err == NULL)
         workers[i] = (AMQ_Worker *) *priv;
+    else
+        workers[i] = NULL;
     return err;
 }
 
@@ -148,23 +152,32 @@ MQ_Reconnect(void **priv)
     AMQ_Connection *conn;
     int wrk_num;
 
+    err = AMQ_GetNum((AMQ_Worker *) priv, &wrk_num);
+    if (err != NULL)
+        return err;
+    assert(wrk_num >= 0 && wrk_num < nwrk);
     err = AMQ_WorkerShutdown((AMQ_Worker **) priv);
     if (err != NULL)
         return err;
-    for (int i = 0; i < nwrk; i++)
-        if (workers[i] == (AMQ_Worker *) *priv) {
-            wrk_num = i;
-            break;
-        }
-    err = AMQ_ConnectionInit(&conn,
-                             uri[connection++ % n_uris]);
-    if (err != NULL) {
+    else
+        workers[wrk_num] = NULL;
+    if (connections[wrk_num] != NULL) {
+        err = AMQ_ConnectionShutdown(connections[wrk_num]);
+        if (err != NULL)
+            return err;
         connections[wrk_num] = NULL;
-        return err;
     }
+    err = AMQ_ConnectionInit(&conn, uri[connection++ % n_uris]);
+    if (err != NULL)
+        return err;
     else
         connections[wrk_num] = conn;
-    return AMQ_WorkerInit((AMQ_Worker **) priv, conn, qname);
+    err = AMQ_WorkerInit((AMQ_Worker **) priv, conn, qname, wrk_num);
+    if (err != NULL)
+        workers[wrk_num] = NULL;
+    else
+        workers[wrk_num] = (AMQ_Worker *) *priv;
+    return err;
 }
 
 const char *
@@ -182,23 +195,41 @@ MQ_ClientID(void *priv, char *clientID)
 const char *
 MQ_WorkerShutdown(void **priv)
 {
-    const char *err = AMQ_WorkerShutdown((AMQ_Worker **) priv);
+    const char *err;
+    int wrk_num;
+
+    err = AMQ_GetNum((AMQ_Worker *) *priv, &wrk_num);
+    if (err != NULL)
+        return err;
+    if (connections[wrk_num] != NULL) {
+        err = AMQ_ConnectionShutdown(connections[wrk_num]);
+        if (err != NULL)
+            return err;
+        connections[wrk_num] = NULL;
+    }
+    AMQ_WorkerShutdown((AMQ_Worker **) priv);
     if (err != NULL)
         return err;
     *priv = NULL;
+    workers[wrk_num] = NULL;
     return NULL;
 }
 
 const char *
 MQ_GlobalShutdown(void)
 {
-    if (n_uris > 0) {
-        const char *err;
-        for (int i = 0; i < n_uris; i++)
-            if (connections[i] != NULL
-                && (err = AMQ_ConnectionShutdown(connections[i])) != NULL)
-                return err;
-        free(connections);
-    }
+    const char *err;
+
+    if (n_uris > 0)
+        free(uri);
+
+    for (int i = 0; i < nwrk; i++)
+        if (connections[i] != NULL
+            && (err = AMQ_ConnectionShutdown(connections[i])) != NULL)
+            return err;
+
+    free(connections);
+    free(workers);
+
     return AMQ_GlobalShutdown();
 }
