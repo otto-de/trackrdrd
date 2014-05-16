@@ -52,13 +52,15 @@ private:
     Queue* queue;
     MessageProducer* producer;
     TextMessage* msg;
+    int num;
     AMQ_Worker() {};
 
 public:
     static void shutdown();
     
-    AMQ_Worker(Connection* connection, std::string& qName,
+    AMQ_Worker(Connection* connection, std::string& qName, int n,
         Session::AcknowledgeMode ackMode, int deliveryMode);
+    int getNum();
     virtual ~AMQ_Worker();
     void send(std::string& text);
     std::string getVersion();
@@ -74,10 +76,11 @@ extern "C" {
 
     const char *AMQ_GlobalInit(void);
     const char *AMQ_WorkerInit(AMQ_Worker **worker, AMQ_Connection *connection,
-        char *qName);
+                               char *qName, int num);
     const char *AMQ_Send(AMQ_Worker *worker, const char *data, unsigned len);
     const char *AMQ_Version(AMQ_Worker *worker, char *version);
     const char *AMQ_ClientID(AMQ_Worker *worker, char *clientID);
+    const char *AMQ_GetNum(AMQ_Worker *worker, int *num);
     const char *AMQ_WorkerShutdown(AMQ_Worker **worker);
     const char *AMQ_GlobalShutdown(void);
 
