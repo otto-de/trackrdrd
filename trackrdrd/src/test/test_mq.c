@@ -180,6 +180,23 @@ static const char
 }
 
 static const char
+*test_reconnect(void)
+{
+    const char *err;
+
+    printf("... testing MQ reconnect\n");
+
+    MASSERT0(worker != NULL, "MQ_Reconnect: worker is NULL before call");
+    err = mqf.reconnect(&worker);
+    VMASSERT(err == NULL, "MQ_Reconnect: %s", err);
+    MASSERT0(worker != NULL, "MQ_Reconnect: worker is NULL after call");
+    err = mqf.send(worker, "send after reconnect", 20);
+    VMASSERT(err == NULL, "MQ_Send() fails after reconnect: %s", err);
+
+    return NULL;
+}
+
+static const char
 *test_worker_shutdown(void)
 {
     const char *err;
@@ -222,6 +239,7 @@ static const char
     mu_run_test(test_version);
     mu_run_test(test_clientID);
     mu_run_test(test_send);
+    mu_run_test(test_reconnect);
     mu_run_test(test_worker_shutdown);
     mu_run_test(test_global_shutdown);
     fini();
