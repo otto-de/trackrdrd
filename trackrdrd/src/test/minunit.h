@@ -29,7 +29,13 @@
  *
  */
 
+#ifndef _MINUNIT_INCLUDED
+#define _MINUNIT_INCLUDED
+
 #include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
 
 /*-
  * Adapted from http://www.jera.com/techinfo/jtns/jtn002.html
@@ -43,28 +49,27 @@
 #define mu_run_test(test) do { const char *msg = test(); tests_run++; \
                                if (msg) return msg; } while (0)
 
-#define _massert(test, errmsg, msg, ...)                \
+char _mu_errmsg[BUFSIZ];
+
+#define _massert(test, msg, ...)                        \
     do {                                                \
         if (!(test)) {                                  \
-            sprintf((errmsg), (msg), __VA_ARGS__);      \
-            return (errmsg);                            \
+            sprintf((_mu_errmsg), (msg), __VA_ARGS__);  \
+            return (_mu_errmsg);                        \
         }                                               \
     } while(0)
 
-#define _massert0(test, errmsg, msg)            \
+#define _massert0(test, msg)                    \
     do {                                        \
         if (!(test)) {                          \
-            sprintf((errmsg), (msg));           \
-            return (errmsg);                    \
+            sprintf((_mu_errmsg), (msg));       \
+            return (_mu_errmsg);                \
         }                                       \
     } while(0)
 
-/* These assume that a global static char* errmsg is declared and
-   has allocated space. */
-#define VMASSERT(test, msg, ...) _massert((test),(errmsg),(msg),__VA_ARGS__)
-#define MASSERT0(test, msg)      _massert0((test),(errmsg),(msg))
+#define VMASSERT(test, msg, ...) _massert((test),(msg),__VA_ARGS__)
+#define MASSERT0(test, msg)      _massert0((test),(msg))
 
-/* This assumes #include <errno.h> and <string.h> */
 #define MASSERT(c)                                              \
     VMASSERT((c), "%s failed in %s at %s:%d (errno %d: %s)",    \
              #c, __func__, __FILE__, __LINE__, errno, strerror(errno))
@@ -97,3 +102,5 @@ main(int argc, char **argv)                            \
     }                                                  \
     exit(EXIT_SUCCESS);                                \
 }
+
+#endif
