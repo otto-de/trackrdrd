@@ -83,7 +83,6 @@ AMQ_Connection::getConnection() {
 
 AMQ_Connection::~AMQ_Connection() {
     if (connection != NULL) {
-        connection->stop();
         connection->close();
 	delete connection;
 	connection = NULL;
