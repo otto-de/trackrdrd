@@ -29,12 +29,191 @@
  *
  */
 
+/**
+ * \file mq.h
+ * \brief MQ -- the messaging interface for the Varnish log tracking
+ * reader.
+ *
+ * This header defines the interface to a messaging system, such as
+ * ActiveMQ or Kafka, used by the tracking reader. It is responsible for
+ * implementing connections to the messaging system, sending data,
+ * detecting errors and managing resources.
+ *
+ * An implementation of this interface is a dynamic library (shared
+ * object) that must provide definitions for each of the functions
+ * declared here (read by the tracking reader via dlsym(3)).
+ *
+ * The tracking reader starts a configurable number of worker threads that
+ * are responsible for sending data to a messaging system, by calling the
+ * MQ_Send() method. The messaging implementation is given the opportunity
+ * to create and use a per-thread private object for each worker thread,
+ * declared in the following as `void *priv` and initialized by
+ * MQ_WorkerInit().  A thread-safe implementation must be provided for
+ * each operation defined with such an object as an argument.
+ *
+ * Each operation in this interface is expected to return `NULL` on
+ * success, or an error string on failure, to be used by the tracking
+ * reader to log error messages. The tracking reader does not attempt to
+ * free non-`NULL` pointers returned from the messaging interface.
+ *
+ * The methods in this interface are called in the following order:
+ *
+ * - MQ_GlobalInit() is called when the tracking reader initializes,
+ *   before any other methods. If it fails, then the tracking reader
+ *   fails.
+ * - MQ_InitConnections() is called after successful return of
+ *   MQ_GlobalInit(), before any worker threads are created. It is
+ *   intended for the initialization of network connections; the tracking
+ *   reader fails (and does not bother to start any threads) if this
+ *   method fails.
+ *
+ * In each worker thread:
+ *
+ * - MQ_WorkerInit() is called when the thread initializes; the thread
+ *   fails if this method fails.
+ * - If MQ_WorkerInit() succeeds, then MQ_Version() and MQ_ClientID()
+ *   are called at initialization (so that the version and client ID
+ *   can be written to the log). If either of them fail, an error is
+ *   logged, but the thread continues.
+ * - The main loop of the worker thread calls MQ_Send() for every data
+ *   record that it processes. See below for a description of how the
+ *   tracking reader handles message send failures.
+ * - MQ_WorkerShutdown() is called when the worker thread is shutting
+ *   down.
+ *
+ * MQ_GlobalShutdown() is called when the tracking reader worker process
+ * (child process) is shutting down. If the call fails, the error
+ * message is logged and the process shutdown continues.
+ *
+ * Once a worker thread has entered its main loop (and hence global
+ * initialization, initialization of network connections and of a private
+ * worker object have succeeded), the tracking reader handles failures of
+ * message sends as follows:
+ *
+ * - If MQ_Send() fails, the thread calls MQ_Reconnect(); the messaging
+ *   implementation is expected to attempt a new connection, and may
+ *   create a new private worker object. If MQ_Reconnect() succeeds,
+ *   then MQ_Send() is attempted again with the same data.
+ * - If either MQ_Reconnect() fails, or the resend after a successful call
+ *   to MQ_Reconnect() fails, then the private worker object is discarded
+ *   (set to `NULL`), and the worker thread stops (without calling
+ *   MQ_WorkerShutdown()). The tracking reader may attempt to start a new
+ *   thread in its place, in which case a new private worker object for
+ *   the messaging implementation is initialized.
+ */
+
+/**
+ * Global initialization of the messaging implementation
+ *
+ * @param nworkers the number of worker threads
+ * @param config_fname path of a configuration file specific to the
+ * messaging implementation
+ * @return `NULL` on success, an error message on failure
+ */
 const char *MQ_GlobalInit(unsigned nworkers, const char *config_fname);
+
+/**
+ * Initialize network connections to the messaging system
+ *
+ * @return `NULL` on success, an error message on failure
+ */
 const char *MQ_InitConnections(void);
+
+/**
+ * Initialize a private object used by one of the tracking reader's worker
+ * threads.
+ *
+ * The implementation of this method must be thread-safe.
+ *
+ * @param priv pointer to a private object handle. The implementation is
+ * expected to place a pointer to its private data structure in this
+ * location.
+ * @return `NULL` on success, an error message on failure
+ */
 const char *MQ_WorkerInit(void **priv);
+
+/**
+ * Send data to the messaging system.
+ *
+ * The implementation of this method must be thread-safe.
+ *
+ * @param priv private object handle
+ * @param data pointer to the data to be sent
+ * @param len length of the data in bytes
+ * @return `NULL` on success, an error message on failure
+ */
 const char *MQ_Send(void *priv, const char *data, unsigned len);
+
+/**
+ * Return the version string of the messaging system.
+ *
+ * The implementation of this method must be thread-safe.
+ *
+ * The tracking reader does not attempt to free the address returned in
+ * `version`.
+ *
+ * @param priv private object handle
+ * @param version pointer to the version string. The implementation is
+ * expected to place the starting address of a null-terminated string in
+ * this location.
+ * @return `NULL` on success, an error message on failure
+ */
 const char *MQ_Version(void *priv, char *version);
+
+/**
+ * Return an ID string for the client connection.
+ *
+ * The implementation of this method must be thread-safe.
+ *
+ * The tracking reader does not attempt to free the address returned in
+ * `clientID`.
+ *
+ * @param priv private object handle
+ * @param clientID pointer to the client ID string. The implementation is
+ * expected to place the starting address of a null-terminated string in
+ * this location.
+ * @return `NULL` on success, an error message on failure
+ */
 const char *MQ_ClientID(void *priv, char *clientID);
+
+/**
+ * Re-initialize a connection to the messaging system after a send
+ * failure.
+ *
+ * The implementation of this method must be thread-safe.
+ *
+ * The implementation is responsible for disconnecting the existing
+ * connection, if it so chooses, and may initialize a new private object;
+ * the implementation is responsible for cleaning up resources as
+ * necessary.
+ *
+ * @param priv pointer to the private object handle. If a new object is
+ * created, the implementation is expected to place its address in this
+ * location.
+ * @return `NULL` on success, an error message on failure
+ */
 const char *MQ_Reconnect(void **priv);
+
+/**
+ * Shut down message processing for a worker thread.
+ *
+ * The implementation of this method must be thread-safe.
+ *
+ * The implementation is responsible for cleaning up resources as
+ * necessary. The tracking reader does not access `priv` after calling
+ * this method (so it may, for example, be set to `NULL`).
+ *
+ * @param priv pointer to the private object handle
+ * @return `NULL` on success, an error message on failure
+ */
 const char *MQ_WorkerShutdown(void **priv);
+
+/**
+ * Globally shut down the messaging implementation
+ *
+ * The implementation is responsible for final cleanup of resources as
+ * necessary.
+ *
+ * @return `NULL` on success, an error message on failure
+ */
 const char *MQ_GlobalShutdown(void);
