@@ -20,3 +20,13 @@ libtrackrdr_activemq_la_LIBADD = \
 	@APU_LIBS@
 
 libtrackrdr_activemq_la_LDFLAGS = -version-info 1:0:0
+
+if HAVE_RST2MAN
+dist_man_MANS = libtrackrdr-activemq.3
+MAINTAINERCLEANFILES = $(dist_man_MANS)
+endif
+
+libtrackrdr-activemq.3: README.rst
+if HAVE_RST2MAN
+	${RST2MAN} README.rst $@
+endif
