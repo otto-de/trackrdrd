@@ -32,6 +32,12 @@ Field              Description
 ``reconnects``     How often worker threads reconnected to a message broker
                    after an unsuccessful send
 ------------------ ------------------------------------------------------------
+``restarts``       How often worker threads were restarted after a message
+                   send, reconnect and resend all failed
+------------------ ------------------------------------------------------------
+``abandoned``      Number of worker threads that have been abandoned due to
+                   reaching the restart limit (``thread.restarts``)
+------------------ ------------------------------------------------------------
 ``failed``         Number of failed sends (failure after reconnect)
 ------------------ ------------------------------------------------------------
 ``occ_hi``         Occupancy high watermark -- highest number of records (open

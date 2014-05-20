@@ -9,8 +9,8 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2013-03-13
-:Version: 2.0
+:Date:   2014-05-20
+:Version: 3.0
 :Manual section: 3
 
 
@@ -23,8 +23,9 @@ DESCRIPTION
 ===========
 
 The ``trackrdrd`` demon reads from the shared memory log of a running
-instance of Varnish, collects data relevant to tracking for the Otto
-project, and forwards the data to ActiveMQ message brokers.
+instance of Varnish, aggregates data for a request that are relevant
+to tracking, and forwards the data to a messaging system (such as
+ActiveMQ or Kafka).
 
 ``trackrdrd`` reads data from ``VCL_Log`` entries that are displayed
 in this format by the ``varnishlog`` tool::
@@ -59,8 +60,8 @@ request and its ESI includes.
 
 When the request processing for an XID is complete (i.e. when
 ``trackrdrd`` reads ``ReqEnd`` for that XID), the data record is
-complete and ready to be forwarded to ActiveMQ message
-brokers. ``trackrdrd`` comprises a reader thread, which reads from the
+complete and ready to be forwarded to the messaging
+system. ``trackrdrd`` comprises a reader thread, which reads from the
 shared memory log, and one or more worker threads, which send records
 to one or more message brokers.
 
@@ -68,6 +69,15 @@ In addition to the data logged for an XID, ``trackrdrd`` prepends a
 field ``XID=<xid>`` to the data, and appends a field ``req_endt=<t>``
 containg the epoch time at which request processing ended (from the
 ``ReqEnd`` entry).
+
+The interface to the messaging system is implemented in a messaging
+plugin -- a shared object that provides definitions for the functions
+declared in the MQ interface in ``include/mq.h``. See ``mq.h`` for
+documentation of the interface.
+
+The source distribution for ``trackrdrd`` includes an implementation
+of the MQ interface for ActiveMQ, see libtrackrdr-activemq(3) for
+details.
 
 EXAMPLE
 =======
@@ -102,8 +112,9 @@ are in::
 
 	git@repo.org:varnish-cache
 
-``trackrdrd`` must link with the CMS or ActiveMQ-CPP library
-(``libactivemq-cpp``) at runtime. The sources can be obtained from::
+To build the messaging plugin for ActiveMQ (``libtrackrdr-activemq``)
+it is neccessary to link with the CMS or ActiveMQ-CPP library
+(``libactivemq-cpp``). The sources can be obtained from::
 
         http://activemq.apache.org/cms/
 
@@ -139,14 +150,17 @@ build::
 	$ CFLAGS=-m64 ./configure
 	$ make
 
-Building and installing ActiveMQ-CPP
-------------------------------------
+Building and installing packaged MQ implementations
+---------------------------------------------------
 
-``trackrdrd`` has been tested with versions 3.4.4 and 3.5.0 of
-ActiveMQ-CPP. If the library ``libactivemq-cpp`` is already installed
-on the platform where ``trackrdrd`` will run, then no further action
-is necessary. To build the library from source, follow the
-instructions in the ``README.txt`` file of its source distribution.
+The ``trackrdrd`` distribution includes an implementation of the MQ
+interface for ActiveMQ message brokers. For details of the build and
+its dependencies, see libtrackrdr-activemq(3) (``README.rst`` in
+``src/mq/activemq``).
+
+Since the global make targets for ``trackrdrd`` also build the MQ
+implementations, it is necessary to configure the build for them as
+well, for example by setting ``CXXFLAGS`` to compile C++ sources.
 
 Building and installing trackrdrd
 ---------------------------------
@@ -161,8 +175,12 @@ The steps to build ``trackrdrd`` are very similar to those for
 building Varnish. The only difference is in the ``configure``
 step:
 
-* The path to the Varnish source directory must be given in the variable ``VARNISHSRC``.
-* The flag ``CXXFLAGS``, like ``CFLAGS``, must also be set to ``-m64``, because C++ code is also compiled. It may be necessary to add additional ``CXXFLAGS`` to compile the ActiveMQ API calls, for example as obtained from ``pkg-config --cflags apr-1``.
+* The path to the Varnish source directory must be given in the
+  variable ``VARNISHSRC``.
+* The flag ``CXXFLAGS``, like ``CFLAGS``, must also be set to
+  ``-m64``, because C++ code is also compiled. It may be necessary to
+  add additional ``CXXFLAGS`` to compile the ActiveMQ API calls, for
+  example as obtained from ``pkg-config --cflags apr-1``.
 
 At minimum, run these steps::
 
@@ -297,10 +315,11 @@ character after the equals sign up to the last non-whitespace
 character on the line. Comments begin with the hash character and
 extend to the end of the line. There are no continuation lines.
 
-The parameters ``mq.uri`` and ``mq.qname`` are required (have no
-default values), and (only) ``mq.uri`` may be specified more than
-once. All other config parameters have default values, and some of
-them correspond to command-line options, as shown below.
+The parameter ``mq.module`` is required (has no default value), and
+``mq.config_file`` is optional (depending on whether the MQ
+implementation requires a configuration file). All other config
+parameters have default values, and some of them correspond to
+command-line options, as shown below.
 
 .. include:: config.rst
 
@@ -316,8 +335,8 @@ to the log (as configured with the parameter
 ``info`` log level, with additional formatting of the log lines,
 depending on how syslog is configured)::
 
- Hash table: len=16384 seen=23591972 drop_reqstart=0 drop_vcl_log=0 drop_reqend=0 expired=0 evacuated=0 open=0 load=0.00 collisions=58534 insert_probes=58974 find_probes=2625 fail=0 occ_hi=591 occ_hi_this=1 
- Data table: len=116384 nodata=11590516 submitted=12001456 wait_room=0 data_hi=3187 data_overflows=0 done=0 open=0 load=0.00 sent=12001456 reconnects=17 failed=0 occ_hi=4345 occ_hi_this=1 
+ Hash table: len=8192 seen=375862067 drop_reqstart=0 drop_vcl_log=0 drop_reqend=14 expired=50 evacuated=0 open=29 load=0.35 collisions=1526027 insert_probes=1534686 find_probes=45907 fail=0 occ_hi=530 occ_hi_this=85
+ Data table: len=18192 nodata=280295531 submitted=95566507 wait_room=0 data_hi=6217 data_overflows=0 done=9 open=29 load=0.21 sent=95566498 reconnects=0 failed=0 restarts=0 abandoned=0 occ_hi=944 occ_hi_this=111
 
 If monitoring of worker threads is switched on, then monitoring logs
 such as this are emitted for each thread::
@@ -349,6 +368,7 @@ each worker thread, one of:
 * ``initializing``
 * ``running``
 * ``waiting``
+* ``abandoned``
 * ``shutting down``
 * ``exited``
 
@@ -405,6 +425,9 @@ SEE ALSO
 ========
 
 * ``varnishd(1)``
+* ``libtrackrdr-activemq(3)``
+* ``ld.so(8)``
+* ``syslog(3)``
 
 COPYRIGHT AND LICENCE
 =====================
@@ -413,8 +436,8 @@ For both the software and this document are governed by a BSD 2-clause
 licence.
 
 
-| Copyright (c) 2012-2013 UPLEX Nils Goroll Systemoptimierung
-| Copyright (c) 2012-2013 Otto Gmbh & Co KG
+| Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+| Copyright (c) 2012-2014 Otto Gmbh & Co KG
 | All rights reserved
 | Use only with permission
 
