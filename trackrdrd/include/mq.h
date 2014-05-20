@@ -96,10 +96,10 @@
  *   then MQ_Send() is attempted again with the same data.
  * - If either MQ_Reconnect() fails, or the resend after a successful call
  *   to MQ_Reconnect() fails, then the private worker object is discarded
- *   (set to `NULL`), and the worker thread stops (without calling
- *   MQ_WorkerShutdown()). The tracking reader may attempt to start a new
- *   thread in its place, in which case a new private worker object for
- *   the messaging implementation is initialized.
+ *   (with a call to MQ_WorkerShutdown()), and the worker thread
+ *   stops. The tracking reader may attempt to start a new thread in its
+ *   place, in which case a new private worker object for the messaging
+ *   implementation is initialized.
  */
 
 /**

@@ -134,7 +134,7 @@ wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
         LOG_Log(LOG_INFO, "Worker %d: Reconnecting", wrk->id);
         err = mqf.reconnect(amq_worker);
         if (err != NULL) {
-            *amq_worker = NULL;
+            wrk->status = EXIT_FAILURE;
             LOG_Log(LOG_ALERT, "Worker %d: Reconnect failed (%s)", wrk->id,
                 err);
             LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
@@ -147,7 +147,7 @@ wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
             err = mqf.send(*amq_worker, entry->data, entry->end);
             if (err != NULL) {
                 wrk->fails++;
-                *amq_worker = NULL;
+                wrk->status = EXIT_FAILURE;
                 LOG_Log(LOG_ALERT,
                     "Worker %d: Failed to send data after reconnect: %s",
                     wrk->id, err);
@@ -215,7 +215,7 @@ static void
             wrk->deqs++;
             wrk_send(&amq_worker, entry, wrk);
 
-            if (amq_worker == NULL)
+            if (wrk->status == EXIT_FAILURE)
                 break;
             continue;
         }
@@ -252,24 +252,22 @@ static void
 
     wrk->state = WRK_SHUTTINGDOWN;
 
-    if (amq_worker == NULL)
-        wrk->status = EXIT_FAILURE;
-    else {
+    if (wrk->status != EXIT_FAILURE) {
         /* Prepare to exit, drain the queue */
         while ((entry = SPMCQ_Deq()) != NULL) {
             wrk->deqs++;
             wrk_send(&amq_worker, entry, wrk);
         }
-
         wrk->status = EXIT_SUCCESS;
-        err = mqf.worker_shutdown(&amq_worker);
-        if (err != NULL) {
-            LOG_Log(LOG_ALERT, "Worker %d: MQ worker shutdown failed: %s",
-                wrk->id, err);
-            wrk->status = EXIT_FAILURE;
-        }
     }
     
+    err = mqf.worker_shutdown(&amq_worker);
+    if (err != NULL) {
+        LOG_Log(LOG_ALERT, "Worker %d: MQ worker shutdown failed: %s",
+                wrk->id, err);
+        wrk->status = EXIT_FAILURE;
+    }
+
     AZ(pthread_mutex_lock(&running_lock));
     running--;
     exited++;
