@@ -67,8 +67,12 @@ rm -rf %{_builddir}/*
 %files -n libtrackrdr-activemq
 %defattr(-,root,root,-)
 %{prefix}/lib/trackrdrd/*
+%doc %{prefix}/share/man/man3/libtrackrdr-activemq.3
 
 %changelog
+* Tue May 20 2014  Geoff Simmons <groff@uplex.de> 3.0
+- Add man page for libtrackrdr-activemq
+
 * Mon May 12 2014  Geoff Simmons <groff@uplex.de> 3.0
 - Add package libtrackrdr-activemq, and adjust dependencies
 
