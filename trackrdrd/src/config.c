@@ -120,6 +120,7 @@ CONF_Add(const char *lval, const char *rval)
 
     confUnsigned("maxopen.scale", maxopen_scale);
     confUnsigned("maxdata", maxdata);
+    confUnsigned("maxkeylen", maxkeylen);
     confUnsigned("qlen.goal", qlen_goal);
     confUnsigned("hash.max_probes", hash_max_probes);
     confUnsigned("hash.ttl", hash_ttl);
@@ -198,6 +199,7 @@ CONF_Init(void)
     config.maxopen_scale = DEF_MAXOPEN_SCALE;
     config.maxdone = DEF_MAXDONE;
     config.maxdata = DEF_MAXDATA;
+    config.maxkeylen = DEF_MAXKEYLEN;
     config.qlen_goal = DEF_QLEN_GOAL;
     config.hash_max_probes = DEF_HASH_MAX_PROBES;
     config.hash_ttl = DEF_HASH_TTL;
@@ -249,6 +251,7 @@ CONF_Dump(void)
     confdump("maxopen.scale = %u", config.maxopen_scale);
     confdump("maxdone = %u", config.maxdone);
     confdump("maxdata = %u", config.maxdata);
+    confdump("maxkeylen = %u", config.maxkeylen);
     confdump("qlen.goal = %u", config.qlen_goal);
     confdump("hash.max_probes = %u", config.hash_max_probes);
     confdump("hash.ttl = %u", config.hash_ttl);
