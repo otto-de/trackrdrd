@@ -135,6 +135,8 @@ struct dataentry_s {
     
     bool		        incomplete; /* expired or evacuated */
     char			*data;
+    char			*key;
+    unsigned			keylen;
 };
 typedef struct dataentry_s dataentry;
 
@@ -270,6 +272,9 @@ struct config {
     
     unsigned	maxdata;  	/* size of char data buffer */
 #define DEF_MAXDATA 1024
+
+    unsigned	maxkeylen;	/* size of shard key buffer */
+#define DEF_MAXKEYLEN 128
 
     /*
      * queue-length goal:
