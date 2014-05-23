@@ -148,7 +148,9 @@ struct data_writer_stats_s {
     unsigned		submitted;	/* Submitted to worker threads */
     unsigned		wait_room;	/* waits for space in dtbl */
     unsigned		data_hi;	/* max string length of entry->data */
+    unsigned		key_hi;		/* max string length of entry->key */
     unsigned		data_overflows; /* config.maxdata exceeded */
+    unsigned		key_overflows; 	/* config.maxkeylen exceeded */
     unsigned		abandoned;	/* Worker threads abandoned */
 };
 

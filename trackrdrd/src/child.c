@@ -644,6 +644,27 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
     return;
 }
 
+static inline void
+addkey(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *key,
+       int keylen)
+{
+    CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+    if (keylen > config.maxkeylen) {
+        LOG_Log(LOG_ALERT,
+                "%s: Key too long, XID=%d, length=%d, "
+                "DISCARDING key=[%.*s]", VSL_tags[tag], xid, keylen,
+                keylen, key);
+        dtbl.w_stats.key_overflows++;
+        return;
+    }
+        
+    memcpy(entry->key, key, keylen);
+    entry->keylen = keylen;
+    if (keylen > dtbl.w_stats.key_hi)
+        dtbl.w_stats.key_hi = keylen;
+    return;
+}
+
 /*
  * rules for reading VSL:
  *
@@ -735,9 +756,15 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         
         err = Parse_VCL_Log(&ptr[TRACKLOG_PREFIX_LEN], len-TRACKLOG_PREFIX_LEN,
                             &xid, &data, &datalen, &data_type);
-        AZ(err);
-        LOG_Log(LOG_DEBUG, "%s: XID=%u, data=[%.*s]", VSL_tags[tag],
-            xid, datalen, data);
+        if (err != 0) {
+            LOG_Log(LOG_ERR,
+                    "Cannot parse VCL_Log entry, DISCARDING [%.*s]: %s",
+                    datalen, data, strerror(err));
+            htbl.drop_vcl_log++;
+        }
+
+        LOG_Log(LOG_DEBUG, "%s: XID=%u, %s=[%.*s]", VSL_tags[tag],
+                xid, data_type == VCL_LOG_DATA ? "data" : "key", datalen, data);
 
         he = hash_find(xid);
         if (he == NULL) {
@@ -751,8 +778,14 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
 
         check_entry(he, xid, fd);
         de = he->de;
-        append(de, tag, xid, data, datalen);
-        de->hasdata = true;
+
+        if (data_type == VCL_LOG_DATA) {
+            append(de, tag, xid, data, datalen);
+            de->hasdata = true;
+        }
+        else
+            addkey(de, tag, xid, data, datalen);
+
         break;
 
     case SLT_ReqEnd:
