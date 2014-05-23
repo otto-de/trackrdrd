@@ -201,6 +201,7 @@ MQ_WorkerShutdown(void **priv)
     err = AMQ_GetNum((AMQ_Worker *) *priv, &wrk_num);
     if (err != NULL)
         return err;
+    assert(wrk_num >= 0 && wrk_num < nwrk);
     if (connections[wrk_num] != NULL) {
         err = AMQ_ConnectionShutdown(connections[wrk_num]);
         if (err != NULL)
