@@ -37,6 +37,9 @@ path is specified as ``mq.config_fname`` in the configuration of
 ``libactivemq-cpp``. The dynamic linker must also be able to find
 ``libactivemq-cpp.so`` at runtime.
 
+This implementation does not use sharding keys; the key data in the
+call to ``MQ_Send()`` are silently discarded.
+
 BUILD/INSTALL
 =============
 

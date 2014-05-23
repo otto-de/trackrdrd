@@ -127,7 +127,8 @@ wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
     AN(amq_worker);
 
     /* XXX: report entry->incomplete to backend ? */
-    err = mqf.send(*amq_worker, entry->data, entry->end);
+    err = mqf.send(*amq_worker, entry->data, entry->end,
+                   entry->key, entry->keylen);
     if (err != NULL) {
         LOG_Log(LOG_WARNING, "Worker %d: Failed to send data: %s",
             wrk->id, err);
@@ -144,7 +145,8 @@ wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
             wrk->reconnects++;
             wrk_log_connection(*amq_worker, wrk->id);
             MON_StatsUpdate(STATS_RECONNECT);
-            err = mqf.send(*amq_worker, entry->data, entry->end);
+            err = mqf.send(*amq_worker, entry->data, entry->end,
+                           entry->key, entry->keylen);
             if (err != NULL) {
                 wrk->fails++;
                 wrk->status = EXIT_FAILURE;

@@ -140,9 +140,12 @@ const char *MQ_WorkerInit(void **priv);
  * @param priv private object handle
  * @param data pointer to the data to be sent
  * @param len length of the data in bytes
+ * @param key an optional sharding key for the messaging system
+ * @param keylen length of the sharding key
  * @return `NULL` on success, an error message on failure
  */
-const char *MQ_Send(void *priv, const char *data, unsigned len);
+const char *MQ_Send(void *priv, const char *data, unsigned len,
+                    const char *key, unsigned keylen);
 
 /**
  * Return the version string of the messaging system.
