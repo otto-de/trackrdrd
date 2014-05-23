@@ -670,6 +670,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     char *data, reqend_str[strlen(REQEND_T_VAR)+22];
     struct timespec reqend_t;
     float tim;
+    vcl_log_t data_type;
 
     static float tim_exp_check = 0.0;
 
@@ -733,7 +734,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
             break;
         
         err = Parse_VCL_Log(&ptr[TRACKLOG_PREFIX_LEN], len-TRACKLOG_PREFIX_LEN,
-                            &xid, &data, &datalen);
+                            &xid, &data, &datalen, &data_type);
         AZ(err);
         LOG_Log(LOG_DEBUG, "%s: XID=%u, data=[%.*s]", VSL_tags[tag],
             xid, datalen, data);

@@ -177,28 +177,26 @@ static char
     unsigned xid;
     int err, len;
     char *data;
+    vcl_log_t type;
 
     printf("... testing Parse_VCL_Log\n");
 
     #define VCLLOG "1253687608 url=%2Frdrtestapp%2F"
-    err = Parse_VCL_Log(VCLLOG, strlen(VCLLOG), &xid, &data, &len);
-    sprintf(errmsg, "VCL_Log %s: %s", VCLLOG, strerror(err));
-    mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "VCL_Log %s: returned XID=%d", VCLLOG, xid);
-    mu_assert(errmsg, xid == 1253687608);
-    sprintf(errmsg, "VCL_Log %s: returned length=%d", VCLLOG, len);
-    mu_assert(errmsg, len == 20);
-    sprintf(errmsg, "VCL_Log %s: returned data=[%.*s]", VCLLOG, len, data);
-    mu_assert(errmsg, strncmp(data, "url=%2Frdrtestapp%2F", 20) == 0);
+    err = Parse_VCL_Log(VCLLOG, strlen(VCLLOG), &xid, &data, &len, &type);
+    VMASSERT(err == 0, "VCL_Log %s: %s", VCLLOG, strerror(err));
+    MASSERT(xid == 1253687608);
+    MASSERT(len == 20);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, "url=%2Frdrtestapp%2F", 20) == 0,
+             "VCL_Log %s: returned data=[%.*s]", VCLLOG, len, data);
 
-    err = Parse_VCL_Log("foo", 3, &xid, &data, &len);
-    sprintf(errmsg, "VCL_Log foo: expected EINVAL, got %d", err);
-    mu_assert(errmsg, err == EINVAL);
+    err = Parse_VCL_Log("foo", 3, &xid, &data, &len, &type);
+    VMASSERT(err == EINVAL, "VCL_Log foo: expected EINVAL, got %d", err);
 
     #define VCLLOG_INVALID "foo url=%2Frdrtestapp%2F"
-    err = Parse_VCL_Log(VCLLOG_INVALID, 3, &xid, &data, &len);
-    sprintf(errmsg, "VCL_Log %s: expected EINVAL, got %d", VCLLOG_INVALID, err);
-    mu_assert(errmsg, err == EINVAL);
+    err = Parse_VCL_Log(VCLLOG_INVALID, 3, &xid, &data, &len, &type);
+    VMASSERT(err == EINVAL, "VCL_Log %s: expected EINVAL, got %d",
+             VCLLOG_INVALID, err);
 
     /* 1024 chars */
     #define LONG_STRING \
@@ -219,15 +217,31 @@ static char
         "1234567890123456789012345678901234567890123456789012345678901234" \
         "1234567890123456789012345678901234567890123456789012345678901234"
     #define VCLLOG_LONG "1253687608 foo=" LONG_STRING
-    err = Parse_VCL_Log(VCLLOG_LONG, 1039, &xid, &data, &len);
-    sprintf(errmsg, "VCL_Log long string: %s", strerror(err));
-    mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "VCL_Log long string: returned XID=%d", xid);
-    mu_assert(errmsg, xid == 1253687608);
-    sprintf(errmsg, "VCL_Log long string: returned length=%d", len);
-    mu_assert(errmsg, len == 1028);
-    sprintf(errmsg, "VCL_Log long string: returned data=[%.*s]", len, data);
-    mu_assert(errmsg, strncmp(data, "foo=" LONG_STRING, 1028) == 0);
+    err = Parse_VCL_Log(VCLLOG_LONG, 1039, &xid, &data, &len, &type);
+    VMASSERT(err == 0, "VCL_Log long string: %s", strerror(err));
+    MASSERT(xid == 1253687608);
+    MASSERT(len == 1028);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, "foo=" LONG_STRING, 1028) == 0,
+             "VCL_Log long string: returned data=[%.*s]", len, data);
+
+    #define VCLKEY "1253687608 key foobarbazquux"
+    err = Parse_VCL_Log(VCLKEY, strlen(VCLKEY), &xid, &data, &len, &type);
+    VMASSERT(err == 0, "VCL_Log %s: %s", VCLKEY, strerror(err));
+    MASSERT(xid == 1253687608);
+    MASSERT(len == 13);
+    MASSERT(type == VCL_LOG_KEY);
+    VMASSERT(strncmp(data, "foobarbazquux", 13) == 0,
+             "VCL_Log %s: returned data=[%.*s]", VCLKEY, len, data);
+
+    #define VCLKEY_LONG "1253687608 key " LONG_STRING
+    err = Parse_VCL_Log(VCLKEY_LONG, 1039, &xid, &data, &len, &type);
+    VMASSERT(err == 0, "VCL_Log long key: %s", strerror(err));
+    MASSERT(xid == 1253687608);
+    MASSERT(len == 1024);
+    MASSERT(type == VCL_LOG_KEY);
+    VMASSERT(strncmp(data, LONG_STRING, 1024) == 0,
+             "VCL_Log long key: returned data=[%.*s]", len, data);
 
     return NULL;
 }

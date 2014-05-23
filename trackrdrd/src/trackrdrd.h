@@ -375,12 +375,16 @@ void MON_StatsInit(void);
 void MON_StatsUpdate(stats_update_t update);
 
 /* parse.c */
+
+/* Whether a VCL_Log entry contains a data payload or a shard key */
+typedef enum { VCL_LOG_DATA, VCL_LOG_KEY } vcl_log_t;
+
 int Parse_XID(const char *str, int len, unsigned *xid);
 int Parse_ReqStart(const char *ptr, int len, unsigned *xid);
 int Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid,
-    struct timespec *reqend_t);
+                 struct timespec *reqend_t);
 int Parse_VCL_Log(const char *ptr, int len, unsigned *xid,
-    char **data, int *datalen);
+                  char **data, int *datalen, vcl_log_t *type);
 
 /* generic init attributes */
 pthread_mutexattr_t attr_lock;
