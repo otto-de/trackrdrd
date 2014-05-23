@@ -108,14 +108,19 @@ Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid,
 */
 int
 Parse_VCL_Log(const char *ptr, int len, unsigned *xid,
-              char **data, int *datalen)
+              char **data, int *datalen, vcl_log_t *type)
 {
+    *type = VCL_LOG_DATA;
     char *blank = memchr(ptr, ' ', len);
     if (blank == NULL)
         return EINVAL;
     int err = Parse_XID(ptr, blank-ptr, xid);
     if (err != 0)
         return err;
+    if (strncmp(blank + 1, "key ", 4) == 0) {
+        blank += 4;
+        *type = VCL_LOG_KEY;
+    }
     *data = blank + 1;
     *datalen = ptr + len - blank - 1;
     return(0);
