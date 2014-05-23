@@ -56,7 +56,9 @@ log_output(void)
         "submitted=%u "
         "wait_room=%u "
         "data_hi=%u "
+        "key_hi=%u "
         "data_overflows=%u "
+        "key_overflows=%u "
         "done=%u "
         "open=%u "
         "load=%.2f "
@@ -72,7 +74,9 @@ log_output(void)
         dtbl.w_stats.submitted,
         dtbl.w_stats.wait_room,
         dtbl.w_stats.data_hi,
+        dtbl.w_stats.key_hi,
         dtbl.w_stats.data_overflows,
+        dtbl.w_stats.key_overflows,
         dtbl.r_stats.done,
         dtbl.r_stats.open,
         (100.0 * (1.0 * dtbl.r_stats.done + 1.0 * dtbl.r_stats.open) / dtbl.len),
