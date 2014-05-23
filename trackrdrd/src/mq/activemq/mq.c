@@ -140,8 +140,13 @@ MQ_WorkerInit(void **priv)
 }
 
 const char *
-MQ_Send(void *priv, const char *data, unsigned len)
+MQ_Send(void *priv, const char *data, unsigned len, const char *key,
+        unsigned keylen)
 {
+    /* The ActiveMQ implementation does not use sharding. */
+    (void) key;
+    (void) keylen;
+
     return AMQ_Send((AMQ_Worker *) priv, data, len);
 }
 

@@ -172,7 +172,7 @@ static const char
     printf("... testing message send\n");
 
     mu_assert("MQ_Send: worker is NULL before call", worker != NULL);
-    err = mqf.send(worker, "foo bar baz quux", 16);
+    err = mqf.send(worker, "foo bar baz quux", 16, "key", 3);
     sprintf(errmsg, "MQ_Send: %s", err);
     mu_assert(errmsg, err == NULL);
 
@@ -190,7 +190,7 @@ static const char
     err = mqf.reconnect(&worker);
     VMASSERT(err == NULL, "MQ_Reconnect: %s", err);
     MASSERT0(worker != NULL, "MQ_Reconnect: worker is NULL after call");
-    err = mqf.send(worker, "send after reconnect", 20);
+    err = mqf.send(worker, "send after reconnect", 20, "key", 3);
     VMASSERT(err == NULL, "MQ_Send() fails after reconnect: %s", err);
 
     return NULL;
@@ -210,7 +210,7 @@ static const char
 
     mu_assert("Worker not NULL after shutdown", worker == NULL);
     
-    err = mqf.send(worker, "foo bar baz quux", 16);
+    err = mqf.send(worker, "foo bar baz quux", 16, "key", 3);
     mu_assert("No failure on MQ_Send after worker shutdown", err != NULL);
 
     return NULL;
