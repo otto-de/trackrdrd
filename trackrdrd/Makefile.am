@@ -1,6 +1,7 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = src src/test src/mq/activemq src/mq/activemq/test
+SUBDIRS = src src/test src/mq/activemq src/mq/activemq/test \
+	src/mq/kafka src/mq/kafka/test
 
 if HAVE_RST2MAN
 dist_man_MANS = trackrdrd.3

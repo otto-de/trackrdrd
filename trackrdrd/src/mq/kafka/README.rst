@@ -1,0 +1,261 @@
+.. _ref-trackrdrd:
+
+==================
+ libtrackrdr-kafka
+==================
+
+--------------------------------------------------------------------
+Kafka implementation of the MQ interface for the Tracking Log Reader
+--------------------------------------------------------------------
+
+:Author: Geoffrey Simmons
+:Date:   2014-05-28
+:Version: 3.0
+:Manual section: 3
+
+
+DESCRIPTION
+===========
+
+``libtrackrdr-kafka.so`` provides an implementation of the tracking
+reader's MQ interface to send messages to Apache Kafka message
+brokers. See ``include/mq.h`` in the ``trackrdrd`` source distribution
+for documentation of the interface.
+
+To use this implementation with ``trackrdrd``, specify the shared
+object as the value of ``mq.module`` in the tracking reader's
+configuration (see trackrdrd(3)). The configuration value may be the
+absolute path of the shared object; or its name, provided that it can
+be found by the dynamic linker (see ld.so(8)).
+
+``libtrackrdr-kafka`` also requires a configuration file, whose path
+is specified as ``mq.config_fname`` in the configuration of
+``trackrdrd``.
+
+``libtrackrdrd-kafka`` in turn depends on these libraries:
+
+* ``rdkafka``, a client library for Kafka
+* ``zookeeper_mt``, a client library for Apache ZooKeeper with
+  multi-threading
+* ``yajl``, a library for JSON parsing
+
+The dynamic linker must also be able to find ``librdkafka.so``,
+``libzookeeper_mt.so`` and ``libyajl.so`` at runtime.
+
+BUILD/INSTALL
+=============
+
+The sources for ``libtrackrdr-kafka`` are provided in the source
+repository for ``trackrdrd``, in the subdirectory ``src/mq/kafka/``
+of::
+
+	git@repo.org:lhotse-tracking-varnish
+
+The sources for the library dependencies can be obtained from:
+
+* https://github.com/edenhill/librdkafka
+* http://zookeeper.apache.org/
+* http://lloyd.github.io/yajl/
+
+Building and installing the library dependencies
+------------------------------------------------
+
+The Kafka interface has been tested with these library versions:
+
+* rdkafka 0.8.3
+* zookeeper_mt 3.4.6
+* yajl 2.0.4
+
+If the libraries are already installed on the platform where
+``trackrdrd`` will run, then no further action is necessary. To build
+the libraries from source, it suffices to follow the instructions in
+the source distributions -- no special configuration for the plugin is
+necessary.
+
+Building and installing libtrackrdr-kafka
+-----------------------------------------
+
+``libtrackrdr-kafka`` is built as part of the global build for
+``trackrdrd``; for details and requirements of the build, see
+trackrdrd(3).
+
+To specifically build the MQ implementation (without building all of
+the rest of ``trackrdrd``), it suffices to invoke ``make`` commands in
+the subdirectory ``src/mq/kafka`` (after having executed the
+``configure`` script for ``trackrdrd``)::
+
+        # in lhotse-tracking-varnish/trackrdrd
+	$ cd src/mq/kafka
+	$ make
+
+For self-tests after the build::
+
+        $ cd src/mq/kafka/test
+	$ make check
+
+The global ``make`` and ``make check`` commands for ``trackrdrd`` also
+execute both of these for the Kafka plugin.
+
+The self-tests depend on the configuration file ``kafka.conf`` in the
+``test/`` subdirectory, which specifies ``localhost:2181`` as the
+address of a ZooKeeper server. If a ZooKeeper is listening, then tests
+are run against that instance of ZooKeeper and any running Kafka
+brokers that the ZooKeeper server is managing. If connections to a
+ZooKeeper server or Kafka brokers fail, then the ``make check`` test
+exits with the status ``SKIPPED``.
+
+To install the shared object ``libtrackrdr-kafka.so``, run ``make
+install`` as root, for example with ``sudo``::
+
+	$ sudo make install
+
+In standard configuration, the ``.so`` file will be installed by
+``libtool(1)``, and its location may be affected by the ``--libdir``
+option to ``configure``.
+
+CONFIGURATION
+=============
+
+As mentioned above, a configuration file for ``libtrackrdr-kafka``
+MUST be specified in the configuration parameter ``mq.config_fname``
+for ``trackrdrd``, and initialization of the MQ implementation fails
+if this file cannot be found or read by the process owner of
+``trackrdrd`` (or if its syntax is false, or if required parameters
+are missing).
+
+The syntax of the configuration file is the same as that of
+``trackrdrd``, and it may contain configuration parameters for
+``rdkafka``, except as noted below -- thus the configuration applies
+to both the messaging plugin and the ``rdkafka`` client library.
+
+If the config parameter ``zookeeper.connect`` is set, then the plugin
+obtains information about Kafka brokers from the specified ZooKeeper
+server(s), and the value of the ``rdkafka`` parameter
+``metadata.broker.list`` is ignored. If ``zookeeper.connect`` is not
+set, then an initial list brokers MUST be specified by
+``metadata.broker.list`` -- if neither of ``zookeeper.connect`` and
+``metadata.broker.list`` are set, then the configuration fails and
+``trackrdrd`` will exit.
+
+In addition to configuration parameters for ``rdkafka``, these
+parameters can be specified:
+
+===================== ==========================================================
+Parameter             Description
+===================== ==========================================================
+``zookeeper.connect`` Comma-separated list of ``host:port`` pairs specifying
+                      the addresses of ZooKeeper servers. If not set, then
+                      ``metadata.broker.list`` MUST be set, as described above.
+--------------------- ----------------------------------------------------------
+``zookeeper.timeout`` Timeout for connections to ZooKeeper servers (optional,
+                      default 0, 
+--------------------- ----------------------------------------------------------
+``zookeeper.log``     Path of a log file for the ZooKeeper client (optional)
+--------------------- ----------------------------------------------------------
+``log``               Path of a log file for the messaging plugin and Kafka
+                      client (optional)
+--------------------- ----------------------------------------------------------
+``topic``             Name of the Kafka topic to which messages are sent
+--------------------- ----------------------------------------------------------
+``mq.debug``          If set to true, then log at DEBUG level
+===================== ==========================================================
+
+Except as noted below, the configuration can specify any parameters for
+the ``rdkafka`` client, as documented at::
+
+	https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+
+The following ``rdkafka`` parameters in the config file are ignored
+(they are set internally by the messaging plugin, or are only relevant
+to consumers):
+
+* ``client.id``
+* ``error_cb``
+* ``stats_cb``
+* ``log_cb``
+* ``socket_cb``
+* ``open_cb``
+* ``opaque``
+* ``queued.*``
+* ``fetch.*``
+* ``group.id``
+* ``dr_cb``
+* ``dr_msg_cb``
+* ``partitioner``
+* ``opaque``
+* ``auto.*``
+* ``offset.*``
+
+SHARDING
+========
+
+The plugin requires that calls to ``MQ_Send()`` supply a hexadecimal
+string of up to 8 characters as the sharding key; ``MQ_Send()`` fails
+if a key is not specified, or if it contains non-hex characters in the
+first 8 bytes.
+
+The plugin uses up to the first 8 hex digits of the key; if the string
+is longer, then the remainder from the 9th byte is ignored.
+
+LOGGING AND STATISTICS
+======================
+
+XXX: TuDu
+
+MESSAGE SEND FAILURE AND RECOVERY
+=================================
+
+XXX: TuDu
+
+* stats callback from rdkafka
+* stats counters for missing shard keys or data
+
+SIGNALS
+=======
+
+XXX: TuDu -- toggle DEBUG log level
+
+SEE ALSO
+========
+
+* ``trackrdrd(3)``
+* ``ld.so(8)``
+* http://kafka.apache.org/
+* http://zookeeper.apache.org/
+* https://github.com/edenhill/librdkafka
+* http://zookeeper.apache.org/doc/r3.4.6/zookeeperProgrammers.html#C+Binding
+
+COPYRIGHT AND LICENCE
+=====================
+
+Both the software and this document are governed by a BSD 2-clause
+licence.
+
+| Copyright (c) 2014 UPLEX Nils Goroll Systemoptimierung
+| Copyright (c) 2014 Otto Gmbh & Co KG
+| All rights reserved
+| Use only with permission
+
+| Author: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
