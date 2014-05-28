@@ -43,7 +43,7 @@
 /* message queue methods, typedefs match the interface in mq.h */
 typedef const char *global_init_f(unsigned nworkers, const char *config_fname);
 typedef const char *init_connections_f(void);
-typedef const char *worker_init_f(void **priv);
+typedef const char *worker_init_f(void **priv, int wrk_num);
 typedef const char *send_f(void *priv, const char *data, unsigned len,
                            const char *key, unsigned keylen);
 typedef const char *version_f(void *priv, char *version);

@@ -31,8 +31,10 @@
 
 /**
  * \file mq.h
- * \brief MQ -- the messaging interface for the Varnish log tracking
- * reader.
+ * \brief MQ messaging interface for trackrdrd
+ * \details MQ -- the messaging interface for the Varnish log tracking
+ * reader
+ * \version 3
  *
  * This header defines the interface to a messaging system, such as
  * ActiveMQ or Kafka, used by the tracking reader. It is responsible for
@@ -128,9 +130,11 @@ const char *MQ_InitConnections(void);
  * @param priv pointer to a private object handle. The implementation is
  * expected to place a pointer to its private data structure in this
  * location.
+ * @param wrk_num the worker number, from 1 to the value of ``nworkers``
+ * supplied in ``MQ_GlobalInit()``, inclusive
  * @return `NULL` on success, an error message on failure
  */
-const char *MQ_WorkerInit(void **priv);
+const char *MQ_WorkerInit(void **priv, int wrk_num);
 
 /**
  * Send data to the messaging system.
