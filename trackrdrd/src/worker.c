@@ -190,7 +190,7 @@ static void
     CHECK_OBJ_NOTNULL(wrk, WORKER_DATA_MAGIC);
     wrk->state = WRK_INITIALIZING;
 
-    err = mqf.worker_init(&amq_worker);
+    err = mqf.worker_init(&amq_worker, wrk->id);
     if (err != NULL) {
         LOG_Log(LOG_ALERT, "Worker %d: Cannot initialize queue connection: %s",
             wrk->id, err);

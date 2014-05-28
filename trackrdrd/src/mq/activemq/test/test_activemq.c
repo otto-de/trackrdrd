@@ -81,7 +81,7 @@ static const char
 
     printf("... testing ActiveMQ worker init\n");
 
-    err = MQ_WorkerInit(&worker);
+    err = MQ_WorkerInit(&worker, NWORKERS);
     VMASSERT(err == NULL, "MQ_WorkerInit: %s", err);
 
     MASSERT0(worker != NULL, "Worker is NULL after MQ_WorkerInit");

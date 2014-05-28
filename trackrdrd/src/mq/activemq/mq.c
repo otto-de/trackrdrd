@@ -33,7 +33,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <pthread.h>
 #include <assert.h>
 
 #include "mq.h"
@@ -43,7 +42,6 @@
 
 static AMQ_Connection **connections;
 static AMQ_Worker **workers;
-static pthread_mutex_t connection_lock = PTHREAD_MUTEX_INITIALIZER;
 static unsigned connection = 0;
 static unsigned nwrk = 0;
 
@@ -113,29 +111,25 @@ MQ_InitConnections(void)
 }
 
 const char *
-MQ_WorkerInit(void **priv)
+MQ_WorkerInit(void **priv, int wrk_num)
 {
-    int i, ret;
     const char *err = NULL;
     
-    ret = pthread_mutex_lock(&connection_lock);
-    assert(ret == 0);
-    i = connection++ % nwrk;
-    ret = pthread_mutex_unlock(&connection_lock);
-    assert(ret == 0);
-    AMQ_Connection *conn = connections[i];
+    assert(wrk_num >= 1 && wrk_num <= nwrk);
+    wrk_num--;
+    AMQ_Connection *conn = connections[wrk_num];
     if (conn == NULL) {
-        err = AMQ_ConnectionInit(&conn, uri[i % n_uris]);
+        err = AMQ_ConnectionInit(&conn, uri[wrk_num % n_uris]);
         if (err != NULL)
             return err;
         else
-            connections[i] = conn;
+            connections[wrk_num] = conn;
     }
-    err = AMQ_WorkerInit((AMQ_Worker **) priv, conn, qname, i);
+    err = AMQ_WorkerInit((AMQ_Worker **) priv, conn, qname, wrk_num);
     if (err == NULL)
-        workers[i] = (AMQ_Worker *) *priv;
+        workers[wrk_num] = (AMQ_Worker *) *priv;
     else
-        workers[i] = NULL;
+        workers[wrk_num] = NULL;
     return err;
 }
 
