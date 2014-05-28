@@ -43,6 +43,8 @@
 #define MQ_MODULE "../mq/activemq/.libs/libtrackrdr-activemq.so"
 #define MQ_CONFIG "activemq.conf"
 
+#define NWORKERS 1
+
 int tests_run = 0;
 static char errmsg[BUFSIZ];
 static void *mqh;
@@ -87,7 +89,7 @@ static char
 
     printf("... testing MQ global initialization\n");
 
-    config.nworkers = 1;
+    config.nworkers = NWORKERS;
     strcpy(config.mq_config_file, MQ_CONFIG);
     err = mqf.global_init(config.nworkers, config.mq_config_file);
     sprintf(errmsg, "MQ_GlobalInit: %s", err);
@@ -121,7 +123,7 @@ static const char
 
     printf("... test worker init\n");
 
-    err = mqf.worker_init(&worker);
+    err = mqf.worker_init(&worker, NWORKERS);
     sprintf(errmsg, "MQ_WorkerInit: %s", err);
     mu_assert(errmsg, err == NULL);
 
