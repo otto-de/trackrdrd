@@ -145,5 +145,7 @@ AC_CONFIG_FILES([
         src/test/Makefile
         src/mq/activemq/Makefile
         src/mq/activemq/test/Makefile
+        src/mq/kafka/Makefile
+        src/mq/kafka/test/Makefile
 ])
 AC_OUTPUT
