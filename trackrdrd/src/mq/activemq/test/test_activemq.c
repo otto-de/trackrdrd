@@ -125,12 +125,13 @@ static const char
 *test_send(void)
 {
     const char *err;
+    int ret;
 
     printf("... testing ActiveMQ message send\n");
 
     MASSERT0(worker != NULL, "MQ_Send: worker is NULL before call");
-    err = MQ_Send(worker, "foo bar baz quux", 16, "key", 3);
-    VMASSERT(err == NULL, "MQ_Send: %s", err);
+    ret = MQ_Send(worker, "foo bar baz quux", 16, "key", 3, &err);
+    VMASSERT(ret == 0, "MQ_Send: %s", err);
 
     return NULL;
 }
@@ -139,6 +140,7 @@ static const char
 *test_reconnect(void)
 {
     const char *err;
+    int ret;
 
     printf("... testing ActiveMQ reconnect\n");
 
@@ -146,8 +148,8 @@ static const char
     err = MQ_Reconnect(&worker);
     VMASSERT(err == NULL, "MQ_Reconnect: %s", err);
     MASSERT0(worker != NULL, "MQ_Reconnect: worker is NULL after call");
-    err = MQ_Send(worker, "send after reconnect", 20, "key", 3);
-    VMASSERT(err == NULL, "MQ_Send() fails after reconnect: %s", err);
+    ret = MQ_Send(worker, "send after reconnect", 20, "key", 3, &err);
+    VMASSERT(ret == 0, "MQ_Send() fails after reconnect: %s", err);
 
     return NULL;
 }
@@ -156,6 +158,7 @@ static const char
 *test_worker_shutdown(void)
 {
     const char *err;
+    int ret;
 
     printf("... testing ActiveMQ worker shutdown\n");
 
@@ -165,8 +168,8 @@ static const char
 
     MASSERT0(worker == NULL, "Worker not NULL after shutdown");
     
-    err = MQ_Send(worker, "foo bar baz quux", 16, "key", 3);
-    MASSERT0(err != NULL, "No failure on MQ_Send after worker shutdown");
+    ret = MQ_Send(worker, "foo bar baz quux", 16, "key", 3, &err);
+    MASSERT0(ret != 0, "No failure on MQ_Send after worker shutdown");
 
     return NULL;
 }

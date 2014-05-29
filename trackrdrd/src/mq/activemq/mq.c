@@ -133,15 +133,18 @@ MQ_WorkerInit(void **priv, int wrk_num)
     return err;
 }
 
-const char *
+int
 MQ_Send(void *priv, const char *data, unsigned len, const char *key,
-        unsigned keylen)
+        unsigned keylen, const char **error)
 {
     /* The ActiveMQ implementation does not use sharding. */
     (void) key;
     (void) keylen;
 
-    return AMQ_Send((AMQ_Worker *) priv, data, len);
+    *error = AMQ_Send((AMQ_Worker *) priv, data, len);
+    if (*error != NULL)
+        return -1;
+    return 0;
 }
 
 const char *

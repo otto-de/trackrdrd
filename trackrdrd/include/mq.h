@@ -53,10 +53,24 @@
  * MQ_WorkerInit().  A thread-safe implementation must be provided for
  * each operation defined with such an object as an argument.
  *
- * Each operation in this interface is expected to return `NULL` on
- * success, or an error string on failure, to be used by the tracking
- * reader to log error messages. The tracking reader does not attempt to
- * free non-`NULL` pointers returned from the messaging interface.
+ * With the exception of MQ_Send(), each operation in this interface is
+ * expected to return `NULL` on success, or an error string on failure, to
+ * be used by the tracking reader to log error messages. MQ_Send() is
+ * expected to return 0 for a successful send, an integer greater than 0
+ * for a recoverable error, or an integer less than 0 for a
+ * non-recoverable error; and to place an error message in its `error`
+ * parameter. Non-recoverable errors should be signaled when internal
+ * structures of the messaging implementation must be shut down and
+ * re-initialized, for example when a network connection has been lost or
+ * has become unreliable; in this case, the tracking reader performs the
+ * error recovery procedure described below. After recoverable errors from
+ * MQ_Send(), the tracking reader simply logs the error message and
+ * continues.
+ *
+ * The pointers to error messages returned from operations in this
+ * interface, or set in the `error` parameter of MQ_Send(), should point
+ * to static storage. The tracking reader does not attempt to free
+ * non-`NULL` pointers returned from the interface.
  *
  * The methods in this interface are called in the following order:
  *
@@ -79,7 +93,7 @@
  *   logged, but the thread continues.
  * - The main loop of the worker thread calls MQ_Send() for every data
  *   record that it processes. See below for a description of how the
- *   tracking reader handles message send failures.
+ *   tracking reader handles non-recoverable message send failures.
  * - MQ_WorkerShutdown() is called when the worker thread is shutting
  *   down.
  *
@@ -89,8 +103,8 @@
  *
  * Once a worker thread has entered its main loop (and hence global
  * initialization, initialization of network connections and of a private
- * worker object have succeeded), the tracking reader handles failures of
- * message sends as follows:
+ * worker object have succeeded), the tracking reader handles
+ * non-recoverable failures of message sends as follows:
  *
  * - If MQ_Send() fails, the thread calls MQ_Reconnect(); the messaging
  *   implementation is expected to attempt a new connection, and may
@@ -139,6 +153,14 @@ const char *MQ_WorkerInit(void **priv, int wrk_num);
 /**
  * Send data to the messaging system.
  *
+ * On failure, the implementation must signal whether the error is
+ * recoverable or non-recoverable, with a return code greater than or less
+ * than zero, respectively. If the implementation can safely continue with
+ * the state referenced by its private object handle, the error is
+ * recoverable; if its private structures must be shut down / destroyed,
+ * the error is non-recoverable (and the tracking reader initiates the
+ * shutdown and possible re-initialization as described above).
+ *
  * The implementation of this method must be thread-safe.
  *
  * @param priv private object handle
@@ -146,10 +168,13 @@ const char *MQ_WorkerInit(void **priv, int wrk_num);
  * @param len length of the data in bytes
  * @param key an optional sharding key for the messaging system
  * @param keylen length of the sharding key
- * @return `NULL` on success, an error message on failure
+ * @param error pointer to an error message. The implementation is
+ * expected to place a message in this location when non-zero is returned.
+ * @return zero on success, >0 for a recoverable error, <0 for a
+ * non-recoverable error
  */
-const char *MQ_Send(void *priv, const char *data, unsigned len,
-                    const char *key, unsigned keylen);
+int MQ_Send(void *priv, const char *data, unsigned len,
+            const char *key, unsigned keylen, const char **error);
 
 /**
  * Return the version string of the messaging system.
