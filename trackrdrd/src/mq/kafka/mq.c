@@ -105,10 +105,11 @@ static void
 dr_cb(rd_kafka_t *rk, void *payload, size_t len, rd_kafka_resp_err_t err,
       void *opaque, void *msg_opaque)
 {
-    (void) opaque;
     (void) msg_opaque;
 
     if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+        kafka_wrk_t *wrk = (kafka_wrk_t *) opaque;
+        CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
         MQ_LOG_Log(LOG_ERR, "Delivery error (client ID = %s, msg = [%.*s]): %s",
                    rd_kafka_name(rk), (int) len, (char *) payload,
                    rd_kafka_err2str(err));
@@ -122,10 +123,10 @@ dr_cb(rd_kafka_t *rk, void *payload, size_t len, rd_kafka_resp_err_t err,
 static void
 error_cb(rd_kafka_t *rk, int err, const char *reason, void *opaque)
 {
-    (void) opaque;
-
-    MQ_LOG_Log(LOG_ERR, "rdkafka error (ID = %s) %d: %s", rd_kafka_name(rk),
-               err, reason);
+    kafka_wrk_t *wrk = (kafka_wrk_t *) opaque;
+    CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
+    MQ_LOG_Log(LOG_ERR, "Client error (ID = %s) %d: %s", rd_kafka_name(rk), err,
+           reason);
     wrk->err = 1;
 }
 
@@ -134,8 +135,8 @@ stats_cb(rd_kafka_t *rk, char *json, size_t json_len, void *opaque)
 {
     (void) opaque;
 
-    MQ_LOG_Log(LOG_INFO, "rdkafka stats (ID = %s): %.*s", rd_kafka_name(rk),
-               (int) json_len, json);
+    MQ_LOG_Log(LOG_INFO, "Client stats (ID = %s): %.*s", rd_kafka_name(rk),
+           (int) json_len, json);
     return 0;
 }
 
