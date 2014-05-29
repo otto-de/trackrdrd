@@ -126,7 +126,7 @@ error_cb(rd_kafka_t *rk, int err, const char *reason, void *opaque)
     kafka_wrk_t *wrk = (kafka_wrk_t *) opaque;
     CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
     MQ_LOG_Log(LOG_ERR, "Client error (ID = %s) %d: %s", rd_kafka_name(rk), err,
-           reason);
+               reason);
     wrk->err = 1;
 }
 
@@ -136,7 +136,7 @@ stats_cb(rd_kafka_t *rk, char *json, size_t json_len, void *opaque)
     (void) opaque;
 
     MQ_LOG_Log(LOG_INFO, "Client stats (ID = %s): %.*s", rd_kafka_name(rk),
-           (int) json_len, json);
+               (int) json_len, json);
     return 0;
 }
 
@@ -564,32 +564,28 @@ MQ_WorkerInit(void **priv, int wrk_num)
     return NULL;
 }
 
-/*
- * XXX: we really only want to set off trackrdrd error recovery on
- * message send failure or priv == NULL, not e.g. if the key is
- * missing or invalid. How to signal back a recoverable error?
- */
-const char *
+int
 MQ_Send(void *priv, const char *data, unsigned len, const char *key,
-        unsigned keylen)
+        unsigned keylen, const char **error)
 {
     kafka_wrk_t *wrk;
     void *payload = NULL;
-    char *ret = NULL;
+    int ret = 0;
 
     /* XXX: error? */
     if (len == 0)
-        return NULL;
+        return 0;
 
     if (priv == NULL) {
         MQ_LOG_Log(LOG_ERR, "MQ_Send() called with NULL worker object");
-        return "Worker object is NULL";
+        strncpy(errmsg, "Worker object is NULL", LINE_MAX);
+        *error = errmsg;
+        return -1;
     }
     CAST_OBJ(wrk, priv, KAFKA_WRK_MAGIC);
 
     /*
      * XXX
-     * These errors are recoverable
      * Increment stats counters on error, so that they can be monitored
      * Toggle log level DEBUG with signals
      */
@@ -599,7 +595,8 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         MQ_LOG_Log(LOG_ERR, errmsg);
         MQ_LOG_Log(LOG_DEBUG, "%s data=[%.*s] key=", rd_kafka_name(wrk->kafka),
                    len, data);
-        return errmsg;
+        *error = errmsg;
+        return 1;
     }
     if (data == NULL) {
         snprintf(errmsg, LINE_MAX, "%s message payload is NULL",
@@ -607,7 +604,8 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         MQ_LOG_Log(LOG_DEBUG, "%s data= key=[%.*s]", rd_kafka_name(wrk->kafka),
                    keylen, key);
         MQ_LOG_Log(LOG_ERR, errmsg);
-        return errmsg;
+        *error = errmsg;
+        return 1;
     }
 
     if (keylen > 8)
@@ -619,7 +617,8 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
             MQ_LOG_Log(LOG_ERR, errmsg);
             MQ_LOG_Log(LOG_DEBUG, "%s data=[%.*s] key=[%.*s]",
                        rd_kafka_name(wrk->kafka), len, data, keylen, key);
-            return errmsg;
+            *error = errmsg;
+            return 1;
         }
 
     REPLACE(payload, data);
@@ -628,7 +627,8 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         snprintf(errmsg, LINE_MAX, rd_kafka_err2str(rd_kafka_errno2err(errno)));
         MQ_LOG_Log(LOG_ERR, "%s message send failure (%d): %s",
                    rd_kafka_name(wrk->kafka), errno, errmsg);
-        ret = errmsg;
+        *error = errmsg;
+        ret = -1;
     }
     rd_kafka_poll(wrk->kafka, 0);
     return ret;

@@ -125,49 +125,50 @@ static const char
 *test_send(void)
 {
     const char *err;
+    int ret;
 
     printf("... testing Kafka message send\n");
 
     MASSERT0(worker != NULL, "MQ_Send: worker is NULL before call");
-    err = MQ_Send(worker, "foo bar baz quux", 16, "12345678", 8);
-    VMASSERT(err == NULL, "MQ_Send: %s", err);
+    ret = MQ_Send(worker, "foo bar baz quux", 16, "12345678", 8, &err);
+    VMASSERT(ret == 0, "MQ_Send: %s", err);
 
     /* Keys shorter and longer than 8 hex digits */
-    err = MQ_Send(worker, "the quick brown fox", 19, "abcdef", 6);
-    VMASSERT(err == NULL, "MQ_Send: %s", err);
-    err = MQ_Send(worker, "jumps over the lazy dog", 23,
-                  "fedcba9876543210", 16);
-    VMASSERT(err == NULL, "MQ_Send: %s", err);
+    ret = MQ_Send(worker, "the quick brown fox", 19, "abcdef", 6, &err);
+    VMASSERT(ret == 0, "MQ_Send: %s", err);
+    ret = MQ_Send(worker, "jumps over the lazy dog", 23,
+                  "fedcba9876543210", 16, &err);
+    VMASSERT(ret == 0, "MQ_Send: %s", err);
 
     /* No error if message is empty (silently discarded) */
-    err = MQ_Send(worker, "", 0, "12345678", 8);
-    VMASSERT(err == NULL, "MQ_Send: %s", err);
+    ret = MQ_Send(worker, "", 0, "12345678", 8, &err);
+    VMASSERT(ret == 0, "MQ_Send: %s", err);
 
-    /* Fail if the worker object is null */
-    err = MQ_Send(NULL, "foo bar baz quux", 16, "12345678", 8);
-    MAN(err);
+    /* Non-recoverable error if the worker object is null */
+    ret = MQ_Send(NULL, "foo bar baz quux", 16, "12345678", 8, &err);
+    MASSERT(ret < 0);
 
-    /* Fail if the key is empty */
-    err = MQ_Send(worker, "foo bar baz quux", 16, "", 0);
-    MAN(err);
+    /* Recoverable error if the key is empty */
+    ret = MQ_Send(worker, "foo bar baz quux", 16, "", 0 ,&err);
+    MASSERT(ret > 0);
     VMASSERT(strstr("shard key is missing", err) == 0,
              "MQ_Send unexpected error message: %s", err);
 
-    /* Fail if the key is NULL */
-    err = MQ_Send(worker, "foo bar baz quux", 16, NULL, 0);
-    MAN(err);
+    /* Recoverable error if the key is NULL */
+    ret = MQ_Send(worker, "foo bar baz quux", 16, NULL, 0, &err);
+    MASSERT(ret > 0);
     VMASSERT(strstr("shard key is missing", err) == 0,
              "MQ_Send unexpected error message: %s", err);
 
-    /* Fail if the key contains non-hex characters */
-    err = MQ_Send(worker, "foo bar baz quux", 16, "key", 3);
-    MAN(err);
+    /* Recoverable error if the key contains non-hex characters */
+    ret = MQ_Send(worker, "foo bar baz quux", 16, "key", 3, &err);
+    MASSERT(ret > 0);
     VMASSERT(strstr("shard key is not hex", err) == 0,
              "MQ_Send unexpected error message: %s", err);
 
-    /* Fail if the message is NULL */
-    err = MQ_Send(worker, NULL, 16, "12345678", 8);
-    MAN(err);
+    /* Recoverable error if the message is NULL */
+    ret = MQ_Send(worker, NULL, 16, "12345678", 8, &err);
+    MASSERT(ret > 0);
     VMASSERT(strstr("message payload is NULL", err) == 0,
              "MQ_Send unexpected error message: %s", err);
 
@@ -178,6 +179,7 @@ static const char
 *test_reconnect(void)
 {
     const char *err;
+    int ret;
 
     printf("... testing Kafka reconnect\n");
 
@@ -185,8 +187,8 @@ static const char
     err = MQ_Reconnect(&worker);
     VMASSERT(err == NULL, "MQ_Reconnect: %s", err);
     MASSERT0(worker != NULL, "MQ_Reconnect: worker is NULL after call");
-    err = MQ_Send(worker, "send after reconnect", 20, "12345678", 8);
-    VMASSERT(err == NULL, "MQ_Send() fails after reconnect: %s", err);
+    ret = MQ_Send(worker, "send after reconnect", 20, "12345678", 8, &err);
+    VMASSERT(ret == 0, "MQ_Send() fails after reconnect: %s", err);
 
     return NULL;
 }
@@ -195,6 +197,7 @@ static const char
 *test_worker_shutdown(void)
 {
     const char *err;
+    int ret;
 
     printf("... testing Kafka worker shutdown\n");
 
@@ -204,8 +207,8 @@ static const char
 
     MASSERT0(worker == NULL, "Worker not NULL after shutdown");
     
-    err = MQ_Send(worker, "foo bar baz quux", 16, "12345678", 8);
-    MASSERT0(err != NULL, "No failure on MQ_Send after worker shutdown");
+    ret = MQ_Send(worker, "foo bar baz quux", 16, "12345678", 8, &err);
+    MASSERT0(ret != 0, "No failure on MQ_Send after worker shutdown");
 
     return NULL;
 }
