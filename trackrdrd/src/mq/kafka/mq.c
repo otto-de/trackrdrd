@@ -38,7 +38,6 @@
 #include <syslog.h>
 #include <ctype.h>
 
-#include <librdkafka/rdkafka.h>
 #include <zookeeper/zookeeper.h>
 #include <zookeeper/zookeeper_version.h>
 #include <yajl/yajl_tree.h>
@@ -64,23 +63,6 @@
 #define SO_VERSION "unknown version"
 #endif
 
-typedef struct kafka_wrk {
-    unsigned		magic;
-#define KAFKA_WRK_MAGIC 0xd14d4425
-    int			n;
-    rd_kafka_t		*kafka;
-    rd_kafka_topic_t	*topic;
-    int			err;
-    char		reason[LINE_MAX]; /* errs from rdkafka callbacks */
-    char		errmsg[LINE_MAX]; /* thread-safe return from MQ_*() */
-    unsigned		nokey;
-    unsigned		badkey;
-    unsigned		nodata;
-} kafka_wrk_t;
-
-static kafka_wrk_t **workers;
-static unsigned nwrk = 0;
-
 static char logpath[PATH_MAX] = "";
 
 static char zookeeper[LINE_MAX] = "";
@@ -98,6 +80,7 @@ static char errmsg[LINE_MAX];
 static char _version[LINE_MAX];
 
 static int loglvl = LOG_INFO;
+static unsigned stats_interval = 0;
 
 static void
 log_cb(const rd_kafka_t *rk, int level, const char *fac, const char *buf)
@@ -194,7 +177,7 @@ partitioner_cb(const rd_kafka_topic_t *rkt, const void *keydata, size_t keylen,
 static const char
 *wrk_init(int wrk_num)
 {
-    char clientid[sizeof("libtrackrdr-kafka-worker 2147483648")];
+    char clientid[sizeof("libtrackrdr-kafka-worker-2147483648")];
     rd_kafka_conf_t *wrk_conf;
     rd_kafka_topic_conf_t *wrk_topic_conf;
     rd_kafka_t *rk;
@@ -205,7 +188,7 @@ static const char
 
     wrk_conf = rd_kafka_conf_dup(conf);
     wrk_topic_conf = rd_kafka_topic_conf_dup(topic_conf);
-    sprintf(clientid, "libtrackrdr-kafka-worker %d", wrk_num);
+    sprintf(clientid, "libtrackrdr-kafka-worker-%d", wrk_num);
     if (rd_kafka_conf_set(wrk_conf, "client.id", clientid, errmsg,
                           LINE_MAX) != RD_KAFKA_CONF_OK) {
         MQ_LOG_Log(LOG_ERR, "rdkafka config error [client.id = %s]: %s",
@@ -286,8 +269,7 @@ conf_add(const char *lval, const char *rval)
 
     errstr[0] = '\0';
 
-    /* XXX: rename as "mq.log" */
-    if (strcmp(lval, "log") == 0) {
+    if (strcmp(lval, "mq.log") == 0) {
         strncpy(logpath, rval, PATH_MAX);
         return(0);
     }
@@ -309,6 +291,24 @@ conf_add(const char *lval, const char *rval)
         if (val > UINT_MAX)
             return ERANGE;
         zoo_timeout = val;
+        return(0);
+    }
+    if (strcmp(lval, "statistics.interval.ms") == 0) {
+        char *endptr = NULL;
+        long val;
+
+        errno = 0;
+        val = strtoul(rval, &endptr, 10);
+        if (errno != 0)
+            return errno;
+        if (*endptr != '\0')
+            return EINVAL;
+        if (val > UINT_MAX)
+            return ERANGE;
+        stats_interval = val;
+        result = rd_kafka_conf_set(conf, lval, rval, errstr, LINE_MAX);
+        if (result != RD_KAFKA_CONF_OK)
+            return EINVAL;
         return(0);
     }
     if (strcmp(lval, "zookeeper.log") == 0) {
@@ -354,12 +354,7 @@ conf_add(const char *lval, const char *rval)
 const char *
 MQ_GlobalInit(unsigned nworkers, const char *config_fname)
 {
-    snprintf(_version, LINE_MAX,
-             "libtrackrdr-kafka %s, rdkafka %s, zookeeper %d.%d.%d, "
-             "yajl %d.%d.%d", SO_VERSION, rd_kafka_version_str(),
-             ZOO_MAJOR_VERSION, ZOO_MINOR_VERSION, ZOO_PATCH_VERSION,
-             YAJL_MAJOR, YAJL_MINOR, YAJL_MICRO);
-            
+    nwrk = nworkers;
     conf = rd_kafka_conf_new();
     topic_conf = rd_kafka_topic_conf_new();
 
@@ -375,6 +370,11 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
         }
         MQ_LOG_SetLevel(loglvl);
     }
+    snprintf(_version, LINE_MAX,
+             "libtrackrdr-kafka %s, rdkafka %s, zookeeper %d.%d.%d, "
+             "yajl %d.%d.%d", SO_VERSION, rd_kafka_version_str(),
+             ZOO_MAJOR_VERSION, ZOO_MINOR_VERSION, ZOO_PATCH_VERSION,
+             YAJL_MAJOR, YAJL_MINOR, YAJL_MICRO);
     MQ_LOG_Log(LOG_INFO, "initializing (%s)", _version);
 
     if (zookeeper[0] == '\0' && brokerlist[0] == '\0') {
@@ -392,7 +392,6 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
         MQ_LOG_Log(LOG_ERR, errmsg);
         return errmsg;
     }
-    nwrk = nworkers;
 
     if (zoolog[0] != '\0') {
         zoologf = fopen(zoolog, "a");
@@ -403,6 +402,16 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
             return errmsg;
         }
         zoo_set_log_stream(zoologf);
+    }
+
+    if (stats_interval != 0) {
+        int err = MQ_MON_Init(stats_interval);
+        if (err != 0) {
+            snprintf(errmsg, LINE_MAX, "Cannot start monitoring thread: %s",
+                     strerror(err));
+            MQ_LOG_Log(LOG_ERR, errmsg);
+            return errmsg;
+        }
     }
 
     rd_kafka_conf_set_dr_cb(conf, dr_cb);
@@ -722,6 +731,7 @@ MQ_GlobalShutdown(void)
 {
     int zerr;
 
+    MQ_MON_Fini();
     for (int i = 0; i < nwrk; i++)
         if (workers[i] != NULL)
             wrk_fini(workers[i]);
@@ -741,6 +751,7 @@ MQ_GlobalShutdown(void)
         MQ_LOG_Log(LOG_ERR, errmsg);
         return errmsg;
     }
+
     fclose(zoologf);
     MQ_LOG_Log(LOG_INFO, "shutting down");
     MQ_LOG_Close();
