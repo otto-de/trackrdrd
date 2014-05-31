@@ -9,7 +9,7 @@ Kafka implementation of the MQ interface for the Tracking Log Reader
 --------------------------------------------------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2014-05-28
+:Date:   2014-05-31
 :Version: 3.0
 :Manual section: 3
 
@@ -37,10 +37,10 @@ is specified as ``mq.config_fname`` in the configuration of
 * ``rdkafka``, a client library for Kafka
 * ``zookeeper_mt``, a client library for Apache ZooKeeper with
   multi-threading
-* ``yajl``, a library for JSON parsing
+* ``pcre``, a regular expression library (used for JSON parsing)
 
 The dynamic linker must also be able to find ``librdkafka.so``,
-``libzookeeper_mt.so`` and ``libyajl.so`` at runtime.
+``libzookeeper_mt.so`` and ``libpcre.so`` at runtime.
 
 BUILD/INSTALL
 =============
@@ -55,7 +55,7 @@ The sources for the library dependencies can be obtained from:
 
 * https://github.com/edenhill/librdkafka
 * http://zookeeper.apache.org/
-* http://lloyd.github.io/yajl/
+* http://www.pcre.org/
 
 Building and installing the library dependencies
 ------------------------------------------------
@@ -64,13 +64,16 @@ The Kafka interface has been tested with these library versions:
 
 * rdkafka 0.8.3
 * zookeeper_mt 3.4.6
-* yajl 2.0.4
+* pcre 8.30 2012-02-04
 
 If the libraries are already installed on the platform where
-``trackrdrd`` will run, then no further action is necessary. To build
-the libraries from source, it suffices to follow the instructions in
-the source distributions -- no special configuration for the plugin is
-necessary.
+``trackrdrd`` will run, then no further action is necessary. This is
+almost certainly the case for the pcre library, since it is a
+requirement for Varnish.
+
+To build the libraries from source, it suffices to follow the
+instructions in the source distributions -- no special configuration
+for the plugin is necessary.
 
 Building and installing libtrackrdr-kafka
 -----------------------------------------
