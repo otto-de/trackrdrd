@@ -15,6 +15,6 @@ test_kafka_LDADD = \
 	../log.$(OBJEXT) \
 	../monitor.$(OBJEXT) \
 	${PTHREAD_LIBS} \
-	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lyajl
+	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
 
 CLEANFILES = kafka.log zoo.log *~
