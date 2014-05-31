@@ -71,7 +71,7 @@ static FILE *zoologf;
 static zhandle_t *zh;
 static unsigned zoo_timeout = 0;
 
-static char topic[LINE_MAX];
+static char topic[LINE_MAX] = "";
 static rd_kafka_topic_conf_t *topic_conf;
 static rd_kafka_conf_t *conf;
 
@@ -349,7 +349,6 @@ conf_add(const char *lval, const char *rval)
         return(0);
 }
 
-/* XXX: fail if "topic" is not set */
 const char *
 MQ_GlobalInit(unsigned nworkers, const char *config_fname)
 {
@@ -380,6 +379,12 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
         snprintf(errmsg, LINE_MAX,
                  "zookeeper.connect and metadata.broker.list not set in %s",
                  config_fname);
+        MQ_LOG_Log(LOG_ERR, errmsg);
+        return errmsg;
+    }
+
+    if (topic[0] == '\0') {
+        snprintf(errmsg, LINE_MAX, "topic not set in %s", config_fname);
         MQ_LOG_Log(LOG_ERR, errmsg);
         return errmsg;
     }
