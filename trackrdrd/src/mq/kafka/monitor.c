@@ -69,11 +69,11 @@ static void
     unsigned interval = *((unsigned *) arg);
 
     /* Convert ms -> struct timespec */
-    t.tv_sec = (time_t) interval / 10e3;
-    t.tv_nsec = (interval % (unsigned) 10e3) * 10e6;
+    t.tv_sec = (time_t) interval / 1e3;
+    t.tv_nsec = (interval % (unsigned) 1e3) * 1e6;
     MQ_LOG_Log(LOG_INFO,
-               "libtrackrdr-kafka monitor thread running every %u.%03u secs",
-               t.tv_sec, t.tv_nsec / 10e6);
+               "libtrackrdr-kafka monitor thread running every %u.%03lu secs",
+               t.tv_sec, t.tv_nsec / (unsigned long) 1e6);
     run = 1;
 
     pthread_cleanup_push(monitor_cleanup, arg);
