@@ -13,6 +13,7 @@ test_kafka_LDADD = \
 	../../../config_common.$(OBJEXT)  \
 	../mq.$(OBJEXT) \
 	../log.$(OBJEXT) \
+	../monitor.$(OBJEXT) \
 	${PTHREAD_LIBS} \
 	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lyajl
 

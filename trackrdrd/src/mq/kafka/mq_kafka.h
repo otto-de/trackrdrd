@@ -1,11 +1,10 @@
 /*-
- * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012-2014 Otto Gmbh & Co KG
+ * Copyright (c) 2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
  * Authors: Geoffrey Simmons <geoffrey.simmons@uplex.de>
- *	    Nils Goroll <nils.goroll@uplex.de>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,12 +30,36 @@
  */
 
 #include <assert.h>
+#include <limits.h>
+
+#include <librdkafka/rdkafka.h>
 
 #define AZ(foo)         do { assert((foo) == 0); } while (0)
 #define AN(foo)         do { assert((foo) != 0); } while (0)
+
+typedef struct kafka_wrk {
+    unsigned		magic;
+#define KAFKA_WRK_MAGIC 0xd14d4425
+    int			n;
+    rd_kafka_t		*kafka;
+    rd_kafka_topic_t	*topic;
+    int			err;
+    char		reason[LINE_MAX]; /* errs from rdkafka callbacks    */
+    char		errmsg[LINE_MAX]; /* thread-safe return from MQ_*() */
+    unsigned		nokey;
+    unsigned		badkey;
+    unsigned		nodata;
+} kafka_wrk_t;
+
+kafka_wrk_t **workers;
+unsigned nwrk;
 
 /* log.c */
 int MQ_LOG_Open(const char *path);
 void MQ_LOG_Log(int level, const char *msg, ...);
 void MQ_LOG_SetLevel(int level);
 void MQ_LOG_Close(void);
+
+/* monitor.c */
+int MQ_MON_Init(unsigned interval);
+void MQ_MON_Fini(void);
