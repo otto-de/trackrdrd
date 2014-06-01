@@ -37,6 +37,7 @@
 #include <limits.h>
 #include <syslog.h>
 #include <ctype.h>
+#include <signal.h>
 
 #include <zookeeper/zookeeper.h>
 #include <zookeeper/zookeeper_version.h>
@@ -75,11 +76,42 @@ static char topic[LINE_MAX] = "";
 static rd_kafka_topic_conf_t *topic_conf;
 static rd_kafka_conf_t *conf;
 
+static unsigned stats_interval = 0;
+
 static char errmsg[LINE_MAX];
 static char _version[LINE_MAX];
 
 static int loglvl = LOG_INFO;
-static unsigned stats_interval = 0;
+static int saved_lvl = LOG_INFO;
+static int debug_toggle = 0;
+struct sigaction toggle_action;
+
+static void
+toggle_debug(int sig)
+{
+    (void) sig;
+
+    if (debug_toggle) {
+        /* Toggle from debug back to saved level */
+        loglvl = saved_lvl;
+        debug_toggle = 0;
+        MQ_LOG_Log(LOG_INFO, "Debug toggle switched off");
+        zoo_set_debug_level(ZOO_LOG_LEVEL_INFO);
+    }
+    else {
+        saved_lvl = loglvl;
+        loglvl = LOG_DEBUG;
+        debug_toggle = 1;
+        MQ_LOG_Log(LOG_INFO, "Debug toggle switched on");
+        zoo_set_debug_level(ZOO_LOG_LEVEL_DEBUG);
+    }
+    MQ_LOG_SetLevel(loglvl);
+    for (int i = 0; i < nwrk; i++)
+        if (workers[i] != NULL) {
+            CHECK_OBJ(workers[i], KAFKA_WRK_MAGIC);
+            rd_kafka_set_log_level(workers[i]->kafka, loglvl);
+        }
+}
 
 static void
 log_cb(const rd_kafka_t *rk, int level, const char *fac, const char *buf)
@@ -392,6 +424,16 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     workers = (kafka_wrk_t **) calloc(sizeof (kafka_wrk_t *), nworkers);
     if (workers == NULL) {
         snprintf(errmsg, LINE_MAX, "Cannot allocate worker table: %s",
+                 strerror(errno));
+        MQ_LOG_Log(LOG_ERR, errmsg);
+        return errmsg;
+    }
+
+    toggle_action.sa_handler = toggle_debug;
+    AZ(sigemptyset(&toggle_action.sa_mask));
+    toggle_action.sa_flags |= SA_RESTART;
+    if (sigaction(SIGUSR2, &toggle_action, NULL) != 0) {
+        snprintf(errmsg, LINE_MAX, "Cannot install signal handler for USR2: %s",
                  strerror(errno));
         MQ_LOG_Log(LOG_ERR, errmsg);
         return errmsg;
