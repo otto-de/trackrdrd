@@ -243,6 +243,9 @@ Statistic             Description
                       payload.
 ===================== ==========================================================
 
+The log level can be toggled to DEBUG and back by sending signal
+``USR2`` to the process, as described below.
+
 MESSAGE SEND FAILURE AND RECOVERY
 =================================
 
@@ -278,7 +281,20 @@ point in time.
 SIGNALS
 =======
 
-XXX: TuDu -- toggle DEBUG log level
+The message plugin overrides the signal handler of the tracking
+reader's child process for signal ``USR2`` (see signal(7)), so that it
+toggles the DEBUG log level when the process receives the signal.
+
+The initial log level is set by the configuration parameter
+``mq.debug`` when the plugin is initialized, and the level is changed
+from this level to DEBUG, or from DEBUG back to the initial level,
+when ``USR2`` is sent to the process (for example by using
+kill(1)). Log level toggling affects logging for the messaging plugin
+as well as the rdkafka and zookeeper client libraries.
+
+Logging at DEBUG level may be very verbose, so that log files may
+become very large (and partitions may overflow) if DEBUG level is left
+on for a long time.
 
 SEE ALSO
 ========
