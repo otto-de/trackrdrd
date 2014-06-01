@@ -1,4 +1,4 @@
-INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) -I$(top_srcdir)/include
+INCLUDES = -I$(top_srcdir)/include
 
 CURRENT = 3
 REVISION = 0
@@ -13,6 +13,7 @@ libtrackrdr_kafka_la_SOURCES = \
 	mq.c \
 	log.c \
 	monitor.c \
+	zookeeper.c \
 	$(top_srcdir)/src/config_common.c
 
 libtrackrdr_kafka_la_LIBADD = \
