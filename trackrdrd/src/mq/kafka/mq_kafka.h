@@ -63,3 +63,10 @@ void MQ_LOG_Close(void);
 /* monitor.c */
 int MQ_MON_Init(unsigned interval);
 void MQ_MON_Fini(void);
+
+/* zookeeper.c */
+const char *MQ_ZOO_Init(char *zooservers, unsigned timeout, char *brokerlist,
+                        int max);
+const char *MQ_ZOO_SetLog(const char *path);
+void MQ_ZOO_SetLogLevel(int level);
+const char *MQ_ZOO_Fini(void);
