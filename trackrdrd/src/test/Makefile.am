@@ -9,7 +9,9 @@ check_PROGRAMS = test_parse test_data test_hash test_mq test_spmcq	test_config \
 test_parse_SOURCES = \
 	minunit.h \
 	test_parse.c \
-	../trackrdrd.h
+	../trackrdrd.h \
+	testing.h \
+	testing.c
 
 test_parse_LDADD = \
 	-lm \
@@ -75,7 +77,9 @@ test_config_SOURCES = \
 	../trackrdrd.h
 
 test_config_LDADD = \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la
+	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
+	testing.$(OBJEXT)
+	
 
 test_worker_SOURCES = \
 	minunit.h \
