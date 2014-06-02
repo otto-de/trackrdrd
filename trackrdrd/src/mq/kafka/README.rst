@@ -290,10 +290,10 @@ associated with a worker object during ``MQ_Send()`` once before
 invoking the "produce" operation, once afterward, and also every time
 rdkafka internal statistics are queried as described above. If a prior
 error state is determined during the call to ``MQ_Send()``, then a log
-message at level WARNING is generated. It should be understood these
-warning messages describe an error that may have occurred at an
-earlier point in time, and recovery may have already succeeded (which
-can be ascertained from messages that appear earlier in the log).
+message at level ERROR is generated. It should be understood these
+messages describe an error that may have occurred at an earlier point
+in time, and recovery may have already succeeded (which can be
+ascertained from messages that appear earlier in the log).
 
 SIGNALS
 =======
