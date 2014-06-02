@@ -127,7 +127,7 @@ CONF_Add(const char *lval, const char *rval)
     confUnsigned("hash.mlt", hash_mlt);
     confUnsigned("nworkers", nworkers);
     confUnsigned("restarts", restarts);
-    confUnsigned("thread.restarts", restarts);
+    confUnsigned("thread.restarts", thread_restarts);
     confUnsigned("monitor.interval", monitor_interval);
 
     if (strcmp(lval, "maxdone") == 0) {
