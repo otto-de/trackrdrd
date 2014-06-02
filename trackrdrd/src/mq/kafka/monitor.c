@@ -40,12 +40,13 @@
 
 static pthread_t monitor;
 static int run = 0;
-static unsigned seen, produced, delivered, failed, nokey, badkey, nodata;
+static unsigned long seen, produced, delivered, failed, nokey, badkey, nodata;
 
 /* Call rd_kafka_poll() for each worker to provoke callbacks */
 static void
 poll_workers(void)
 {
+    seen = produced = delivered = failed = nokey = badkey = nodata = 0;
     for (int i = 0; i < nwrk; i++)
         if (workers[i] != NULL) {
             kafka_wrk_t *wrk = workers[i];
@@ -103,7 +104,6 @@ static void
                 pthread_exit(&err);
             }
         }
-        seen = produced = delivered = failed = nokey = badkey = nodata = 0;
         poll_workers();
         MQ_LOG_Log(LOG_INFO, "mq stats summary: seen=%u produced=%u "
                    "delivered=%u failed=%u nokey=%u badkey=%u nodata=%u",
