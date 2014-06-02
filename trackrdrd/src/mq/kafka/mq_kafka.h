@@ -43,8 +43,6 @@ typedef struct kafka_wrk {
     int			n;
     rd_kafka_t		*kafka;
     rd_kafka_topic_t	*topic;
-    int			err;
-    char		reason[LINE_MAX]; /* errs from rdkafka callbacks    */
     char		errmsg[LINE_MAX]; /* thread-safe return from MQ_*() */
     unsigned long	seen;
     unsigned long	produced;

@@ -124,10 +124,10 @@ dr_cb(rd_kafka_t *rk, void *payload, size_t len, rd_kafka_resp_err_t err,
     CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
 
     if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
-        strncpy(wrk->reason, rd_kafka_err2str(err), LINE_MAX);
-        MQ_LOG_Log(LOG_ERR, "Delivery error (client ID = %s, msg = [%.*s]): %s",
-                   rd_kafka_name(rk), (int) len, (char *) payload, wrk->reason);
-        wrk->err = (int) err;
+        MQ_LOG_Log(LOG_ERR,
+                   "Delivery error %d (client ID = %s, msg = [%.*s]): %s",
+                   err, rd_kafka_name(rk), (int) len, (char *) payload,
+                   rd_kafka_err2str(err));
         wrk->failed++;
     }
     else {
@@ -141,12 +141,10 @@ dr_cb(rd_kafka_t *rk, void *payload, size_t len, rd_kafka_resp_err_t err,
 static void
 error_cb(rd_kafka_t *rk, int err, const char *reason, void *opaque)
 {
-    kafka_wrk_t *wrk = (kafka_wrk_t *) opaque;
-    CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
+    (void) opaque;
+
     MQ_LOG_Log(LOG_ERR, "Client error (ID = %s) %d: %s", rd_kafka_name(rk), err,
                reason);
-    wrk->err = err;
-    strncpy(wrk->reason, reason, LINE_MAX);
 }
 
 static int
@@ -261,9 +259,7 @@ static const char
     wrk-> n = wrk_num;
     wrk->kafka = rk;
     wrk->topic = rkt;
-    wrk->err = 0;
     wrk->errmsg[0] = '\0';
-    wrk->reason[0] = '\0';
     wrk->seen = wrk->produced = wrk->delivered = wrk->failed = wrk->nokey
         = wrk->badkey = wrk->nodata = 0;
     workers[wrk_num] = wrk;
@@ -582,13 +578,7 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         return 0;
     }
 
-    /* Check for an error state */
     rd_kafka_poll(wrk->kafka, 0);
-    if (wrk->err) {
-        MQ_LOG_Log(LOG_WARNING, "%s error state (%d): %s",
-                   rd_kafka_name(wrk->kafka), wrk->err, wrk->reason);
-        wrk->err = 0;
-    }
 
     if (key == NULL || keylen == 0) {
         snprintf(wrk->errmsg, LINE_MAX, "%s message shard key is missing",
@@ -635,16 +625,9 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         *error = wrk->errmsg;
         return -1;
     }
+
     wrk->produced++;
-
-    /* Check for an error state again */
     rd_kafka_poll(wrk->kafka, 0);
-    if (wrk->err) {
-        MQ_LOG_Log(LOG_WARNING, "%s error state (%d): %s",
-                   rd_kafka_name(wrk->kafka), wrk->err, wrk->reason);
-        wrk->err = 0;
-    }
-
     return 0;
 }
 
