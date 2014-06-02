@@ -568,10 +568,6 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
     kafka_wrk_t *wrk;
     void *payload = NULL;
 
-    /* XXX: error? */
-    if (len == 0)
-        return 0;
-
     if (priv == NULL) {
         MQ_LOG_Log(LOG_ERR, "MQ_Send() called with NULL worker object");
         *error = "MQ_Send() called with NULL worker object";
@@ -580,20 +576,20 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
     CAST_OBJ(wrk, priv, KAFKA_WRK_MAGIC);
     wrk->seen++;
 
+    /* XXX: error? */
+    if (len == 0) {
+        wrk->nodata++;
+        return 0;
+    }
+
     /* Check for an error state */
     rd_kafka_poll(wrk->kafka, 0);
     if (wrk->err) {
-        snprintf(wrk->errmsg, LINE_MAX, "%s error state (%d): %s",
-                 rd_kafka_name(wrk->kafka), wrk->err, wrk->reason);
-        MQ_LOG_Log(LOG_ERR, wrk->errmsg);
-        *error = wrk->errmsg;
-        return -1;
+        MQ_LOG_Log(LOG_WARNING, "%s error state (%d): %s",
+                   rd_kafka_name(wrk->kafka), wrk->err, wrk->reason);
+        wrk->err = 0;
     }
 
-    /*
-     * XXX
-     * Toggle log level DEBUG with signals
-     */
     if (key == NULL || keylen == 0) {
         snprintf(wrk->errmsg, LINE_MAX, "%s message shard key is missing",
                  rd_kafka_name(wrk->kafka));
@@ -644,12 +640,11 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
     /* Check for an error state again */
     rd_kafka_poll(wrk->kafka, 0);
     if (wrk->err) {
-        snprintf(wrk->errmsg, LINE_MAX, "%s error state (%d): %s",
-                 rd_kafka_name(wrk->kafka), wrk->err, wrk->reason);
-        MQ_LOG_Log(LOG_ERR, wrk->errmsg);
-        *error = wrk->errmsg;
-        return -1;
+        MQ_LOG_Log(LOG_WARNING, "%s error state (%d): %s",
+                   rd_kafka_name(wrk->kafka), wrk->err, wrk->reason);
+        wrk->err = 0;
     }
+
     return 0;
 }
 
