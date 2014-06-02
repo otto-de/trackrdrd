@@ -104,3 +104,13 @@ main(int argc, char **argv)                            \
 }
 
 #endif
+
+/** debugging output */
+#define VERBOSE 1
+#ifdef VERBOSE
+#define verbose(fmt, ...) \
+    do { printf("%s:%d:%s: \n>>> "fmt"\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); } while (0)
+#else
+    #define verbose(fmt, ...) do{ } while ( 0 )
+#endif
+
