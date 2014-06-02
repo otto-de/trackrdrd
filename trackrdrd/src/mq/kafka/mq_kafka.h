@@ -46,6 +46,10 @@ typedef struct kafka_wrk {
     int			err;
     char		reason[LINE_MAX]; /* errs from rdkafka callbacks    */
     char		errmsg[LINE_MAX]; /* thread-safe return from MQ_*() */
+    unsigned		seen;
+    unsigned		produced;
+    unsigned		delivered;
+    unsigned		failed;
     unsigned		nokey;
     unsigned		badkey;
     unsigned		nodata;
