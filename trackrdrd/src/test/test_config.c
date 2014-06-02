@@ -34,6 +34,7 @@
 #include <string.h>
 
 #include "minunit.h"
+#include "testing.h"
 
 #include "../trackrdrd.h"
 #include "config_common.h"
@@ -42,52 +43,10 @@ int tests_run = 0;
 #define DEFAULT_USER "nobody"
 #define DEFAULT_PID_FILE "/var/run/trackrdrd.pid"
 
-int compareFiles(const char * fname1, const char * fname2);
-
 char verbose_buffer[9000];
 char * getConfigContent(void);
 
 int saveConfig(const char * fname);
-
-int compareFiles(const char * fname1, const char * fname2)
-{
-    FILE *fp1, *fp2;
-    int ch1, ch2;
-    int line = 1;
-    int col = 1;
-
-    fp1 = fopen( fname1,  "r" );
-    if ( fp1 == NULL )
-    {
-       printf("Cannot open %s for reading ", fname1 );
-       return -2;
-    }
-
-    fp2 = fopen( fname2,  "r" ) ;
-    if (fp2 == NULL)
-    {
-       printf("Cannot open %s for reading ", fname2 );
-       fclose ( fp1 );
-       return -3;
-    }
-    do
-    {
-        col++;
-        ch1 = getc( fp1 );
-        ch2 = getc( fp2 );
-        if ( ch1 == '\n' )
-        {
-            line++;
-            col = 0;
-        }
-    } while ((ch1 != EOF) && (ch2 != EOF) && (ch1 == ch2));
-    fclose ( fp1 );
-    fclose ( fp2 );
-    if ( ch1 != ch2 ) {
-        printf("  files differ at line: %i col: %i \n", line, col);
-    }
-    return ch1 == ch2;
-}
 
 #define confdump(str,val) \
     i += sprintf(verbose_buffer + i, str"\n", (val))
@@ -166,7 +125,6 @@ static char
 {
     printf("... testing CONF_ReadDefault\n");
 
-//    CONF_Init();
     strcpy(config.log_file, "testing.log");
     LOG_Open("trackrdrd");
     LOG_SetLevel(7);
@@ -176,9 +134,9 @@ static char
     VMASSERT(err == 0, "Error code during reading default config: %i", err);
     err = CONF_ReadFile("trackrdrd.conf", CONF_Add);
     VMASSERT(err == 0, "Error code during reading config: %i", err);
-    verbose("Config is:\n%s", getConfigContent());
+//    verbose("Config is:\n%s", getConfigContent());
     saveConfig("trackrdrd.conf.new");
-    VMASSERT(compareFiles("trackrdrd.conf", "trackrdrd.conf.new"),
+    VMASSERT(TEST_compareFiles("trackrdrd.conf", "trackrdrd.conf.new"),
         "Files are not equal: %s %s", "trackrdrd.conf", "trackrdrd.conf.new");
 //	CONF_Dump();
 
