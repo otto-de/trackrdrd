@@ -60,18 +60,6 @@
 #define SO_VERSION "unknown version"
 #endif
 
-static char logpath[PATH_MAX] = "";
-
-static char zookeeper[LINE_MAX] = "";
-static char brokerlist[LINE_MAX] = "";
-static char zoolog[PATH_MAX] = "";
-static unsigned zoo_timeout = 0;
-
-static rd_kafka_topic_conf_t *topic_conf;
-static rd_kafka_conf_t *conf;
-
-static unsigned stats_interval = 0;
-
 static char errmsg[LINE_MAX];
 static char _version[LINE_MAX];
 
@@ -105,105 +93,13 @@ toggle_debug(int sig)
         }
 }
 
-static int
-conf_add(const char *lval, const char *rval)
-{
-    rd_kafka_conf_res_t result;
-    char errstr[LINE_MAX];
-
-    errstr[0] = '\0';
-
-    if (strcmp(lval, "mq.log") == 0) {
-        strncpy(logpath, rval, PATH_MAX);
-        return(0);
-    }
-    if (strcmp(lval, "zookeeper.connect") == 0) {
-        strncpy(zookeeper, rval, LINE_MAX);
-        return(0);
-    }
-    /* XXX: "zookeeper.connection.timeout.ms", to match Kafka config */
-    if (strcmp(lval, "zookeeper.timeout") == 0) {
-        char *endptr = NULL;
-        long val;
-
-        errno = 0;
-        val = strtoul(rval, &endptr, 10);
-        if (errno != 0)
-            return errno;
-        if (*endptr != '\0')
-            return EINVAL;
-        if (val > UINT_MAX)
-            return ERANGE;
-        zoo_timeout = val;
-        return(0);
-    }
-    if (strcmp(lval, "statistics.interval.ms") == 0) {
-        char *endptr = NULL;
-        long val;
-
-        errno = 0;
-        val = strtoul(rval, &endptr, 10);
-        if (errno != 0)
-            return errno;
-        if (*endptr != '\0')
-            return EINVAL;
-        if (val > UINT_MAX)
-            return ERANGE;
-        stats_interval = val;
-        result = rd_kafka_conf_set(conf, lval, rval, errstr, LINE_MAX);
-        if (result != RD_KAFKA_CONF_OK)
-            return EINVAL;
-        return(0);
-    }
-    if (strcmp(lval, "zookeeper.log") == 0) {
-        strncpy(zoolog, rval, PATH_MAX);
-        return(0);
-    }
-    if (strcmp(lval, "topic") == 0) {
-        strncpy(topic, rval, LINE_MAX);
-        return(0);
-    }
-    if (strcmp(lval, "metadata.broker.list") == 0) {
-        strncpy(brokerlist, rval, LINE_MAX);
-        result = rd_kafka_conf_set(conf, lval, rval, errstr, LINE_MAX);
-        if (result != RD_KAFKA_CONF_OK)
-            return EINVAL;
-        return(0);
-    }
-    /* XXX: use the rdkakfka param "log_level" instead */
-    if (strcmp(lval, "mq.debug") == 0) {
-        if (strcmp(rval, "1") == 0
-            || strcasecmp(rval, "true") == 0
-            || strcasecmp(rval, "yes") == 0
-            || strcasecmp(rval, "on") == 0)
-            loglvl = LOG_DEBUG;
-        else if (strcmp(rval, "0") != 0
-                 && strcasecmp(rval, "false") != 0
-                 && strcasecmp(rval, "no") != 0
-                 && strcasecmp(rval, "off") != 0)
-            return EINVAL;
-        return(0);
-    }
-
-    result = rd_kafka_topic_conf_set(topic_conf, lval, rval, errstr, LINE_MAX);
-    if (result == RD_KAFKA_CONF_UNKNOWN)
-        result = rd_kafka_conf_set(conf, lval, rval, errstr, LINE_MAX);
-    if (result != RD_KAFKA_CONF_OK)
-        return EINVAL;
-    else
-        return(0);
-}
-
 const char *
 MQ_GlobalInit(unsigned nworkers, const char *config_fname)
 {
+    CONF_Init();
     nwrk = nworkers;
-    conf = rd_kafka_conf_new();
-    topic_conf = rd_kafka_topic_conf_new();
-    loglvl = LOG_INFO;
-    topic[0] = '\0';
 
-    if (CONF_ReadFile(config_fname, conf_add) != 0)
+    if (CONF_ReadFile(config_fname, CONF_Add) != 0)
         return "Error reading config file for Kafka";
 
     if (logpath[0] != '\0') {
@@ -255,7 +151,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     }
 
     if (zoolog[0] != '\0') {
-        const char *err = MQ_ZOO_SetLog(zoolog);
+        const char *err = MQ_ZOO_OpenLog();
         if (err != NULL) {
             snprintf(errmsg, LINE_MAX, "Cannot open zookeeper.log %s: %s",
                      zoolog, err);
@@ -285,8 +181,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
         const char **cfg;
 
         /* Dump config */
-        MQ_LOG_Log(LOG_DEBUG, "zookeeper.connect = %s", zookeeper);
-        MQ_LOG_Log(LOG_DEBUG, "topic = %s", topic);
+        CONF_Dump();
         cfg = rd_kafka_conf_dump(conf, &cfglen);
         if (cfg != NULL && cfglen > 0)
             for (int i = 0; i < cfglen >> 1; i++) {
@@ -318,8 +213,7 @@ MQ_InitConnections(void)
         char zbrokerlist[LINE_MAX];
         const char *err;
 
-        if ((err = MQ_ZOO_Init(zookeeper, zoo_timeout, zbrokerlist, LINE_MAX))
-            != NULL) {
+        if ((err = MQ_ZOO_Init(zbrokerlist, LINE_MAX)) != NULL) {
             snprintf(errmsg, LINE_MAX,
                      "Failed to init/connect to zookeeper [%s]: %s",
                      zookeeper, err);
@@ -353,7 +247,7 @@ MQ_InitConnections(void)
     }
 
     for (int i = 0; i < nwrk; i++) {
-        const char *err = WRK_Init(i, conf, topic_conf);
+        const char *err = WRK_Init(i);
         if (err != NULL)
             return err;
     }
@@ -459,7 +353,7 @@ MQ_Reconnect(void **priv)
     assert(wrk_num >= 0 && wrk_num < nwrk);
     WRK_Fini(wrk);
 
-    err = WRK_Init(wrk_num, conf, topic_conf);
+    err = WRK_Init(wrk_num);
     if (err != NULL)
         return err;
     *priv = workers[wrk_num];

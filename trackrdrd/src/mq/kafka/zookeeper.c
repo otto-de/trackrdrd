@@ -57,16 +57,16 @@ static char errmsg[LINE_MAX];
 static FILE *zoologf = NULL;
 
 static const char
-*setBrokerList(char *brokerlist, int max)
+*setBrokerList(char *brokers, int max)
 {
-    struct String_vector brokers;
+    struct String_vector broker_ids;
     int result;
-    char *brokerptr = brokerlist;
+    char *brokerptr = brokers;
     const char *pcre_err;
 
     AN(zh);
 
-    if ((result = zoo_get_children(zh, BROKER_PATH, 1, &brokers)) != ZOK) {
+    if ((result = zoo_get_children(zh, BROKER_PATH, 1, &broker_ids)) != ZOK) {
         snprintf(errmsg, LINE_MAX, "Cannot get broker ids from zookeeper: %s",
                  zerror(result));
         return errmsg;
@@ -83,16 +83,16 @@ static const char
         AN(port_regex);
     }
 
-    memset(brokerlist, 0, max);
-    for (int i = 0; i < brokers.count; i++) {
+    memset(brokers, 0, max);
+    for (int i = 0; i < broker_ids.count; i++) {
         char path[PATH_MAX], broker[LINE_MAX];
         int len = LINE_MAX;
 
-        snprintf(path, PATH_MAX, "/brokers/ids/%s", brokers.data[i]);
+        snprintf(path, PATH_MAX, "/brokers/ids/%s", broker_ids.data[i]);
         if ((result = zoo_get(zh, path, 0, broker, &len, NULL)) != ZOK) {
             snprintf(errmsg, LINE_MAX,
                      "Cannot get config for broker id %s: %s",
-                     brokers.data[i], zerror(result));
+                     broker_ids.data[i], zerror(result));
             return errmsg;
         }
         if (len > 0) {
@@ -101,13 +101,13 @@ static const char
 
             broker[len] = '\0';
             MQ_LOG_Log(LOG_DEBUG, "Zookeeper broker id %s config: %s",
-                       brokers.data[i], broker);
+                       broker_ids.data[i], broker);
 
             r = pcre_exec(host_regex, NULL, broker, len, 0, 0, ovector, 6);
             if (r <= PCRE_ERROR_NOMATCH) {
                 snprintf(errmsg, LINE_MAX,
                          "Host not found in config for broker id %s [%s]",
-                         brokers.data[i], broker);
+                         broker_ids.data[i], broker);
                 return errmsg;
             }
             pcre_get_substring(broker, ovector, r, 1, &host);
@@ -116,30 +116,30 @@ static const char
             if (r <= PCRE_ERROR_NOMATCH) {
                 snprintf(errmsg, LINE_MAX,
                          "Port not found in config for broker id %s [%s]",
-                         brokers.data[i], broker);
+                         broker_ids.data[i], broker);
                 return errmsg;
             }
             pcre_get_substring(broker, ovector, r, 1, &port);
             AN(port);
 
-            if (strlen(brokerlist) + strlen(host) + strlen(port) + 2 > max) {
+            if (strlen(brokers) + strlen(host) + strlen(port) + 2 > max) {
                 snprintf(errmsg, LINE_MAX,
                          "Broker list length exceeds max %d [%s%s:%s]",
-                         max, brokerlist, host, port);
+                         max, brokers, host, port);
                 return errmsg;
             }
             sprintf(brokerptr, "%s:%s", host, port);
             pcre_free_substring(host);
             pcre_free_substring(port);
             brokerptr += strlen(brokerptr);
-            if (i < brokers.count - 1)
+            if (i < broker_ids.count - 1)
                 *brokerptr++ = ',';
         }
         else
             MQ_LOG_Log(LOG_WARNING, "Empty config returned for broker id %s",
-                       brokers.data[i]);
+                       broker_ids.data[i]);
     }
-    deallocate_String_vector(&brokers);
+    deallocate_String_vector(&broker_ids);
     return NULL;
 }
 
@@ -167,25 +167,27 @@ watcher(zhandle_t *zzh, int type, int state, const char *path, void *watcherCtx)
 }
 
 const char
-*MQ_ZOO_Init(char *zooservers, unsigned timeout, char *brokerlist, int max)
+*MQ_ZOO_Init(char *brokers, int max)
 {
+    AN(zookeeper[0]);
+
     /* XXX: wait for ZOO_CONNECTED_STATE */
     errno = 0;
-    zh = zookeeper_init(zooservers, watcher, timeout, 0, 0, 0);
+    zh = zookeeper_init(zookeeper, watcher, zoo_timeout, 0, 0, 0);
     if (zh == NULL) {
         snprintf(errmsg, LINE_MAX, "init/connect failure: %s", strerror(errno));
         return errmsg;
     }
-    return setBrokerList(brokerlist, max);
+    return setBrokerList(brokers, max);
 }
 
 const char
-*MQ_ZOO_SetLog(const char *path)
+*MQ_ZOO_OpenLog(void)
 {
-    AN(path);
-    AN(path[0]);
+    AN(zoolog);
+    AN(zoolog[0]);
 
-    zoologf = fopen(path, "a");
+    zoologf = fopen(zoolog, "a");
     if (zoologf == NULL) {
         strncpy(errmsg, strerror(errno), LINE_MAX);
         return errmsg;

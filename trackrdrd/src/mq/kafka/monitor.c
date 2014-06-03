@@ -77,6 +77,8 @@ static void
     struct timespec t;
     unsigned interval = *((unsigned *) arg);
 
+    AN(interval);
+
     /* Convert ms -> struct timespec */
     t.tv_sec = (time_t) interval / 1e3;
     t.tv_nsec = (interval % (unsigned) 1e3) * 1e6;

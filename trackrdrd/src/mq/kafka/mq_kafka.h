@@ -56,9 +56,18 @@ typedef struct kafka_wrk {
 kafka_wrk_t **workers;
 unsigned nwrk;
 
+/* configuration */
 char topic[LINE_MAX];
-
 int loglvl;
+char logpath[PATH_MAX];
+char zookeeper[LINE_MAX];
+char brokerlist[LINE_MAX];
+char zoolog[PATH_MAX];
+unsigned zoo_timeout;
+unsigned stats_interval;
+
+rd_kafka_topic_conf_t *topic_conf;
+rd_kafka_conf_t *conf;
 
 /* log.c */
 int MQ_LOG_Open(const char *path);
@@ -71,15 +80,13 @@ int MQ_MON_Init(unsigned interval);
 void MQ_MON_Fini(void);
 
 /* zookeeper.c */
-const char *MQ_ZOO_Init(char *zooservers, unsigned timeout, char *brokerlist,
-                        int max);
-const char *MQ_ZOO_SetLog(const char *path);
+const char *MQ_ZOO_Init(char *brokers, int max);
+const char *MQ_ZOO_OpenLog(void);
 void MQ_ZOO_SetLogLevel(int level);
 const char *MQ_ZOO_Fini(void);
 
 /* worker.c */
-const char *WRK_Init(int wrk_num, rd_kafka_conf_t *conf,
-                     rd_kafka_topic_conf_t *topic_conf);
+const char *WRK_Init(int wrk_num);
 void WRK_AddBrokers(const char *brokers);
 void WRK_Fini(kafka_wrk_t *wrk);
 
@@ -92,3 +99,8 @@ void CB_DeliveryReport(rd_kafka_t *rk, void *payload, size_t len,
                        rd_kafka_resp_err_t err, void *opaque, void *msg_opaque);
 void CB_Error(rd_kafka_t *rk, int err, const char *reason, void *opaque);
 int CB_Stats(rd_kafka_t *rk, char *json, size_t json_len, void *opaque);
+
+/* config.c */
+void CONF_Init(void);
+int CONF_Add(const char *lval, const char *rval);
+void CONF_Dump(void);

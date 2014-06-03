@@ -17,6 +17,7 @@ test_kafka_LDADD = \
 	../zookeeper.$(OBJEXT) \
 	../worker.$(OBJEXT) \
 	../callback.$(OBJEXT) \
+	../config.$(OBJEXT) \
 	${PTHREAD_LIBS} \
 	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
 
