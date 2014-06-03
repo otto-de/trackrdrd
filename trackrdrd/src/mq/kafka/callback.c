@@ -37,6 +37,7 @@
 #include <syslog.h>
 
 #include "mq_kafka.h"
+#include "miniobj.h"
 
 /*
  * Partitioner assumes that the key string is an unsigned 32-bit
@@ -77,4 +78,58 @@ CB_Partitioner(const rd_kafka_topic_t *rkt, const void *keydata, size_t keylen,
     MQ_LOG_Log(LOG_DEBUG, "Computed partition %d for key %.*s", partition,
                (int) keylen, (const char *) keydata);
     return partition;
+}
+
+void
+CB_Log(const rd_kafka_t *rk, int level, const char *fac, const char *buf)
+{
+    (void) fac;
+    MQ_LOG_Log(level, "rdkafka %s: %s", rd_kafka_name(rk), buf);
+}
+
+void
+CB_DeliveryReport(rd_kafka_t *rk, void *payload, size_t len,
+                  rd_kafka_resp_err_t err, void *opaque, void *msg_opaque)
+{
+    (void) msg_opaque;
+    kafka_wrk_t *wrk = (kafka_wrk_t *) opaque;
+    CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
+
+    if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+        MQ_LOG_Log(LOG_ERR,
+                   "Delivery error %d (client ID = %s, msg = [%.*s]): %s",
+                   err, rd_kafka_name(rk), (int) len, (char *) payload,
+                   rd_kafka_err2str(err));
+        wrk->failed++;
+    }
+    else {
+        wrk->delivered++;
+        if (loglvl == LOG_DEBUG)
+            MQ_LOG_Log(LOG_DEBUG, "Delivered (client ID = %s): msg = [%.*s]",
+                       rd_kafka_name(rk), (int) len, (char *) payload);
+    }
+}
+
+void
+CB_Error(rd_kafka_t *rk, int err, const char *reason, void *opaque)
+{
+    (void) opaque;
+
+    MQ_LOG_Log(LOG_ERR, "Client error (ID = %s) %d: %s", rd_kafka_name(rk), err,
+               reason);
+}
+
+int
+CB_Stats(rd_kafka_t *rk, char *json, size_t json_len, void *opaque)
+{
+    kafka_wrk_t *wrk = (kafka_wrk_t *) opaque;
+    CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
+    MQ_LOG_Log(LOG_INFO, "rdkafka stats (ID = %s): %.*s", rd_kafka_name(rk),
+               (int) json_len, json);
+    MQ_LOG_Log(LOG_INFO,
+               "mq stats (ID = %s): seen=%u produced=%u delivered=%u failed=%u "
+               "nokey=%u badkey=%u nodata=%u",
+               rd_kafka_name(rk), wrk->seen, wrk->produced, wrk->delivered,
+               wrk->failed, wrk->nokey, wrk->badkey, wrk->nodata);
+    return 0;
 }
