@@ -38,6 +38,24 @@
 
 #include "mq_kafka.h"
 
+static int
+conf_getUnsignedInt(const char *rval, unsigned *i)
+{
+    unsigned long n;
+    char *p;
+
+    errno = 0;
+    n = strtoul(rval, &p, 10);
+    if (errno)
+        return(errno);
+    if (strlen(p) != 0)
+        return(EINVAL);
+    if (n > UINT_MAX)
+        return(ERANGE);
+    *i = (unsigned int) n;
+    return(0);
+}
+
 void
 CONF_Init(void)
 {
@@ -51,6 +69,7 @@ CONF_Init(void)
     stats_interval = 0;
     zoolog[0] = '\0';
     brokerlist[0] = '\0';
+    wrk_shutdown_timeout = 1000;
 }
 
 int
@@ -58,6 +77,7 @@ CONF_Add(const char *lval, const char *rval)
 {
     rd_kafka_conf_res_t result;
     char errstr[LINE_MAX];
+    int err;
 
     errstr[0] = '\0';
 
@@ -71,33 +91,18 @@ CONF_Add(const char *lval, const char *rval)
     }
     /* XXX: "zookeeper.connection.timeout.ms", to match Kafka config */
     if (strcmp(lval, "zookeeper.timeout") == 0) {
-        char *endptr = NULL;
-        long val;
-
-        errno = 0;
-        val = strtoul(rval, &endptr, 10);
-        if (errno != 0)
-            return errno;
-        if (*endptr != '\0')
-            return EINVAL;
-        if (val > UINT_MAX)
-            return ERANGE;
-        zoo_timeout = val;
+        if ((err = conf_getUnsignedInt(rval, &zoo_timeout)) != 0)
+            return(err);
+        return(0);
+    }
+    if (strcmp(lval, "worker.shutdown.timeout.ms") == 0) {
+        if ((err = conf_getUnsignedInt(rval, &wrk_shutdown_timeout)) != 0)
+            return(err);
         return(0);
     }
     if (strcmp(lval, "statistics.interval.ms") == 0) {
-        char *endptr = NULL;
-        long val;
-
-        errno = 0;
-        val = strtoul(rval, &endptr, 10);
-        if (errno != 0)
-            return errno;
-        if (*endptr != '\0')
-            return EINVAL;
-        if (val > UINT_MAX)
-            return ERANGE;
-        stats_interval = val;
+        if ((err = conf_getUnsignedInt(rval, &stats_interval)) != 0)
+            return(err);
         result = rd_kafka_conf_set(conf, lval, rval, errstr, LINE_MAX);
         if (result != RD_KAFKA_CONF_OK)
             return EINVAL;
@@ -150,5 +155,7 @@ CONF_Dump(void)
     MQ_LOG_Log(LOG_DEBUG, "zookeeper.timeout = %u", zoo_timeout);
     MQ_LOG_Log(LOG_DEBUG, "zookeeper.log = %s", zoolog);
     MQ_LOG_Log(LOG_DEBUG, "topic = %s", topic);
+    MQ_LOG_Log(LOG_DEBUG, "worker.shutdown.timeout.ms = %u",
+               wrk_shutdown_timeout);
     // leaving out mq.debug for now
 }

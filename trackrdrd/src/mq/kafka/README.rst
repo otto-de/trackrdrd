@@ -145,27 +145,41 @@ The ``topic`` parameter MUST be set.
 In addition to configuration parameters for ``rdkafka``, these
 parameters can be specified:
 
-===================== ==========================================================
-Parameter             Description
-===================== ==========================================================
-``zookeeper.connect`` Comma-separated list of ``host:port`` pairs specifying
-                      the addresses of ZooKeeper servers. If not set, then
-                      ``metadata.broker.list`` MUST be set, as described above.
---------------------- ----------------------------------------------------------
-``zookeeper.timeout`` Timeout in milliseconds for connections to ZooKeeper
-                      servers. If 0, then a connection attempt fails immediately
-                      if the servers cannot be reached. (optional, default 0)
---------------------- ----------------------------------------------------------
-``zookeeper.log``     Path of a log file for the ZooKeeper client (optional)
---------------------- ----------------------------------------------------------
-``mq.log``            Path of a log file for the messaging plugin and Kafka
-                      client (optional)
---------------------- ----------------------------------------------------------
-``topic``             Name of the Kafka topic to which messages are sent
-                      (required)
---------------------- ----------------------------------------------------------
-``mq.debug``          If set to true, then log at DEBUG level
-===================== ==========================================================
+=================================== ============================================
+Parameter                           Description
+=================================== ============================================
+``zookeeper.connect``               Comma-separated list of ``host:port`` pairs
+                                    specifying the addresses of ZooKeeper
+                                    servers. If not set, then
+                                    ``metadata.broker.list`` MUST be set, as
+                                    described above.
+----------------------------------- --------------------------------------------
+``zookeeper.timeout``               Timeout in milliseconds for connections to
+                                    ZooKeeper servers. If 0, then a connection
+                                    attempt fails immediately if the servers
+                                    cannot be reached. (optional, default 0)
+----------------------------------- --------------------------------------------
+``zookeeper.log``                   Path of a log file for the ZooKeeper client
+                                    (optional)
+----------------------------------- --------------------------------------------
+``mq.log``                          Path of a log file for the messaging plugin
+                                    and Kafka client (optional)
+----------------------------------- --------------------------------------------
+``topic``                           Name of the Kafka topic to which messages
+                                    are sent (required)
+----------------------------------- --------------------------------------------
+``mq.debug``                        If set to true, then log at DEBUG level
+----------------------------------- --------------------------------------------
+``worker.shutdown.timeout.ms``      If non-zero, workers will wait this long
+                                    before they shut down for acknowledgements
+                                    that all of the messages that they produced
+                                    are delivered; and on global shutdown, the
+                                    plugin will wait this long for all rdkafka
+                                    client objects to finalize. If zero, wait
+                                    indefinitely for message delivery, but don't
+                                    wait for rdkafka finalization. (optional,
+                                    default 1000 ms)
+=================================== ============================================
 
 Except as noted below, the configuration can specify any parameters for
 the ``rdkafka`` client, as documented at::
