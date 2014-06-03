@@ -30,42 +30,54 @@
  */
 
 /**
- * Module:       testing.h
+ * Module:       test_utils.c
  * Description:  Contains utilities for testing.
  */
 
-#ifndef _TESTING_H
-#define _TESTING_H
-
-
 /***** includes ***************************************************************/
 
-#include <stdio.h>
-
-
-/***** defines ****************************************************************/
-
-/** debugging output */
-#define VERBOSE 1
-#ifdef VERBOSE
-#define verbose(fmt, ...) \
-    do { printf("%8s:%4d:%20s:>>> "fmt"\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); } while (0)
-#else
-    #define verbose(fmt, ...) do{ } while ( 0 )
-#endif
-
-
-/***** variables **************************************************************/
-
-extern long global_line_pos;               /* actual position in input line */
-
-
-/***** structures *************************************************************/
+#include "test_utils.h"
 
 
 /***** functions **************************************************************/
 
-extern int TEST_compareFiles(const char * fname1, const char * fname2);
+int TEST_compareFiles(const char * fname1, const char * fname2)
+{
+    FILE *fp1, *fp2;
+    int ch1, ch2;
+    int line = 1;
+    int col = 1;
 
+    fp1 = fopen( fname1,  "r" );
+    if ( fp1 == NULL )
+    {
+       printf("Cannot open %s for reading ", fname1 );
+       return -2;
+    }
 
-#endif /* _TESTING_H */
+    fp2 = fopen( fname2,  "r" ) ;
+    if (fp2 == NULL)
+    {
+       printf("Cannot open %s for reading ", fname2 );
+       fclose ( fp1 );
+       return -3;
+    }
+    do
+    {
+        col++;
+        ch1 = getc( fp1 );
+        ch2 = getc( fp2 );
+        if ( ch1 == '\n' )
+        {
+            line++;
+            col = 0;
+        }
+    } while ((ch1 != EOF) && (ch2 != EOF) && (ch1 == ch2));
+    fclose ( fp1 );
+    fclose ( fp2 );
+    if ( ch1 != ch2 ) {
+        printf("  files differ at line: %i col: %i \n", line, col);
+    }
+    return ch1 == ch2;
+}
+
