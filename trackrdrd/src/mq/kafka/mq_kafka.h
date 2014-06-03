@@ -56,6 +56,10 @@ typedef struct kafka_wrk {
 kafka_wrk_t **workers;
 unsigned nwrk;
 
+char topic[LINE_MAX];
+
+int loglvl;
+
 /* log.c */
 int MQ_LOG_Open(const char *path);
 void MQ_LOG_Log(int level, const char *msg, ...);
@@ -72,3 +76,14 @@ const char *MQ_ZOO_Init(char *zooservers, unsigned timeout, char *brokerlist,
 const char *MQ_ZOO_SetLog(const char *path);
 void MQ_ZOO_SetLogLevel(int level);
 const char *MQ_ZOO_Fini(void);
+
+/* worker.c */
+const char *WRK_Init(int wrk_num, rd_kafka_conf_t *conf,
+                     rd_kafka_topic_conf_t *topic_conf);
+void WRK_AddBrokers(const char *brokers);
+void WRK_Fini(kafka_wrk_t *wrk);
+
+/* callback.c */
+int32_t CB_Partitioner(const rd_kafka_topic_t *rkt, const void *keydata,
+                       size_t keylen, int32_t partition_cnt, void *rkt_opaque,
+                       void *msg_opaque);
