@@ -89,8 +89,7 @@ CONF_Add(const char *lval, const char *rval)
         strncpy(zookeeper, rval, LINE_MAX);
         return(0);
     }
-    /* XXX: "zookeeper.connection.timeout.ms", to match Kafka config */
-    if (strcmp(lval, "zookeeper.timeout") == 0) {
+    if (strcmp(lval, "zookeeper.connection.timeout.ms") == 0) {
         if ((err = conf_getUnsignedInt(rval, &zoo_timeout)) != 0)
             return(err);
         return(0);

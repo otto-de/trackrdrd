@@ -154,10 +154,10 @@ Parameter                           Description
                                     ``metadata.broker.list`` MUST be set, as
                                     described above.
 ----------------------------------- --------------------------------------------
-``zookeeper.timeout``               Timeout in milliseconds for connections to
-                                    ZooKeeper servers. If 0, then a connection
-                                    attempt fails immediately if the servers
-                                    cannot be reached. (optional, default 0)
+``zookeeper.connection.timeout.ms`` Timeout for connections to ZooKeeper
+                                    servers. If 0, then a connection  attempt
+                                    fails immediately if the servers cannot be
+                                    reached. (optional, default 0)
 ----------------------------------- --------------------------------------------
 ``zookeeper.log``                   Path of a log file for the ZooKeeper client
                                     (optional)
