@@ -400,6 +400,11 @@ MQ_GlobalShutdown(void)
             WRK_Fini(workers[i]);
     free(workers);
 
+    if (wrk_shutdown_timeout
+        && rd_kafka_wait_destroyed(wrk_shutdown_timeout) != 0)
+        MQ_LOG_Log(LOG_WARNING, "timeout (%u ms) waiting for "
+                   "rdkafka clients to shut down", wrk_shutdown_timeout);
+
     rd_kafka_conf_destroy(conf);
     rd_kafka_topic_conf_destroy(topic_conf);
 
