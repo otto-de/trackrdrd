@@ -30,7 +30,6 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <strings.h>
@@ -68,7 +67,6 @@ static char brokerlist[LINE_MAX] = "";
 static char zoolog[PATH_MAX] = "";
 static unsigned zoo_timeout = 0;
 
-static char topic[LINE_MAX] = "";
 static rd_kafka_topic_conf_t *topic_conf;
 static rd_kafka_conf_t *conf;
 
@@ -77,7 +75,6 @@ static unsigned stats_interval = 0;
 static char errmsg[LINE_MAX];
 static char _version[LINE_MAX];
 
-static int loglvl = LOG_INFO;
 static int saved_lvl = LOG_INFO;
 static int debug_toggle = 0;
 struct sigaction toggle_action;
@@ -160,135 +157,6 @@ stats_cb(rd_kafka_t *rk, char *json, size_t json_len, void *opaque)
                rd_kafka_name(rk), wrk->seen, wrk->produced, wrk->delivered,
                wrk->failed, wrk->nokey, wrk->badkey, wrk->nodata);
     return 0;
-}
-
-/*
- * Partitioner assumes that the key string is an unsigned 32-bit
- * hexadecimal.
- */
-static int32_t
-partitioner_cb(const rd_kafka_topic_t *rkt, const void *keydata, size_t keylen,
-               int32_t partition_cnt, void *rkt_opaque, void *msg_opaque)
-{
-    int32_t partition;
-    unsigned long key;
-    char keystr[sizeof("ffffffff")], *endptr = NULL;
-    (void) rkt_opaque;
-    (void) msg_opaque;
-
-    assert(partition_cnt > 0);
-    assert(keylen <= 8);
-
-    strncpy(keystr, (const char *) keydata, keylen);
-    keystr[keylen] = '\0';
-    errno = 0;
-    key = strtoul(keystr, &endptr, 16);
-    if (errno != 0 || *endptr != '\0' || key > 0xffffffffUL) {
-        MQ_LOG_Log(LOG_ERR, "Cannot parse partition key: %.*s", (int) keylen,
-                   (const char *) keydata);
-        return RD_KAFKA_PARTITION_UA;
-    }
-    if ((partition_cnt & (partition_cnt - 1)) == 0)
-        /* partition_cnt is a power of 2 */
-        partition = key & (partition_cnt - 1);
-    else
-        partition = key % partition_cnt;
-
-    if (! rd_kafka_topic_partition_available(rkt, partition)) {
-        MQ_LOG_Log(LOG_ERR, "Partition %d not available", partition);
-        return RD_KAFKA_PARTITION_UA;
-    }
-    MQ_LOG_Log(LOG_DEBUG, "Computed partition %d for key %.*s", partition,
-               (int) keylen, (const char *) keydata);
-    return partition;
-}
-
-/* XXX: encapsulate wrk_init and _fini in a separate source */
-
-static const char
-*wrk_init(int wrk_num)
-{
-    char clientid[sizeof("libtrackrdr-kafka-worker-2147483648")];
-    rd_kafka_conf_t *wrk_conf;
-    rd_kafka_topic_conf_t *wrk_topic_conf;
-    rd_kafka_t *rk;
-    rd_kafka_topic_t *rkt;
-    kafka_wrk_t *wrk;
-
-    assert(wrk_num >= 0 && wrk_num < nwrk);
-
-    wrk_conf = rd_kafka_conf_dup(conf);
-    wrk_topic_conf = rd_kafka_topic_conf_dup(topic_conf);
-    sprintf(clientid, "libtrackrdr-kafka-worker-%d", wrk_num);
-    if (rd_kafka_conf_set(wrk_conf, "client.id", clientid, errmsg,
-                          LINE_MAX) != RD_KAFKA_CONF_OK) {
-        MQ_LOG_Log(LOG_ERR, "rdkafka config error [client.id = %s]: %s",
-                   clientid, errmsg);
-        return errmsg;
-    }
-    rd_kafka_topic_conf_set_partitioner_cb(wrk_topic_conf, partitioner_cb);
-
-    ALLOC_OBJ(wrk, KAFKA_WRK_MAGIC);
-    if (wrk == NULL) {
-        snprintf(errmsg, LINE_MAX, "Failed to create worker handle: %s",
-                 strerror(errno));
-        MQ_LOG_Log(LOG_ERR, errmsg);
-        return errmsg;
-    }
-    rd_kafka_conf_set_opaque(wrk_conf, (void *) wrk);
-    rd_kafka_topic_conf_set_opaque(wrk_topic_conf, (void *) wrk);
-
-    rk = rd_kafka_new(RD_KAFKA_PRODUCER, wrk_conf, errmsg, LINE_MAX);
-    if (rk == NULL) {
-        MQ_LOG_Log(LOG_ERR, "Failed to create producer: %s", errmsg);
-        return errmsg;
-    }
-    CHECK_OBJ_NOTNULL((kafka_wrk_t *) rd_kafka_opaque(rk), KAFKA_WRK_MAGIC);
-    rd_kafka_set_log_level(rk, loglvl);
-
-    errno = 0;
-    rkt = rd_kafka_topic_new(rk, topic, wrk_topic_conf);
-    if (rkt == NULL) {
-        rd_kafka_resp_err_t rkerr = rd_kafka_errno2err(errno);
-        snprintf(errmsg, LINE_MAX, "Failed to initialize topic: %s",
-                 rd_kafka_err2str(rkerr));
-        MQ_LOG_Log(LOG_ERR, errmsg);
-        return errmsg;
-    }
-
-    wrk-> n = wrk_num;
-    wrk->kafka = rk;
-    wrk->topic = rkt;
-    wrk->errmsg[0] = '\0';
-    wrk->seen = wrk->produced = wrk->delivered = wrk->failed = wrk->nokey
-        = wrk->badkey = wrk->nodata = 0;
-    workers[wrk_num] = wrk;
-    MQ_LOG_Log(LOG_INFO, "initialized worker %d: %s", wrk_num,
-               rd_kafka_name(wrk->kafka));
-    rd_kafka_poll(wrk->kafka, 0);
-    return NULL;
-}
-
-static void
-wrk_fini(kafka_wrk_t *wrk)
-{
-    int wrk_num;
-
-    CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
-
-    wrk_num = wrk->n;
-    assert(wrk_num >= 0 && wrk_num < nwrk);
-
-    /* Wait for messages to be delivered */
-    /* XXX: timeout? configure poll timeout? */
-    while (rd_kafka_outq_len(wrk->kafka) > 0)
-        rd_kafka_poll(wrk->kafka, 100);
-
-    rd_kafka_topic_destroy(wrk->topic);
-    rd_kafka_destroy(wrk->kafka);
-    FREE_OBJ(wrk);
-    AN(wrk);
-    workers[wrk_num] = NULL;
 }
 
 static int
@@ -386,6 +254,8 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     nwrk = nworkers;
     conf = rd_kafka_conf_new();
     topic_conf = rd_kafka_topic_conf_new();
+    loglvl = LOG_INFO;
+    topic[0] = '\0';
 
     if (CONF_ReadFile(config_fname, conf_add) != 0)
         return "Error reading config file for Kafka";
@@ -462,7 +332,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     rd_kafka_conf_set_error_cb(conf, error_cb);
     rd_kafka_conf_set_log_cb(conf, log_cb);
     rd_kafka_conf_set_stats_cb(conf, stats_cb);
-    rd_kafka_topic_conf_set_partitioner_cb(topic_conf, partitioner_cb);
+    rd_kafka_topic_conf_set_partitioner_cb(topic_conf, CB_Partitioner);
 
     if (loglvl == LOG_DEBUG) {
         size_t cfglen;
@@ -537,7 +407,7 @@ MQ_InitConnections(void)
     }
 
     for (int i = 0; i < nwrk; i++) {
-        const char *err = wrk_init(i);
+        const char *err = WRK_Init(i, conf, topic_conf);
         if (err != NULL)
             return err;
     }
@@ -641,9 +511,9 @@ MQ_Reconnect(void **priv)
     CAST_OBJ_NOTNULL(wrk, *priv, KAFKA_WRK_MAGIC);
     wrk_num = wrk->n;
     assert(wrk_num >= 0 && wrk_num < nwrk);
-    wrk_fini(wrk);
+    WRK_Fini(wrk);
 
-    err = wrk_init(wrk_num);
+    err = WRK_Init(wrk_num, conf, topic_conf);
     if (err != NULL)
         return err;
     *priv = workers[wrk_num];
@@ -673,7 +543,7 @@ MQ_WorkerShutdown(void **priv)
     kafka_wrk_t *wrk;
 
     CAST_OBJ_NOTNULL(wrk, *priv, KAFKA_WRK_MAGIC);
-    wrk_fini(wrk);
+    WRK_Fini(wrk);
     *priv = NULL;
 
     return NULL;
@@ -687,7 +557,7 @@ MQ_GlobalShutdown(void)
     MQ_MON_Fini();
     for (int i = 0; i < nwrk; i++)
         if (workers[i] != NULL)
-            wrk_fini(workers[i]);
+            WRK_Fini(workers[i]);
     free(workers);
 
     rd_kafka_conf_destroy(conf);

@@ -162,19 +162,7 @@ watcher(zhandle_t *zzh, int type, int state, const char *path, void *watcherCtx)
             return;
         }
         if (brokers[0] != '\0')
-            /* XXX: encapsulate */
-            for (int i = 0; i < nwrk; i++)
-                if (workers[i] != NULL) {
-                    int nbrokers;
-
-                    CHECK_OBJ(workers[i], KAFKA_WRK_MAGIC);
-                    nbrokers = rd_kafka_brokers_add(workers[i]->kafka, brokers);
-                    /* XXX: poll timeout configurable? */
-                    rd_kafka_poll(workers[i]->kafka, 10);
-                    MQ_LOG_Log(LOG_INFO, "%s: added %d brokers [%s]",
-                               rd_kafka_name(workers[i]->kafka), nbrokers,
-                               brokers);
-                }
+            WRK_AddBrokers((const char *) brokers);
     }
 }
 
