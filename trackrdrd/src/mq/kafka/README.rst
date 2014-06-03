@@ -168,8 +168,6 @@ Parameter                           Description
 ``topic``                           Name of the Kafka topic to which messages
                                     are sent (required)
 ----------------------------------- --------------------------------------------
-``mq.debug``                        If set to true, then log at DEBUG level
------------------------------------ --------------------------------------------
 ``worker.shutdown.timeout.ms``      If non-zero, workers will wait this long
                                     before they shut down for acknowledgements
                                     that all of the messages that they produced
@@ -185,6 +183,12 @@ Except as noted below, the configuration can specify any parameters for
 the ``rdkafka`` client, as documented at::
 
 	https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+
+The ``rdkafka`` parameter ``log_level`` sets the log level for both
+the ``rdkafka`` client and the messaging plugin. Note that the value
+of this parameter is a numeric syslog(3) "serverity level" (cf. RFC
+5424 section 6.2.1, table 2), so INFO level is 6 (the default) and
+DEBUG level is 7.
 
 The following ``rdkafka`` parameters in the config file are ignored
 (they are set internally by the messaging plugin, or are only relevant

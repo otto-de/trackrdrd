@@ -122,17 +122,15 @@ CONF_Add(const char *lval, const char *rval)
             return EINVAL;
         return(0);
     }
-    /* XXX: use the rdkakfka param "log_level" instead */
-    if (strcmp(lval, "mq.debug") == 0) {
-        if (strcmp(rval, "1") == 0
-            || strcasecmp(rval, "true") == 0
-            || strcasecmp(rval, "yes") == 0
-            || strcasecmp(rval, "on") == 0)
-            loglvl = LOG_DEBUG;
-        else if (strcmp(rval, "0") != 0
-                 && strcasecmp(rval, "false") != 0
-                 && strcasecmp(rval, "no") != 0
-                 && strcasecmp(rval, "off") != 0)
+    if (strcmp(lval, "log_level") == 0) {
+        unsigned l;
+        if ((err = conf_getUnsignedInt(rval, &l)) != 0)
+            return(err);
+        if (loglvl > LOG_DEBUG)
+            return EINVAL;
+        loglvl = l;
+        result = rd_kafka_conf_set(conf, lval, rval, errstr, LINE_MAX);
+        if (result != RD_KAFKA_CONF_OK)
             return EINVAL;
         return(0);
     }
@@ -156,5 +154,4 @@ CONF_Dump(void)
     MQ_LOG_Log(LOG_DEBUG, "topic = %s", topic);
     MQ_LOG_Log(LOG_DEBUG, "worker.shutdown.timeout.ms = %u",
                wrk_shutdown_timeout);
-    // leaving out mq.debug for now
 }
