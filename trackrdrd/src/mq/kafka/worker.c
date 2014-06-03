@@ -33,11 +33,20 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 #include "mq_kafka.h"
 #include "miniobj.h"
 
 static char errmsg[LINE_MAX];
+
+static unsigned
+get_clock_ms(void)
+{
+    struct timespec t;
+    AZ(clock_gettime(CLOCK_REALTIME, &t));
+    return (t.tv_sec * 1e3) + (t.tv_nsec / 1e6);
+}
 
 const char
 *WRK_Init(int wrk_num)
@@ -123,6 +132,7 @@ void
 WRK_Fini(kafka_wrk_t *wrk)
 {
     int wrk_num;
+    unsigned t = 0;
 
     CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
 
@@ -130,9 +140,17 @@ WRK_Fini(kafka_wrk_t *wrk)
     assert(wrk_num >= 0 && wrk_num < nwrk);
 
     /* Wait for messages to be delivered */
-    /* XXX: timeout? configure poll timeout? */
-    while (rd_kafka_outq_len(wrk->kafka) > 0)
+    if (wrk_shutdown_timeout)
+        t = get_clock_ms();
+    while (rd_kafka_outq_len(wrk->kafka) > 0) {
         rd_kafka_poll(wrk->kafka, 100);
+        if (t && (get_clock_ms() - t > wrk_shutdown_timeout)) {
+            MQ_LOG_Log(LOG_WARNING,
+                       "%s: timeout (%u ms) waiting for message delivery",
+                       rd_kafka_name(wrk->kafka), wrk_shutdown_timeout);
+            break;
+        }
+    }
 
     rd_kafka_topic_destroy(wrk->topic);
     rd_kafka_destroy(wrk->kafka);

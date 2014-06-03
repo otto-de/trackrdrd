@@ -65,6 +65,7 @@ char brokerlist[LINE_MAX];
 char zoolog[PATH_MAX];
 unsigned zoo_timeout;
 unsigned stats_interval;
+unsigned wrk_shutdown_timeout;
 
 rd_kafka_topic_conf_t *topic_conf;
 rd_kafka_conf_t *conf;
