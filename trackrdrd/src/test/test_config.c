@@ -29,29 +29,37 @@
  *
  */
 
+/***** includes ***************************************************************/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "minunit.h"
-#include "testing.h"
+#include "test_utils.h"
 
 #include "../trackrdrd.h"
 #include "config_common.h"
 
-int tests_run = 0;
+
+/***** defines ****************************************************************/
+
 #define DEFAULT_USER "nobody"
 #define DEFAULT_PID_FILE "/var/run/trackrdrd.pid"
-
-char verbose_buffer[9000];
-char * getConfigContent(void);
-
-int saveConfig(const char * fname);
 
 #define confdump(str,val) \
     i += sprintf(verbose_buffer + i, str"\n", (val))
 
-char *
+
+/***** variables **************************************************************/
+
+int tests_run = 0;
+char verbose_buffer[9000];
+
+
+/***** functions **************************************************************/
+
+static char *
 getConfigContent(void)
 {
     int i = 0;
@@ -81,7 +89,8 @@ getConfigContent(void)
     return verbose_buffer;
 }
 
-int saveConfig(const char * fname)
+static int
+saveConfig(const char * fname)
 {
     FILE *fp;
     char * content;
@@ -105,8 +114,8 @@ int saveConfig(const char * fname)
     return 0;
 }
 
-static char
-*test_CONF_Init(void)
+static char *
+test_CONF_Init(void)
 {
     printf("... testing CONF_Init\n");
 
@@ -120,8 +129,30 @@ static char
 }
 
 
-static char
-*test_CONF_ReadDefault(void)
+static char *
+readAndCompare(const char * confName)
+{
+    int err;
+    char confNameNew[512];
+
+    err = CONF_ReadDefault();
+    VMASSERT(err == 0, "Error code during reading default config: %i", err);
+    err = CONF_ReadFile(confName, CONF_Add);
+    VMASSERT(err == 0, "Error code during reading config \"%s\": %i", confName, err);
+//    verbose("Config is:\n%s", getConfigContent());
+
+    strcpy(confNameNew, confName);
+    strcat(confNameNew, ".new");
+    saveConfig(confNameNew);
+    VMASSERT(TEST_compareFiles(confName, confNameNew),
+        "Files are not equal: \"%s\" and \"%s\"", confName, confNameNew);
+//  CONF_Dump();
+
+    return NULL;
+}
+
+static const char *
+test_CONF_ReadDefault(void)
 {
     printf("... testing CONF_ReadDefault\n");
 
@@ -129,23 +160,16 @@ static char
     LOG_Open("trackrdrd");
     LOG_SetLevel(7);
 
-    int err;
-    err = CONF_ReadDefault();
-    VMASSERT(err == 0, "Error code during reading default config: %i", err);
-    err = CONF_ReadFile("trackrdrd.conf", CONF_Add);
-    VMASSERT(err == 0, "Error code during reading config: %i", err);
-//    verbose("Config is:\n%s", getConfigContent());
-    saveConfig("trackrdrd.conf.new");
-    VMASSERT(TEST_compareFiles("trackrdrd.conf", "trackrdrd.conf.new"),
-        "Files are not equal: %s %s", "trackrdrd.conf", "trackrdrd.conf.new");
-//	CONF_Dump();
+    returnIfNotNull(readAndCompare("trackrdrd_001.conf"));
+    returnIfNotNull(readAndCompare("trackrdrd_002.conf"));
+    returnIfNotNull(readAndCompare("trackrdrd_003.conf"));
 
     return NULL;
 }
 
 
-static const char
-*all_tests(void)
+static const char *
+all_tests(void)
 {
     mu_run_test(test_CONF_Init);
     mu_run_test(test_CONF_ReadDefault);
