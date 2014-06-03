@@ -87,3 +87,8 @@ void WRK_Fini(kafka_wrk_t *wrk);
 int32_t CB_Partitioner(const rd_kafka_topic_t *rkt, const void *keydata,
                        size_t keylen, int32_t partition_cnt, void *rkt_opaque,
                        void *msg_opaque);
+void CB_Log(const rd_kafka_t *rk, int level, const char *fac, const char *buf);
+void CB_DeliveryReport(rd_kafka_t *rk, void *payload, size_t len,
+                       rd_kafka_resp_err_t err, void *opaque, void *msg_opaque);
+void CB_Error(rd_kafka_t *rk, int err, const char *reason, void *opaque);
+int CB_Stats(rd_kafka_t *rk, char *json, size_t json_len, void *opaque);
