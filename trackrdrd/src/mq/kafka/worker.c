@@ -40,7 +40,7 @@
 static char errmsg[LINE_MAX];
 
 const char
-*WRK_Init(int wrk_num, rd_kafka_conf_t *conf, rd_kafka_topic_conf_t *topic_conf)
+*WRK_Init(int wrk_num)
 {
     char clientid[sizeof("libtrackrdr-kafka-worker-2147483648")];
     rd_kafka_conf_t *wrk_conf;

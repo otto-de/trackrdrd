@@ -16,6 +16,7 @@ libtrackrdr_kafka_la_SOURCES = \
 	zookeeper.c \
 	worker.c \
 	callback.c \
+	config.c \
 	$(top_srcdir)/src/config_common.c
 
 libtrackrdr_kafka_la_LIBADD = \
