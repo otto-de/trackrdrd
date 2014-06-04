@@ -14,9 +14,9 @@ Packager: LHOTSE Operations <lhotse-ops@dv.otto.de>
 AutoReqProv: no
 %endif
 %if "%{_vendor}" == "redhat"
-BuildRequires: activemq-cpp-library-devel
+BuildRequires: activemq-cpp-library-devel libzookeeper-devel librdkafka-devel
 Requires: lhotse-varnish
-Requires: libtrackrdr-activemq
+Requires: libtrackrdr-activemq libtrackrdr-kafka
 %endif
 #Requires: logrotate
 #Requires(post): /sbin/chkconfig
@@ -36,6 +36,15 @@ Requires: libactivemq-cpp6
 
 %description -n libtrackrdr-activemq
 ActiveMQ implementation of the messaging interface for the Varnish log
+tracking reader
+
+%package -n libtrackrdr-kafka
+Summary: Kafka implementation of the trackrdrd MQ interface
+Group: System Environment/Libraries
+Requires: libzookeeper librdkafka1
+
+%description -n libtrackrdr-kafka
+Kafka implementation of the messaging interface for the Varnish log
 tracking reader
 
 %prep
@@ -61,19 +70,29 @@ rm -rf %{_builddir}/*
 %config(noreplace) %{_sysconfdir}/init.d/%{name}
 
 %post -n libtrackrdr-activemq -p /sbin/ldconfig
+%post -n libtrackrdr-kafka -p /sbin/ldconfig
 
 %postun -n libtrackrdr-activemq -p /sbin/ldconfig
+%postun -n libtrackrdr-kafka -p /sbin/ldconfig
 
 %files -n libtrackrdr-activemq
 %defattr(-,root,root,-)
-%{prefix}/lib/trackrdrd/*
+%{prefix}/lib/trackrdrd/libtrackrdr-activemq.*
 %doc %{prefix}/share/man/man3/libtrackrdr-activemq.3
 
+%files -n libtrackrdr-kafka
+%defattr(-,root,root,-)
+%{prefix}/lib/trackrdrd/libtrackrdr-kafka.*
+%doc %{prefix}/share/man/man3/libtrackrdr-kafka.3
+
 %changelog
-* Tue May 20 2014  Geoff Simmons <groff@uplex.de> 3.0
+* Wed Jun  4 2014  Geoff Simmons <geoff@uplex.de> 3.0
+- Add package libtrackrdr-kafka
+
+* Tue May 20 2014  Geoff Simmons <geoff@uplex.de> 3.0
 - Add man page for libtrackrdr-activemq
 
-* Mon May 12 2014  Geoff Simmons <groff@uplex.de> 3.0
+* Mon May 12 2014  Geoff Simmons <geoff@uplex.de> 3.0
 - Add package libtrackrdr-activemq, and adjust dependencies
 
 * Mon Apr 29 2013  Geoff Simmons <geoff@uplex.de> 1.0
