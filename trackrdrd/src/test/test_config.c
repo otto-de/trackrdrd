@@ -114,8 +114,8 @@ saveConfig(const char * fname)
     return 0;
 }
 
-static char *
-test_CONF_Init(void)
+static char
+*test_CONF_Init(void)
 {
     printf("... testing CONF_Init\n");
 
@@ -129,8 +129,8 @@ test_CONF_Init(void)
 }
 
 
-static char *
-readAndCompare(const char * confName)
+static char
+*readAndCompare(const char * confName)
 {
     int err;
     char confNameNew[512];
@@ -151,8 +151,8 @@ readAndCompare(const char * confName)
     return NULL;
 }
 
-static const char *
-test_CONF_ReadDefault(void)
+static const char
+*test_CONF_ReadDefault(void)
 {
     printf("... testing CONF_ReadDefault\n");
 
