@@ -46,6 +46,7 @@
 
 #define DEFAULT_USER "nobody"
 #define DEFAULT_PID_FILE "/var/run/trackrdrd.pid"
+#define DEFAULT_RESTART_PAUSE 1
 
 #define confdump(str,val) \
     i += sprintf(verbose_buffer + i, str"\n", (val))
@@ -84,6 +85,7 @@ getConfigContent(void)
     confdump("mq.config_file = %s", config.mq_config_file);
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
+    confdump("restart.pause = %u", config.restart_pause);
     confdump("thread.restarts = %u", config.thread_restarts);
     confdump("user = %s", config.user_name);
     return verbose_buffer;
@@ -125,6 +127,7 @@ static char
     	"Default user name expected: \"%s\", but found: \"%s\"", DEFAULT_USER, config.user_name);
     VMASSERT(!strcmp(DEFAULT_PID_FILE, config.pid_file),
     	"Default pid file name expected: \"%s\", but found: \"%s\"", DEFAULT_PID_FILE, config.user_name);
+    MASSERT(DEFAULT_RESTART_PAUSE == config.restart_pause);
     return NULL;
 }
 

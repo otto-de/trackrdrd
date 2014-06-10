@@ -127,6 +127,7 @@ CONF_Add(const char *lval, const char *rval)
     confUnsigned("hash.mlt", hash_mlt);
     confUnsigned("nworkers", nworkers);
     confUnsigned("restarts", restarts);
+    confUnsigned("restart.pause", restart_pause);
     confUnsigned("thread.restarts", thread_restarts);
     confUnsigned("monitor.interval", monitor_interval);
 
@@ -209,6 +210,7 @@ CONF_Init(void)
     config.mq_config_file[0] = '\0';
     config.nworkers = 1;
     config.restarts = 1;
+    config.restart_pause = 1;
     config.thread_restarts = 1;
     
     pw = getpwnam(DEFAULT_USER);
@@ -261,6 +263,7 @@ CONF_Dump(void)
     confdump("mq.config_file = %s", config.mq_config_file);
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
+    confdump("restart.pause = %u", config.restart_pause);
     confdump("thread.restarts = %u", config.thread_restarts);
     confdump("user = %s", config.user_name);
 }
