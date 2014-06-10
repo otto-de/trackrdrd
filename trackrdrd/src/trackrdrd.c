@@ -196,6 +196,11 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
             parent_shutdown(EXIT_FAILURE, 0);
         }
         
+        if (config.restart_pause > 0) {
+            LOG_Log(LOG_INFO, "Pausing %u seconds before restarting child",
+                    config.restart_pause);
+            TIM_sleep(config.restart_pause);
+        }
         child_pid = child_restart(child_pid, vd, endless, 0);
         restarts++;
     }
