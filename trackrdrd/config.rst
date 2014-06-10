@@ -50,6 +50,8 @@ Parameter            CLI Option Description                                     
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``restarts``                    Maximum number of restarts of the child process by the management process                 1
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``restart.pause``               Seconds to pause before restarting a child process                                        1
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``thread.restarts``             Maximum number of restarts of a worker thread by the child process. A thread is restarted 1
                                 after a message send, message system reconnect and message resend have all failed. If the
                                 restart limit for a thread is reached, then the thread goes into the state ``abandoned``
