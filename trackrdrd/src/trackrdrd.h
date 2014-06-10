@@ -322,6 +322,7 @@ struct config {
     char	mq_config_file[BUFSIZ];
     unsigned	nworkers;
     unsigned	restarts;
+    unsigned	restart_pause;
     unsigned	thread_restarts;
     char	user_name[BUFSIZ];
     uid_t	uid;
