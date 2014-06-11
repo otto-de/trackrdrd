@@ -274,7 +274,7 @@ static void
         wrk->status = EXIT_SUCCESS;
     }
     
-    err = mqf.worker_shutdown(&mq_worker);
+    err = mqf.worker_shutdown(&mq_worker, wrk->id);
     if (err != NULL) {
         LOG_Log(LOG_ALERT, "Worker %d: MQ worker shutdown failed: %s",
                 wrk->id, err);

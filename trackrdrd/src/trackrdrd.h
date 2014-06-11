@@ -49,7 +49,7 @@ typedef int send_f(void *priv, const char *data, unsigned len,
 typedef const char *version_f(void *priv, char *version);
 typedef const char *client_id_f(void *priv, char *clientID);
 typedef const char *reconnect_f(void **priv);
-typedef const char *worker_shutdown_f(void **priv);
+typedef const char *worker_shutdown_f(void **priv, int wrk_num);
 typedef const char *global_shutdown_f(void);
 
 struct mqf {

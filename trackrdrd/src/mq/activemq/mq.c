@@ -195,14 +195,11 @@ MQ_ClientID(void *priv, char *clientID)
 }
 
 const char *
-MQ_WorkerShutdown(void **priv)
+MQ_WorkerShutdown(void **priv, int wrk_num)
 {
     const char *err;
-    int wrk_num;
 
-    err = AMQ_GetNum((AMQ_Worker *) *priv, &wrk_num);
-    if (err != NULL)
-        return err;
+    wrk_num--;
     assert(wrk_num >= 0 && wrk_num < nwrk);
     if (connections[wrk_num] != NULL) {
         err = AMQ_ConnectionShutdown(connections[wrk_num]);
@@ -210,6 +207,8 @@ MQ_WorkerShutdown(void **priv)
             return err;
         connections[wrk_num] = NULL;
     }
+    if (workers[wrk_num] != (AMQ_Worker *) *priv)
+        return "AMQ worker handle not found in worker table";
     AMQ_WorkerShutdown((AMQ_Worker **) priv);
     if (err != NULL)
         return err;
