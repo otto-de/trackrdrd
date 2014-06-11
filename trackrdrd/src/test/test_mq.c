@@ -209,7 +209,7 @@ static const char
     printf("... testing worker shutdown\n");
 
     mu_assert("MQ_WorkerShutdown: worker is NULL before call", worker != NULL);
-    err = mqf.worker_shutdown(&worker);
+    err = mqf.worker_shutdown(&worker, NWORKERS);
     sprintf(errmsg, "MQ_WorkerShutdown: %s", err);
     mu_assert(errmsg, err == NULL);
 

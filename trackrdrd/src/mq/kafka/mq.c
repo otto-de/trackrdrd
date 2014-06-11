@@ -378,10 +378,11 @@ MQ_ClientID(void *priv, char *clientID)
 }
 
 const char *
-MQ_WorkerShutdown(void **priv)
+MQ_WorkerShutdown(void **priv, int wrk_num)
 {
     kafka_wrk_t *wrk;
 
+    (void) wrk_num;
     CAST_OBJ_NOTNULL(wrk, *priv, KAFKA_WRK_MAGIC);
     WRK_Fini(wrk);
     *priv = NULL;

@@ -202,7 +202,7 @@ static const char
     printf("... testing Kafka worker shutdown\n");
 
     MASSERT0(worker != NULL, "MQ_Send: worker is NULL before call");
-    err = MQ_WorkerShutdown(&worker);
+    err = MQ_WorkerShutdown(&worker, NWORKERS);
     VMASSERT(err == NULL, "MQ_WorkerShutdown: %s", err);
 
     MASSERT0(worker == NULL, "Worker not NULL after shutdown");

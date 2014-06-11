@@ -34,7 +34,7 @@
  * \brief MQ messaging interface for trackrdrd
  * \details MQ -- the messaging interface for the Varnish log tracking
  * reader
- * \version 3
+ * \version 4
  *
  * This header defines the interface to a messaging system, such as
  * ActiveMQ or Kafka, used by the tracking reader. It is responsible for
@@ -236,9 +236,11 @@ const char *MQ_Reconnect(void **priv);
  * this method (so it may, for example, be set to `NULL`).
  *
  * @param priv pointer to the private object handle
+ * @param wrk_num worker number, the same value passed in the call
+ * to MQ_Init() when this object was initialized
  * @return `NULL` on success, an error message on failure
  */
-const char *MQ_WorkerShutdown(void **priv);
+const char *MQ_WorkerShutdown(void **priv, int wrk_num);
 
 /**
  * Globally shut down the messaging implementation
