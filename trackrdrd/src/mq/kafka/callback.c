@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <syslog.h>
+#include <stdint.h>
 
 #include "mq_kafka.h"
 #include "miniobj.h"
@@ -43,15 +44,12 @@
  * Partitioner assumes that the key string is an unsigned 32-bit
  * hexadecimal.
  */
-int32_t
-CB_Partitioner(const rd_kafka_topic_t *rkt, const void *keydata, size_t keylen,
-               int32_t partition_cnt, void *rkt_opaque, void *msg_opaque)
+static inline int32_t
+get_partition(const void *keydata, size_t keylen, int32_t partition_cnt)
 {
     int32_t partition;
     unsigned long key;
     char keystr[sizeof("ffffffff")], *endptr = NULL;
-    (void) rkt_opaque;
-    (void) msg_opaque;
 
     assert(partition_cnt > 0);
     assert(keylen <= 8);
@@ -60,23 +58,43 @@ CB_Partitioner(const rd_kafka_topic_t *rkt, const void *keydata, size_t keylen,
     keystr[keylen] = '\0';
     errno = 0;
     key = strtoul(keystr, &endptr, 16);
-    if (errno != 0 || *endptr != '\0' || key > 0xffffffffUL) {
-        MQ_LOG_Log(LOG_ERR, "Cannot parse partition key: %.*s", (int) keylen,
-                   (const char *) keydata);
-        return RD_KAFKA_PARTITION_UA;
-    }
+    if (errno != 0 || *endptr != '\0' || key < 0 || key > UINT32_MAX)
+        return -1;
     if ((partition_cnt & (partition_cnt - 1)) == 0)
         /* partition_cnt is a power of 2 */
         partition = key & (partition_cnt - 1);
     else
         partition = key % partition_cnt;
+    return partition;
+}
 
+int32_t
+TEST_Partition(const void *keydata, size_t keylen, int32_t partition_cnt)
+{
+    return get_partition(keydata, keylen, partition_cnt);
+}
+
+int32_t
+CB_Partitioner(const rd_kafka_topic_t *rkt, const void *keydata, size_t keylen,
+               int32_t partition_cnt, void *rkt_opaque, void *msg_opaque)
+{
+    int32_t partition;
+    (void) rkt_opaque;
+    (void) msg_opaque;
+
+    partition = get_partition(keydata, keylen, partition_cnt);
+    if (partition < 0) {
+        MQ_LOG_Log(LOG_ERR, "Cannot parse partition key: %.*s", (int) keylen,
+                   (const char *) keydata);
+        return RD_KAFKA_PARTITION_UA;
+    }
     if (! rd_kafka_topic_partition_available(rkt, partition)) {
         MQ_LOG_Log(LOG_ERR, "Partition %d not available", partition);
         return RD_KAFKA_PARTITION_UA;
     }
-    MQ_LOG_Log(LOG_DEBUG, "Computed partition %d for key %.*s", partition,
-               (int) keylen, (const char *) keydata);
+    MQ_LOG_Log(LOG_DEBUG,
+               "Computed partition %d for key %.*s (%d partitions)",
+               partition, (int) keylen, (const char *) keydata, partition_cnt);
     return partition;
 }
 
