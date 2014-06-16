@@ -1,8 +1,18 @@
 INCLUDES = -I$(top_srcdir)/include
 
-TESTS = test_kafka
+TESTS = test_partition test_kafka
 
-check_PROGRAMS = test_kafka
+check_PROGRAMS = test_partition test_kafka
+
+test_partition_SOURCES = \
+	../../minunit.h \
+	../mq_kafka.h \
+	test_partition.c
+
+test_partition_LDADD = \
+	../callback.$(OBJEXT) \
+	../log.$(OBJEXT) \
+	-lrdkafka
 
 test_kafka_SOURCES = \
 	../../minunit.h \
