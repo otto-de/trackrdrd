@@ -96,10 +96,15 @@ CB_DeliveryReport(rd_kafka_t *rk, void *payload, size_t len,
     CHECK_OBJ_NOTNULL(wrk, KAFKA_WRK_MAGIC);
 
     if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
-        MQ_LOG_Log(LOG_ERR,
-                   "Delivery error %d (client ID = %s, msg = [%.*s]): %s",
-                   err, rd_kafka_name(rk), (int) len, (char *) payload,
-                   rd_kafka_err2str(err));
+        if (loglvl == LOG_DEBUG)
+            MQ_LOG_Log(LOG_DEBUG,
+                       "Delivery error %d (client ID = %s), msg = [%.*s]: %s",
+                       err, rd_kafka_name(rk), (int) len, (char *) payload,
+                       rd_kafka_err2str(err));
+        else
+            MQ_LOG_Log(LOG_ERR,
+                       "Delivery error %d (client ID = %s): %s",
+                       err, rd_kafka_name(rk), rd_kafka_err2str(err));
         wrk->failed++;
     }
     else {
