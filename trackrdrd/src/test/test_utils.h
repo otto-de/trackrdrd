@@ -47,18 +47,30 @@
 
 /** debugging output */
 #define VERBOSE 1
+#undef VERBOSE
 #ifdef VERBOSE
 #define verbose(fmt, ...) \
-    do { printf("%8s:%4d:%20s:>>> "fmt"\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); } while (0)
+    do { printf("%8s:%4d:%20s:>>> "fmt"\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); } \
+    while (0)
 #else
     #define verbose(fmt, ...) do{ } while ( 0 )
 #endif
 
 #define returnIfNotNull(test) do { const char *msg = test; if (msg) return msg; } while (0)
 
-/***** variables **************************************************************/
 
-extern long global_line_pos;               /* actual position in input line */
+/***** constants **************************************************************/
+
+/** file name for saving stdout */
+// #define FILE_NAME_STDOUT = "stdout.txt";
+extern const char * FILE_NAME_STDOUT;
+
+/** file name for saving stderr */
+//#define FILE_NAME_STDERR = "stderr.txt";
+extern const char * FILE_NAME_STDERR;
+
+
+/***** variables **************************************************************/
 
 
 /***** structures *************************************************************/
@@ -66,7 +78,66 @@ extern long global_line_pos;               /* actual position in input line */
 
 /***** functions **************************************************************/
 
+/**
+ * Redirect stdout into new file FILE_NAME_STDOUT
+ */
+extern int TEST_catchStdoutStart(void);
+
+/**
+ * Reset redirection of stdout and close resulting file FILE_NAME_STDOUT
+ */
+extern int TEST_catchStdoutEnd(void);
+
+/**
+ * Redirect stderr into new file FILE_NAME_STDERR
+ */
+extern int TEST_catchStderrStart(void);
+
+/**
+ * Reset redirection of stdout and close resulting file FILE_NAME_STDERR
+ */
+extern int TEST_catchStderrEnd(void);
+
+/**
+ * Test if files have same content. If the comparison is not successful some info
+ * is written to stderr.
+ *
+ * @param fname1 first file.
+ * @param fname2 second file.
+ * @return 0 on success, a value < 0 if we had problems reading the files and a
+ *     line number (starting with 1) if there was a difference in that line.
+ */
 extern int TEST_compareFiles(const char * fname1, const char * fname2);
+
+/**
+ * Test if file contents equals given text.
+ *
+ * @param fname file name.
+ * @param text compare file contents with this text.
+ * @return 0 on success, a value < 0 if we had problems reading the file and a
+ *     line number (starting with 1) if there was a difference in that line.
+ */
+extern int TEST_compareFileWithString(const char * fname, const char * text);
+
+/**
+ * Test if previously saved stdout equals given text. See TEST_catchStdoutStart() and
+ * TEST_catchStdoutEnd().
+ *
+ * @param text compare stdout with this text.
+ * @return 0 on success, a value < 0 if we had problems reading the stdout file and a
+ *     line number (starting with 1) if there was a difference in that line.
+ */
+extern int TEST_stdoutEquals(const char * text);
+
+/**
+ * Test if previously saved stderr equals given text. See TEST_catchStderrStart() and
+ * TEST_catchStderrEnd().
+ *
+ * @param text compare stderr with this text.
+ * @return 0 on success, a value < 0 if we had problems reading the stderr file and a
+ *     line number (starting with 1) if there was a difference in that line.
+ */
+extern int TEST_stderrEquals(const char * text);
 
 
 #endif /* _TEST_UTILS_H */

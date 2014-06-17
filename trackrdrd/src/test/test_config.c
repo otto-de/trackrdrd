@@ -47,6 +47,7 @@
 #define DEFAULT_USER "nobody"
 #define DEFAULT_PID_FILE "/var/run/trackrdrd.pid"
 #define DEFAULT_RESTART_PAUSE 1
+#define DEFAULT_HASH_MAX_PROBES 10
 
 #define confdump(str,val) \
     i += sprintf(verbose_buffer + i, str"\n", (val))
@@ -100,7 +101,7 @@ saveConfig(const char * fname)
     fp = fopen( fname,  "w" );
     if ( fp == NULL )
     {
-       printf("Cannot open %s for writing ", fname );
+       perror(fname);
        return 4;
     }
     content = getConfigContent();
@@ -124,10 +125,15 @@ static char
     CONF_Init();
 
     VMASSERT(!strcmp(DEFAULT_USER, config.user_name),
-    	"Default user name expected: \"%s\", but found: \"%s\"", DEFAULT_USER, config.user_name);
+        "Default user name expected: \"%s\", but found: \"%s\"",
+         DEFAULT_USER, config.user_name);
     VMASSERT(!strcmp(DEFAULT_PID_FILE, config.pid_file),
-    	"Default pid file name expected: \"%s\", but found: \"%s\"", DEFAULT_PID_FILE, config.user_name);
+        "Default pid file name expected: \"%s\", but found: \"%s\"",
+        DEFAULT_PID_FILE, config.user_name);
     MASSERT(DEFAULT_RESTART_PAUSE == config.restart_pause);
+    VMASSERT(DEFAULT_HASH_MAX_PROBES == config.hash_max_probes,
+        "Default hash_max_probes expected: \"%i\", but found: \"%i\"",
+        DEFAULT_HASH_MAX_PROBES, config.hash_max_probes);
     return NULL;
 }
 
@@ -147,7 +153,7 @@ static char
     strcpy(confNameNew, confName);
     strcat(confNameNew, ".new");
     saveConfig(confNameNew);
-    VMASSERT(TEST_compareFiles(confName, confNameNew),
+    VMASSERT(!TEST_compareFiles(confName, confNameNew),
         "Files are not equal: \"%s\" and \"%s\"", confName, confNameNew);
 //  CONF_Dump();
 
@@ -170,12 +176,37 @@ static const char
     return NULL;
 }
 
+static char
+*readAndFindError(const char * confName)
+{
+    int err;
+
+    CONF_Init();
+    TEST_catchStderrStart();
+    err = CONF_ReadFile(confName, CONF_Add);
+    TEST_catchStderrEnd();
+    VMASSERT(err != 0, "No error code during reading config \"%s\": %i", confName, err);
+    err = TEST_stderrEquals("Error in trackrdrd_010.conf line 16 (Invalid argument): "\
+                            "'unknown.module = /my/path/module.so'\n");
+    VMASSERT(err == 0, "stderr output other than expected: %i", err);
+
+    return NULL;
+}
+
+static const char
+*test_CONF_ReadFile(void)
+{
+    printf("... testing CONF_ReadFile\n");
+    returnIfNotNull(readAndFindError("trackrdrd_010.conf"));
+    return NULL;
+}
 
 static const char *
 all_tests(void)
 {
     mu_run_test(test_CONF_Init);
     mu_run_test(test_CONF_ReadDefault);
+    mu_run_test(test_CONF_ReadFile);
     return NULL;
 }
 

@@ -37,29 +37,38 @@
 /***** includes ***************************************************************/
 
 #include "test_utils.h"
+#include <unistd.h>
+#include <fcntl.h>
+
+/***** constants **************************************************************/
+
+const char * FILE_NAME_STDOUT = "stdout.txt";
+
+const char * FILE_NAME_STDERR = "stderr.txt";
 
 
 /***** functions **************************************************************/
 
-int TEST_compareFiles(const char * fname1, const char * fname2)
+int
+TEST_compareFiles(const char * fname1, const char * fname2)
 {
     FILE *fp1, *fp2;
     int ch1, ch2;
     int line = 1;
     int col = 1;
 
+    verbose("comparing files %s : %s", fname1, fname2);
     fp1 = fopen( fname1,  "r" );
     if ( fp1 == NULL )
     {
-       printf("Cannot open %s for reading ", fname1 );
+       perror(fname1);
        return -2;
     }
 
     fp2 = fopen( fname2,  "r" ) ;
     if (fp2 == NULL)
     {
-       printf("Cannot open %s for reading ", fname2 );
-       fclose ( fp1 );
+       perror(fname2);
        return -3;
     }
     do
@@ -67,7 +76,7 @@ int TEST_compareFiles(const char * fname1, const char * fname2)
         col++;
         ch1 = getc( fp1 );
         ch2 = getc( fp2 );
-        if ( ch1 == '\n' )
+        if ( ch1 == '\n' && ch2 == '\n')
         {
             line++;
             col = 0;
@@ -77,7 +86,118 @@ int TEST_compareFiles(const char * fname1, const char * fname2)
     fclose ( fp2 );
     if ( ch1 != ch2 ) {
         printf("  files differ at line: %i col: %i \n", line, col);
+        return line;
+    } else {
+        return 0;
     }
-    return ch1 == ch2;
 }
 
+int
+TEST_compareFileWithString(const char * fname, const char * text)
+{
+    FILE *fp1;
+    int ch1, ch2;
+    int line = 1;
+    int col = 1;
+    int i = 0;
+
+    verbose("comparing file %s with text", fname);
+    fp1 = fopen( fname,  "r" );
+    if ( fp1 == NULL )
+    {
+       perror(fname);
+       return -2;
+    }
+
+    do
+    {
+        col++;
+        ch1 = getc( fp1 );
+        ch2 = *(text + i++);
+        if ( ch1 == '\n' && ch2 == '\n')
+        {
+            line++;
+            col = 0;
+        }
+    } while ((ch1 != EOF) && (ch2 != '\0') && (ch1 == ch2));
+    fclose ( fp1 );
+    if ( ch1 != EOF || ch2 != '\0' ) {
+        printf("  file differs at line: %i col: %i \n", line, col);
+        return line;
+    } else {
+        return 0;
+    }
+}
+
+int stdoutBak;
+int stdoutNew;
+fpos_t stdoutPos;
+
+int
+TEST_catchStdoutStart()
+{
+    fflush(stdout);
+    fgetpos(stdout, &stdoutPos);
+    stdoutBak = dup(fileno(stdout));
+    stdoutNew = open(FILE_NAME_STDOUT, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | \
+                                       S_IROTH | S_IWOTH);
+    dup2(stdoutNew, fileno(stdout));
+    close(stdoutNew);
+
+    return(0);
+}
+
+int
+TEST_catchStdoutEnd()
+{
+    fflush(stdout);
+    dup2(stdoutBak, fileno(stdout));
+    close(stdoutBak);
+    clearerr(stdout);
+    fsetpos(stdout, &stdoutPos);
+    return(0);
+}
+
+int stderrBak, stderrNew;
+fpos_t stderrPos;
+
+int
+TEST_catchStderrStart()
+{
+    fflush(stderr);
+    fgetpos(stdout, &stderrPos);
+    stderrBak = dup(fileno(stderr));
+
+    stderrNew = open(FILE_NAME_STDERR, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | \
+                                       S_IROTH | S_IWOTH);
+    if (stderrNew < 0) {
+        perror(NULL);
+        return(-1);
+    }
+    dup2(stderrNew, fileno(stderr));
+    close(stderrNew);
+    return(0);
+}
+
+int
+TEST_catchStderrEnd()
+{
+    fflush(stderr);
+    dup2(stderrBak, fileno(stderr));
+    close(stderrBak);
+    clearerr(stderr);
+    fsetpos(stderr, &stderrPos);
+    return(0);
+}
+
+int
+TEST_stdoutEquals(const char * text)
+{
+    return TEST_compareFileWithString(FILE_NAME_STDOUT, text);
+}
+
+int
+TEST_stderrEquals(const char * text)
+{
+    return TEST_compareFileWithString(FILE_NAME_STDERR, text);
+}
