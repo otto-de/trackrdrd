@@ -29,5 +29,31 @@
  *
  */
 
+/**
+ * \file config_common.h
+ * \brief Config handling interface
+ * \details Common functions to get configuration data
+ *
+ * This header defines the functions the plugin uses to get its
+ * configuration data.
+ */
+
+
+/**
+ * Function type for adding key value pairs to config data.
+ *
+ * @param lval key
+ * @param rval value
+ * @return 0 on success, an error value on failure
+ */
 typedef int conf_add_f(const char *lval, const char *rval);
+
+/**
+ * Set config values.
+ *
+ * @param file config path we are reading
+ * @param func pointer for config add function.
+ * @return 0 on success, an value less than zero if we had a problem
+ * reading from one file, parsing a line or adding a config value.
+ */
 int CONF_ReadFile(const char *file, conf_add_f *func);
