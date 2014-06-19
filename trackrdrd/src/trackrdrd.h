@@ -331,6 +331,13 @@ struct config {
 
 void CONF_Init(void);
 int CONF_Add(const char *lval, const char *rval);
+/**
+ * Reads the default config file `/etc/trackrdrd.conf`, if present
+ *
+ * @returns 0 if the file does not exist or was successfully read,
+ *          >0 (errno) if the file exists but cannot be read,
+ *          <0 if the file was read but the contents could not be processed
+ */
 int CONF_ReadDefault(void);
 void CONF_Dump(void);
 

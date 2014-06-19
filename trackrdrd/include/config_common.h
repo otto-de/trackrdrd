@@ -34,8 +34,11 @@
  * \brief Config handling interface
  * \details Common functions to get configuration data
  *
- * This header defines the functions the plugin uses to get its
- * configuration data.
+ * This header defines the functions used to get configuration data.
+ *
+ * If the conf_add() callback returns non-zero, CONF_ReadFile() prints
+ * an error message to `stderr` assuming that the return value is an
+ * errno value.
  */
 
 
@@ -44,7 +47,7 @@
  *
  * @param lval key
  * @param rval value
- * @return 0 on success, an error value on failure
+ * @return 0 on success, an errno value on failure
  */
 typedef int conf_add_f(const char *lval, const char *rval);
 

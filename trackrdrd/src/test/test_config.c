@@ -183,7 +183,7 @@ static char
     TEST_catchStderrStart();
     err = CONF_ReadFile(confName, CONF_Add);
     TEST_catchStderrEnd();
-    VMASSERT(err == -1, "Wrong error code during reading config \"%s\": %i",
+    VMASSERT(err < 0, "Wrong error code during reading config \"%s\": %i",
              confName, err);
     err = TEST_stderrEquals(errmsg);
     VMASSERT(err == 0,
