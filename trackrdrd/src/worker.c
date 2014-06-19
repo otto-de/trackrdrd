@@ -134,8 +134,10 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
     if (errnum != 0) {
         LOG_Log(LOG_WARNING, "Worker %d: Failed to send data: %s",
                 wrk->id, err);
-        if (errnum > 0)
+        if (errnum > 0) {
             wrk->recoverables++;
+            MON_StatsUpdate(STATS_FAILED);
+        }
         else {
             /* Non-recoverable error */
             LOG_Log(LOG_INFO, "Worker %d: Reconnecting", wrk->id);
@@ -146,6 +148,7 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
                         err);
                 LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
                         entry->end, entry->data);
+                MON_StatsUpdate(STATS_FAILED);
             }
             else {
                 wrk->reconnects++;
@@ -156,8 +159,10 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
                 if (errnum != 0) {
                     LOG_Log(LOG_WARNING, "Worker %d: Failed to send data "
                             "after reconnect: %s", wrk->id, err);
-                    if (errnum > 0)
+                    if (errnum > 0) {
                         wrk->recoverables++;
+                        MON_StatsUpdate(STATS_FAILED);
+                    }
                     else {
                         /* Fail after reconnect, give up */
                         wrk->fails++;
