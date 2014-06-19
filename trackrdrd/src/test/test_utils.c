@@ -126,9 +126,8 @@ TEST_compareFileWithString(const char * fname, const char * text)
     }
 }
 
-int stdoutBak;
-int stdoutNew;
-fpos_t stdoutPos;
+static int stdoutBak, stdoutNew;
+static fpos_t stdoutPos;
 
 int
 TEST_catchStdoutStart()
@@ -161,8 +160,8 @@ TEST_catchStdoutEnd()
     return(0);
 }
 
-int stderrBak, stderrNew;
-fpos_t stderrPos;
+static int stderrBak, stderrNew;
+static fpos_t stderrPos;
 
 int
 TEST_catchStderrStart()
