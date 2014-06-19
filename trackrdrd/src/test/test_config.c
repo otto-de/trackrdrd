@@ -177,7 +177,7 @@ static const char
 }
 
 static char
-*readAndFindError(const char * confName)
+*readAndFindError(const char * confName, const char * errmsg)
 {
     int err;
 
@@ -185,10 +185,11 @@ static char
     TEST_catchStderrStart();
     err = CONF_ReadFile(confName, CONF_Add);
     TEST_catchStderrEnd();
-    VMASSERT(err != 0, "No error code during reading config \"%s\": %i", confName, err);
-    err = TEST_stderrEquals("Error in trackrdrd_010.conf line 16 (Invalid argument): "\
-                            "'unknown.module = /my/path/module.so'\n");
-    VMASSERT(err == 0, "stderr output other than expected: %i", err);
+    VMASSERT(err == -1, "Wrong error code during reading config \"%s\": %i", confName, err);
+    err = TEST_stderrEquals(errmsg);
+    VMASSERT(err == 0, "stderr output during parsing config \"%s\" other than expected. " \
+       "Expected:\n%s",
+       confName, errmsg);
 
     return NULL;
 }
@@ -197,7 +198,10 @@ static const char
 *test_CONF_ReadFile(void)
 {
     printf("... testing CONF_ReadFile\n");
-    returnIfNotNull(readAndFindError("trackrdrd_010.conf"));
+
+    returnIfNotNull(readAndFindError("trackrdrd_010.conf", \
+        "Error in trackrdrd_010.conf line 16 (Invalid argument): " \
+        "'unknown.module = /my/path/module.so'\n"));
     return NULL;
 }
 
