@@ -133,12 +133,17 @@ fpos_t stdoutPos;
 int
 TEST_catchStdoutStart()
 {
+    FILE *new;
+
     fflush(stdout);
     fgetpos(stdout, &stdoutPos);
     stdoutBak = dup(fileno(stdout));
-    stdoutNew = open(FILE_NAME_STDOUT,
-                     O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
-                     | S_IROTH | S_IWOTH);
+    new = fopen(FILE_NAME_STDOUT, "w");
+    if (new == NULL) {
+        perror(FILE_NAME_STDOUT);
+        return -1;
+    }
+    stdoutNew = fileno(new);
     dup2(stdoutNew, fileno(stdout));
     close(stdoutNew);
 
@@ -162,17 +167,18 @@ fpos_t stderrPos;
 int
 TEST_catchStderrStart()
 {
+    FILE *new;
+
     fflush(stderr);
-    fgetpos(stdout, &stderrPos);
+    fgetpos(stderr, &stderrPos);
     stderrBak = dup(fileno(stderr));
 
-    stderrNew = open(FILE_NAME_STDERR,
-                     O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
-                     | S_IROTH | S_IWOTH);
-    if (stderrNew < 0) {
-        perror(NULL);
+    new = fopen(FILE_NAME_STDERR, "w");
+    if (new == NULL) {
+        perror(FILE_NAME_STDERR);
         return(-1);
     }
+    stderrNew = fileno(new);
     dup2(stderrNew, fileno(stderr));
     close(stderrNew);
     return(0);
