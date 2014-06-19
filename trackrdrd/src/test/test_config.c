@@ -61,7 +61,7 @@ char verbose_buffer[9000];
 
 /***** functions **************************************************************/
 
-static char *
+static const char *
 getConfigContent(void)
 {
     int i = 0;
@@ -96,20 +96,13 @@ static int
 saveConfig(const char * fname)
 {
     FILE *fp;
-    char * content;
 
     fp = fopen( fname,  "w" );
     if ( fp == NULL ) {
        perror(fname);
        return 4;
     }
-    content = getConfigContent();
-    for (int i = 0; *(content + i) != 0; i++) {
-        if (EOF == putc(*(content + i), fp)) {
-            fclose( fp);
-            return 8;
-        }
-    }
+    fprintf(fp, getConfigContent());
     fclose ( fp );
     return 0;
 }
