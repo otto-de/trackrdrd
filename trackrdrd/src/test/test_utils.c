@@ -85,7 +85,8 @@ TEST_compareFiles(const char * fname1, const char * fname2)
     fclose ( fp1 );
     fclose ( fp2 );
     if ( ch1 != ch2 ) {
-        printf("  files differ at line: %i col: %i \n", line, col);
+        printf("    comparing files %s : %s, ", fname1, fname2);
+        printf("files differ at line: %i col: %i \n", line, col);
         return line;
     } else {
         return 0;
@@ -122,7 +123,8 @@ TEST_compareFileWithString(const char * fname, const char * text)
     } while ((ch1 != EOF) && (ch2 != '\0') && (ch1 == ch2));
     fclose ( fp1 );
     if ( ch1 != EOF || ch2 != '\0' ) {
-        printf("  file differs at line: %i col: %i \n", line, col);
+        printf("    comparing file %s with text, ", fname);
+        printf("file differs at line: %i col: %i \n", line, col);
         return line;
     } else {
         return 0;
