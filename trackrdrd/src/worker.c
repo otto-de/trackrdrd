@@ -412,10 +412,11 @@ WRK_Stats(void)
     for (int i = 0; i < config.nworkers; i++) {
         wrk = thread_data[i].wrk_data;
         LOG_Log(LOG_INFO,
-            "Worker %d (%s): seen=%u waits=%u sent=%u reconnects=%u "
-            "restarts=%u failed=%d",
-            wrk->id, statename[wrk->state], wrk->deqs, wrk->waits, wrk->sends,
-            wrk->reconnects, wrk->restarts, wrk->fails);
+                "Worker %d (%s): seen=%u waits=%u sent=%u reconnects=%u "
+                "restarts=%u failed_recoverable=%u failed=%u",
+                wrk->id, statename[wrk->state], wrk->deqs, wrk->waits,
+                wrk->sends, wrk->reconnects, wrk->restarts, wrk->recoverables,
+                wrk->fails);
     }
 }
 
