@@ -59,25 +59,21 @@ TEST_compareFiles(const char * fname1, const char * fname2)
 
     verbose("comparing files %s : %s", fname1, fname2);
     fp1 = fopen( fname1,  "r" );
-    if ( fp1 == NULL )
-    {
+    if ( fp1 == NULL ) {
        perror(fname1);
        return -2;
     }
 
     fp2 = fopen( fname2,  "r" ) ;
-    if (fp2 == NULL)
-    {
+    if (fp2 == NULL) {
        perror(fname2);
        return -3;
     }
-    do
-    {
+    do {
         col++;
         ch1 = getc( fp1 );
         ch2 = getc( fp2 );
-        if ( ch1 == '\n' && ch2 == '\n')
-        {
+        if ( ch1 == '\n' && ch2 == '\n') {
             line++;
             col = 0;
         }
@@ -88,7 +84,8 @@ TEST_compareFiles(const char * fname1, const char * fname2)
         printf("    comparing files %s : %s, ", fname1, fname2);
         printf("files differ at line: %i col: %i \n", line, col);
         return line;
-    } else {
+    }
+    else {
         return 0;
     }
 }
@@ -104,19 +101,16 @@ TEST_compareFileWithString(const char * fname, const char * text)
 
     verbose("comparing file %s with text", fname);
     fp1 = fopen( fname,  "r" );
-    if ( fp1 == NULL )
-    {
+    if ( fp1 == NULL ) {
        perror(fname);
        return -2;
     }
 
-    do
-    {
+    do {
         col++;
         ch1 = getc( fp1 );
         ch2 = *(text + i++);
-        if ( ch1 == '\n' && ch2 == '\n')
-        {
+        if ( ch1 == '\n' && ch2 == '\n') {
             line++;
             col = 0;
         }
@@ -126,7 +120,8 @@ TEST_compareFileWithString(const char * fname, const char * text)
         printf("    comparing file %s with text, ", fname);
         printf("file differs at line: %i col: %i \n", line, col);
         return line;
-    } else {
+    }
+    else {
         return 0;
     }
 }
