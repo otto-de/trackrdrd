@@ -3,8 +3,8 @@ INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) -I$(top_srcdir)/include
 TESTS = test_parse test_data test_hash test_mq test_spmcq test_config	\
 	test_spmcq_loop.sh test_worker regress.sh
 
-check_PROGRAMS = test_parse test_data test_hash test_mq test_spmcq	test_config \
-	test_worker
+check_PROGRAMS = test_parse test_data test_hash test_mq test_spmcq \
+	test_config test_worker
 
 test_parse_SOURCES = \
 	minunit.h \
@@ -78,7 +78,7 @@ test_config_SOURCES = \
 
 test_config_LDADD = \
 	$(VARNISHSRC)/lib/libvarnish/libvarnish.la
-	
+
 
 test_worker_SOURCES = \
 	minunit.h \
