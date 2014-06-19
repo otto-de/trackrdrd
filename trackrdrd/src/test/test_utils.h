@@ -49,14 +49,17 @@
 #define VERBOSE 1
 #undef VERBOSE
 #ifdef VERBOSE
-#define verbose(fmt, ...) \
-    do { printf("%8s:%4d:%20s:>>> "fmt"\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); } \
+#define verbose(fmt, ...)                                               \
+    do {                                                                \
+        printf("%8s:%4d:%20s:>>> "fmt"\n", __FILE__, __LINE__, __FUNCTION__, \
+               ##__VA_ARGS__); }                                        \
     while (0)
 #else
     #define verbose(fmt, ...) do{ } while ( 0 )
 #endif
 
-#define returnIfNotNull(test) do { const char *msg = test; if (msg) return msg; } while (0)
+#define returnIfNotNull(test) \
+    do { const char *msg = test; if (msg) return msg; } while (0)
 
 
 /***** constants **************************************************************/
@@ -99,8 +102,8 @@ extern int TEST_catchStderrStart(void);
 extern int TEST_catchStderrEnd(void);
 
 /**
- * Test if files have same content. If the comparison is not successful some info
- * is written to stderr.
+ * Test if files have same content. If the comparison is not successful
+ * some info is written to stderr.
  *
  * @param fname1 first file.
  * @param fname2 second file.
@@ -120,22 +123,24 @@ extern int TEST_compareFiles(const char * fname1, const char * fname2);
 extern int TEST_compareFileWithString(const char * fname, const char * text);
 
 /**
- * Test if previously saved stdout equals given text. See TEST_catchStdoutStart() and
- * TEST_catchStdoutEnd().
+ * Test if previously saved stdout equals given text. See
+ * TEST_catchStdoutStart() and TEST_catchStdoutEnd().
  *
  * @param text compare stdout with this text.
- * @return 0 on success, a value < 0 if we had problems reading the stdout file and a
- *     line number (starting with 1) if there was a difference in that line.
+ * @return 0 on success, a value < 0 if we had problems reading the stdout
+ *     file and a line number (starting with 1) if there was a difference
+ *     in that line.
  */
 extern int TEST_stdoutEquals(const char * text);
 
 /**
- * Test if previously saved stderr equals given text. See TEST_catchStderrStart() and
- * TEST_catchStderrEnd().
+ * Test if previously saved stderr equals given text. See
+ * TEST_catchStderrStart() and TEST_catchStderrEnd().
  *
  * @param text compare stderr with this text.
- * @return 0 on success, a value < 0 if we had problems reading the stderr file and a
- *     line number (starting with 1) if there was a difference in that line.
+ * @return 0 on success, a value < 0 if we had problems reading the stderr
+ *     file and a line number (starting with 1) if there was a difference
+ *     in that line.
  */
 extern int TEST_stderrEquals(const char * text);
 
