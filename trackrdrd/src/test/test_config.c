@@ -99,16 +99,13 @@ saveConfig(const char * fname)
     char * content;
 
     fp = fopen( fname,  "w" );
-    if ( fp == NULL )
-    {
+    if ( fp == NULL ) {
        perror(fname);
        return 4;
     }
     content = getConfigContent();
-    for (int i = 0; *(content + i) != 0; i++)
-    {
-        if (EOF == putc(*(content + i), fp))
-        {
+    for (int i = 0; *(content + i) != 0; i++) {
+        if (EOF == putc(*(content + i), fp)) {
             fclose( fp);
             return 8;
         }
