@@ -84,22 +84,22 @@ extern const char * FILE_NAME_STDERR;
 /**
  * Redirect stdout into new file FILE_NAME_STDOUT
  */
-extern int TEST_catchStdoutStart(void);
+int TEST_catchStdoutStart(void);
 
 /**
  * Reset redirection of stdout and close resulting file FILE_NAME_STDOUT
  */
-extern int TEST_catchStdoutEnd(void);
+int TEST_catchStdoutEnd(void);
 
 /**
  * Redirect stderr into new file FILE_NAME_STDERR
  */
-extern int TEST_catchStderrStart(void);
+int TEST_catchStderrStart(void);
 
 /**
  * Reset redirection of stdout and close resulting file FILE_NAME_STDERR
  */
-extern int TEST_catchStderrEnd(void);
+int TEST_catchStderrEnd(void);
 
 /**
  * Test if files have same content. If the comparison is not successful
@@ -110,7 +110,7 @@ extern int TEST_catchStderrEnd(void);
  * @return 0 on success, a value < 0 if we had problems reading the files and a
  *     line number (starting with 1) if there was a difference in that line.
  */
-extern int TEST_compareFiles(const char * fname1, const char * fname2);
+int TEST_compareFiles(const char * fname1, const char * fname2);
 
 /**
  * Test if file contents equals given text.
@@ -120,7 +120,7 @@ extern int TEST_compareFiles(const char * fname1, const char * fname2);
  * @return 0 on success, a value < 0 if we had problems reading the file and a
  *     line number (starting with 1) if there was a difference in that line.
  */
-extern int TEST_compareFileWithString(const char * fname, const char * text);
+int TEST_compareFileWithString(const char * fname, const char * text);
 
 /**
  * Test if previously saved stdout equals given text. See
@@ -131,7 +131,7 @@ extern int TEST_compareFileWithString(const char * fname, const char * text);
  *     file and a line number (starting with 1) if there was a difference
  *     in that line.
  */
-extern int TEST_stdoutEquals(const char * text);
+int TEST_stdoutEquals(const char * text);
 
 /**
  * Test if previously saved stderr equals given text. See
@@ -142,7 +142,7 @@ extern int TEST_stdoutEquals(const char * text);
  *     file and a line number (starting with 1) if there was a difference
  *     in that line.
  */
-extern int TEST_stderrEquals(const char * text);
+int TEST_stderrEquals(const char * text);
 
 
 #endif /* _TEST_UTILS_H */
