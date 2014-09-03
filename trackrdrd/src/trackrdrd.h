@@ -151,6 +151,7 @@ struct data_writer_stats_s {
     unsigned		data_hi;	/* max string length of entry->data */
     unsigned		key_hi;		/* max string length of entry->key */
     unsigned		data_overflows; /* config.maxdata exceeded */
+    unsigned		data_truncated; /* shm_reclen exceeded */
     unsigned		key_overflows; 	/* config.maxkeylen exceeded */
     unsigned		abandoned;	/* Worker threads abandoned */
 };

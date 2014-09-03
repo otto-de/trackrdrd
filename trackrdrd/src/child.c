@@ -55,7 +55,6 @@
 #include <dlfcn.h>
 
 #include "vsb.h"
-#include "vmb.h"
 #include "vpf.h"
 
 #include "libvarnish.h"
@@ -228,6 +227,7 @@ data_submit(dataentry *de)
 {
     CHECK_OBJ_NOTNULL(de, DATA_MAGIC);
     assert(de->state == DATA_DONE);
+    AZ(memchr(de->data, '\0', de->end));
     LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", de->end, de->data);
     if (de->hasdata == false) {
         de->state = DATA_EMPTY;
@@ -624,6 +624,8 @@ static inline void
 append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
     int datalen)
 {
+    char *null;
+
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     /* Data overflow */
     if (entry->end + datalen + 1 > config.maxdata) {
@@ -634,11 +636,18 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
         dtbl.w_stats.data_overflows++;
         return;
     }
+    /* Null chars in the payload means that the data was truncated in the
+       log, due to exceeding shm_reclen. */
+    if ((null = memchr(data, '\0', datalen)) != NULL) {
+        datalen = null - data;
+        LOG_Log(LOG_ALERT, "%s: Data truncated in SHM log, XID=%d, data=[%.*s]",
+                VSL_tags[tag], xid, datalen, data);
+        dtbl.w_stats.data_truncated++;
+    }
         
     entry->data[entry->end] = '&';
     entry->end++;
     memcpy(&entry->data[entry->end], data, datalen);
-    VWMB();
     entry->end += datalen;
     if (entry->end > dtbl.w_stats.data_hi)
         dtbl.w_stats.data_hi = entry->end;
