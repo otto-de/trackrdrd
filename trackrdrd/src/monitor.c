@@ -58,6 +58,7 @@ log_output(void)
         "data_hi=%u "
         "key_hi=%u "
         "data_overflows=%u "
+        "data_truncated=%u "
         "key_overflows=%u "
         "done=%u "
         "open=%u "
@@ -76,6 +77,7 @@ log_output(void)
         dtbl.w_stats.data_hi,
         dtbl.w_stats.key_hi,
         dtbl.w_stats.data_overflows,
+        dtbl.w_stats.data_truncated,
         dtbl.w_stats.key_overflows,
         dtbl.r_stats.done,
         dtbl.r_stats.open,
