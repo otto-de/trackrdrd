@@ -130,7 +130,7 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
     AN(mq_worker);
 
     /* XXX: report entry->incomplete to backend ? */
-    VMB();
+    VRMB();
     errnum = mqf.send(*mq_worker, entry->data, entry->end,
                       entry->key, entry->keylen, &err);
     if (errnum != 0) {
