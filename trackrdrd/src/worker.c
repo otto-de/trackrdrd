@@ -38,6 +38,7 @@
 #include "trackrdrd.h"
 #include "vas.h"
 #include "miniobj.h"
+#include "vmb.h"
 
 #define VERSION_LEN 64
 #define CLIENT_ID_LEN 80
@@ -129,6 +130,7 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
     AN(mq_worker);
 
     /* XXX: report entry->incomplete to backend ? */
+    VMB();
     errnum = mqf.send(*mq_worker, entry->data, entry->end,
                       entry->key, entry->keylen, &err);
     if (errnum != 0) {
