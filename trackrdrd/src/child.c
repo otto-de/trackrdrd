@@ -56,7 +56,6 @@
 
 #include "vsb.h"
 #include "vpf.h"
-#include "vmb.h"
 
 #include "libvarnish.h"
 #include "vsl.h"
@@ -816,7 +815,6 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         sprintf(reqend_str, "%s=%u.%09lu", REQEND_T_VAR,
             (unsigned) reqend_t.tv_sec, reqend_t.tv_nsec);
         append(de, tag, xid, reqend_str, strlen(reqend_str));
-        VWMB();
         de->state = DATA_DONE;
         MON_StatsUpdate(STATS_DONE);
         submit(he);
