@@ -55,6 +55,7 @@
 #include <dlfcn.h>
 
 #include "vsb.h"
+#include "vmb.h"
 #include "vpf.h"
 
 #include "libvarnish.h"
@@ -637,6 +638,7 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
     entry->data[entry->end] = '&';
     entry->end++;
     memcpy(&entry->data[entry->end], data, datalen);
+    VWMB();
     entry->end += datalen;
     if (entry->end > dtbl.w_stats.data_hi)
         dtbl.w_stats.data_hi = entry->end;
