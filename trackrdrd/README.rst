@@ -9,7 +9,7 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2014-05-20
+:Date:   2014-09-04
 :Version: 3.0
 :Manual section: 3
 
