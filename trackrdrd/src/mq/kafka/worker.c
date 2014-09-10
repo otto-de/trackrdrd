@@ -34,6 +34,8 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <limits.h>
 
 #include "mq_kafka.h"
 #include "miniobj.h"
@@ -51,7 +53,8 @@ get_clock_ms(void)
 const char
 *WRK_Init(int wrk_num)
 {
-    char clientid[sizeof("libtrackrdr-kafka-worker-2147483648")];
+    char clientid[HOST_NAME_MAX + 1 + sizeof("-kafka-worker-2147483648")];
+    char host[HOST_NAME_MAX + 1];
     rd_kafka_conf_t *wrk_conf;
     rd_kafka_topic_conf_t *wrk_topic_conf;
     rd_kafka_t *rk;
@@ -62,7 +65,8 @@ const char
 
     wrk_conf = rd_kafka_conf_dup(conf);
     wrk_topic_conf = rd_kafka_topic_conf_dup(topic_conf);
-    sprintf(clientid, "libtrackrdr-kafka-worker-%d", wrk_num);
+    AZ(gethostname(host, HOST_NAME_MAX + 1));
+    sprintf(clientid, "%s-kafka-worker-%d", host, wrk_num);
     if (rd_kafka_conf_set(wrk_conf, "client.id", clientid, errmsg,
                           LINE_MAX) != RD_KAFKA_CONF_OK) {
         MQ_LOG_Log(LOG_ERR, "rdkafka config error [client.id = %s]: %s",
