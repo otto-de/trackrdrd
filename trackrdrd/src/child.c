@@ -1237,3 +1237,49 @@ static const char
 TEST_RUNNER
 
 #endif
+
+#ifdef APPEND_TEST
+
+#include "minunit.h"
+
+int tests_run = 0;
+
+static char
+*test_append(void)
+{
+    dataentry *entry;
+    char data_with_null[8];
+
+    printf("... testing data append (expect an ALERT)\n");
+
+    config.maxdata = DEF_MAXDATA;
+    entry = calloc(1, sizeof(dataentry));
+    AN(entry);
+    entry->data = calloc(1, config.maxdata);
+    AN(entry->data);
+    entry->magic = DATA_MAGIC;
+    dtbl.w_stats.data_truncated = dtbl.w_stats.data_hi = 0;
+    strcpy(config.log_file, "-");
+    AZ(LOG_Open("test_append"));
+
+    memcpy(data_with_null, "foo\0bar", 8);
+    append(entry, SLT_VCL_Log, 12345678, data_with_null, 7);
+
+    MASSERT(memcmp(entry->data, "&foo\0\0", 6) == 0);
+    MASSERT(entry->end == 4);
+    MASSERT(dtbl.w_stats.data_truncated == 1);
+    MASSERT(dtbl.w_stats.data_hi == 4);
+
+    return NULL;
+}
+
+static const char
+*all_tests(void)
+{
+    mu_run_test(test_append);
+    return NULL;
+}
+
+TEST_RUNNER
+
+#endif
