@@ -1,10 +1,10 @@
 INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) -I$(top_srcdir)/include
 
-TESTS = test_parse test_data test_hash test_mq test_spmcq test_config	\
-	test_spmcq_loop.sh test_worker regress.sh
+TESTS = test_parse test_data test_hash test_append test_mq test_spmcq	\
+	test_config test_spmcq_loop.sh test_worker regress.sh
 
-check_PROGRAMS = test_parse test_data test_hash test_mq test_spmcq \
-	test_config test_worker
+check_PROGRAMS = test_parse test_data test_hash test_append test_mq	\
+	test_spmcq test_config test_worker
 
 test_parse_SOURCES = \
 	minunit.h \
@@ -45,6 +45,28 @@ test_hash_LDADD = \
 	../sandbox.$(OBJEXT)
 
 test_hash_CFLAGS = -DTEST_DRIVER
+
+test_append_SOURCES = \
+	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
+	../child.c \
+	../trackrdrd.h
+
+test_append_LDADD = \
+	-ldl \
+	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
+	$(VARNISHSRC)/lib/libvarnishapi/libvarnishapi.la \
+	../worker.$(OBJEXT) \
+	../log.$(OBJEXT) \
+	../spmcq.$(OBJEXT) \
+	../data.$(OBJEXT) \
+	../assert.$(OBJEXT) \
+	../monitor.$(OBJEXT) \
+	../parse.$(OBJEXT) \
+	../config.$(OBJEXT) \
+	../config_common.$(OBJEXT) \
+	../sandbox.$(OBJEXT)
+
+test_append_CFLAGS = -DAPPEND_TEST
 
 test_mq_SOURCES = \
 	minunit.h \
