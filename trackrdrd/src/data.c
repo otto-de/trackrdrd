@@ -98,6 +98,21 @@ DATA_Init(void)
     return(0);
 }
 
+void
+DATA_Reset(dataentry *entry)
+{
+    CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+    entry->state = DATA_EMPTY;
+    entry->end = 0;
+    *entry->data = '\0';
+    entry->keylen = 0;
+    *entry->key = '\0';
+    entry->hasdata = false;
+    entry->incomplete = false;
+    entry->xid = 0;
+    entry->tid = 0;
+}
+
 /* 
  * take all free entries from the datatable for lockless
  * allocation
