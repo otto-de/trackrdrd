@@ -96,9 +96,10 @@ static char
 
     printf("... testing worker initialization\n");
 
-    config.maxopen_scale = 10;
-    config.maxdone = 1024;
-    config.maxdata = 1024;
+    config.maxopen_scale = DEF_MAXOPEN_SCALE;
+    config.maxdone = DEF_MAXDONE;
+    config.maxdata = DEF_MAXDATA;
+    config.maxkeylen = DEF_MAXKEYLEN;
     config.nworkers = NWORKERS;
     strcpy(config.mq_config_file, MQ_CONFIG);
 
@@ -145,7 +146,7 @@ static const char
     sprintf(errmsg, "%d of %d worker threads running", wrk_running, NWORKERS);
     mu_assert(errmsg, wrk_running == NWORKERS);
 
-    for (int i = 0; i < 1024; i++) {
+    for (int i = 0; i < (1 << DEF_MAXOPEN_SCALE); i++) {
         entry = &dtbl.entry[i];
         CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         entry->xid = xid;
@@ -161,6 +162,24 @@ static const char
     AZ(mqf.global_shutdown());
     LOG_Close();
 
+    /*
+     * Verify DATA_Reset() by checking that all data entry fields are in
+     * empty states after worker threads are shut down.
+     */
+    for (int i = 0; i < (1 << DEF_MAXOPEN_SCALE); i++) {
+        entry = &dtbl.entry[i];
+        CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+        MASSERT(entry->state == DATA_EMPTY);
+        MAZ(entry->end);
+        MAZ(*entry->data);
+        MAZ(entry->keylen);
+        MAZ(*entry->key);
+        MASSERT(entry->hasdata == false);
+        MASSERT(entry->incomplete == false);
+        MAZ(entry->xid);
+        MAZ(entry->tid);
+    }
+    
     return NULL;
 }
 

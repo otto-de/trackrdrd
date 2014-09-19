@@ -192,6 +192,7 @@ typedef struct datatable_s datatable;
 datatable dtbl;
 
 int DATA_Init(void);
+void DATA_Reset(dataentry *entry);
 void DATA_Take_Freelist(struct freehead_s *dst);
 void DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned);
 void DATA_Dump1(dataentry *entry, int i);

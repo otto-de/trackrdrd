@@ -182,7 +182,7 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
         LOG_Log(LOG_DEBUG, "Worker %d: Successfully sent data [%.*s]", wrk->id,
             entry->end, entry->data);
     }
-    entry->state = DATA_EMPTY;
+    DATA_Reset(entry);
     VSTAILQ_INSERT_TAIL(&wrk->wrk_freelist, entry, freelist);
     wrk->wrk_nfree++;
 
