@@ -596,14 +596,13 @@ static inline dataentry
     CHECK_OBJ_NOTNULL(de, DATA_MAGIC);
     assert(de->state == DATA_EMPTY);
     hashentry *he = hash_insert(xid, de, tim);
-    CHECK_OBJ(he, HASH_MAGIC);
-
     if (! he) {
         LOG_Log(LOG_WARNING, "Insert: Could not insert hash for XID %d",
             xid);
         data_free(de);
         return (NULL);
     }
+    CHECK_OBJ(he, HASH_MAGIC);
 
     /* he being filled out by Hash_Insert, we need to look after de */
     de->xid	= xid;
