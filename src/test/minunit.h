@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -29,7 +29,13 @@
  *
  */
 
+#ifndef _MINUNIT_INCLUDED
+#define _MINUNIT_INCLUDED
+
 #include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
 
 /*-
  * Adapted from http://www.jera.com/techinfo/jtns/jtn002.html
@@ -39,24 +45,45 @@
  *  understanding that it comes with NO WARRANTY."
  */
 
-/* XXX: Format error message in mu_assert() */
-
 #define mu_assert(msg, test) do { if (!(test)) return msg; } while (0)
 #define mu_run_test(test) do { const char *msg = test(); tests_run++; \
                                if (msg) return msg; } while (0)
-/* phk-ish mu_assert */
-#define mu_assert_errno(c)						   \
-    do {                                                                   \
-        if (!(c)) {                                                        \
-            sprintf(errmsg, "%s failed in %s at %s:%d: errno %d (%s)",     \
-                #c, __func__, __FILE__, __LINE__, errno, strerror(errno)); \
-            mu_assert(errmsg, 0);                                          \
-        }                                                                  \
+
+char _mu_errmsg[BUFSIZ];
+
+#define _massert(test, msg, ...)                        \
+    do {                                                \
+        if (!(test)) {                                  \
+            sprintf((_mu_errmsg), (msg), __VA_ARGS__);  \
+            return (_mu_errmsg);                        \
+        }                                               \
     } while(0)
 
+#define _massert0(test, msg)                    \
+    do {                                        \
+        if (!(test)) {                          \
+            sprintf((_mu_errmsg), (msg));       \
+            return (_mu_errmsg);                \
+        }                                       \
+    } while(0)
+
+#define VMASSERT(test, msg, ...) _massert((test),(msg),__VA_ARGS__)
+#define MASSERT0(test, msg)      _massert0((test),(msg))
+
+#define MASSERT(c)                                              \
+    VMASSERT((c), "%s failed in %s at %s:%d (errno %d: %s)",    \
+             #c, __func__, __FILE__, __LINE__, errno, strerror(errno))
+
 /* short for MU Assert Zero / Non-Zero */
-#define MAZ(c)	do { mu_assert_errno((c) == 0); } while(0)
-#define MAN(c)	do { mu_assert_errno((c) != 0); } while(0)
+#define MAZ(c) MASSERT((c) == 0)
+#define MAN(c) MASSERT((c) != 0)
+
+#define MCHECK_OBJ(ptr, type_magic) MASSERT((ptr)->magic == type_magic)
+#define MCHECK_OBJ_NOTNULL(ptr, type_magic)     \
+    do {                                        \
+        MAN(ptr);                               \
+        MCHECK_OBJ(ptr, type_magic);            \
+    } while(0)
 
 extern int tests_run;
 
@@ -75,3 +102,6 @@ main(int argc, char **argv)                            \
     }                                                  \
     exit(EXIT_SUCCESS);                                \
 }
+
+#endif
+
