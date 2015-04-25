@@ -1,6 +1,6 @@
-AC_PREREQ(2.59)
-AC_COPYRIGHT([Copyright (c) 2012 Otto Gmbh & Co KG])
-AC_INIT([trackrdrd], [2.0])
+AC_PREREQ(2.63)
+AC_COPYRIGHT([Copyright (c) 2012-2014 Otto Gmbh & Co KG])
+AC_INIT([trackrdrd], [3.0])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(src/trackrdrd.c)
 AM_CONFIG_HEADER(config.h)
@@ -9,6 +9,10 @@ AC_CANONICAL_SYSTEM
 AC_LANG(C)
 
 AM_INIT_AUTOMAKE([foreign])
+AC_USE_SYSTEM_EXTENSIONS
+
+LT_PREREQ(2.2)
+LT_INIT
 
 AC_GNU_SOURCE
 AC_PROG_CC
@@ -83,8 +87,8 @@ DEVELOPER_CFLAGS="-Wall -Wstrict-prototypes -Wmissing-prototypes -Wpointer-arith
 
 # Added for compiling C++ for ActiveMQ.
 # -Wstrict-prototypes, -Wmissing-prototypes & -Wnested-externs invalid for C++
-# activemq-cpp fails on -Wshadow
-DEVELOPER_CXXFLAGS="-Wall -Wpointer-arith -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wredundant-decls -Wformat"
+# activemq-cpp fails on -Wshadow and -Wcast-qual
+DEVELOPER_CXXFLAGS="-Wall -Wpointer-arith -Wreturn-type -Wwrite-strings -Wswitch -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wredundant-decls -Wformat"
 
 # Additional flags for GCC 4
 EXTRA_DEVELOPER_CFLAGS="-Wextra -Wno-missing-field-initializers -Wno-sign-compare"
@@ -139,5 +143,9 @@ AC_CONFIG_FILES([
 	Makefile
 	src/Makefile
         src/test/Makefile
+        src/mq/activemq/Makefile
+        src/mq/activemq/test/Makefile
+        src/mq/kafka/Makefile
+        src/mq/kafka/test/Makefile
 ])
 AC_OUTPUT
