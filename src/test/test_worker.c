@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -31,6 +31,7 @@
 
 #include <string.h>
 #include <stdbool.h>
+#include <dlfcn.h>
 
 #include "minunit.h"
 
@@ -48,11 +49,43 @@
 
 #define NWORKERS 5
 
-#define URI1 "tcp://localhost:61616?wireFormat.maxInactivityDuration=0"
-#define URI2 "tcp://localhost:61616?connection.sendTimeout=1000&wireFormat.maxInactivityDuration=0"
+#define MQ_MODULE "../mq/activemq/.libs/libtrackrdr-activemq.so"
+#define MQ_CONFIG "activemq2.conf"
 
 int tests_run = 0;
 static char errmsg[BUFSIZ];
+static void *mqh;
+
+static void
+init(void)
+{
+    char *err;
+
+    dlerror(); // to clear errors
+    mqh = dlopen(MQ_MODULE, RTLD_NOW);
+    if ((err = dlerror()) != NULL) {
+        fprintf(stderr, "error reading mq module %s: %s", MQ_MODULE, err);
+        exit(EXIT_FAILURE);
+    }
+
+#define METHOD(instm, intfm)                                            \
+    mqf.instm = dlsym(mqh, #intfm);                                     \
+    if ((err = dlerror()) != NULL) {                                    \
+        fprintf(stderr, "error loading mq method %s: %s", #intfm, err); \
+        exit(EXIT_FAILURE);                                             \
+    }
+#include "../methods.h"
+#undef METHOD
+}
+
+static void
+fini(void)
+{
+    if (dlclose(mqh) != 0) {
+        fprintf(stderr, "Error closing mq module %s: %s", MQ_MODULE, dlerror());
+        exit(EXIT_FAILURE);
+    }
+}
 
 /* N.B.: Always run this test first */
 static char
@@ -63,27 +96,18 @@ static char
 
     printf("... testing worker initialization\n");
 
-    config.maxopen_scale = 10;
-    config.maxdone = 1024;
-    config.maxdata = 1024;
+    config.maxopen_scale = DEF_MAXOPEN_SCALE;
+    config.maxdone = DEF_MAXDONE;
+    config.maxdata = DEF_MAXDATA;
+    config.maxkeylen = DEF_MAXKEYLEN;
     config.nworkers = NWORKERS;
-    strcpy(config.mq_qname, "lhoste/tracking/test");
+    strcpy(config.mq_config_file, MQ_CONFIG);
 
-    config.n_mq_uris = 2;
-    config.mq_uri = (char **) malloc(2 * sizeof(char**));
-    AN(config.mq_uri);
-    config.mq_uri[0] = (char *) malloc(strlen(URI1) + 1);
-    AN(config.mq_uri[0]);
-    strcpy(config.mq_uri[0], URI1);
-    config.mq_uri[1] = (char *) malloc(strlen(URI2) + 1);
-    AN(config.mq_uri[1]);
-    strcpy(config.mq_uri[1], URI2);
-    
-    error = MQ_GlobalInit();
+    error = mqf.global_init(config.nworkers, config.mq_config_file);
     sprintf(errmsg, "MQ_GlobalInit failed: %s", error);
     mu_assert(errmsg, error == NULL);
     
-    error = MQ_InitConnections();
+    error = mqf.init_connections();
     if (error != NULL && strstr(error, "Connection refused") != NULL) {
         printf("Connection refused, ActiveMQ assumed not running\n");
         exit(EXIT_SKIPPED);
@@ -122,7 +146,7 @@ static const char
     sprintf(errmsg, "%d of %d worker threads running", wrk_running, NWORKERS);
     mu_assert(errmsg, wrk_running == NWORKERS);
 
-    for (int i = 0; i < 1024; i++) {
+    for (int i = 0; i < (1 << DEF_MAXOPEN_SCALE); i++) {
         entry = &dtbl.entry[i];
         CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         entry->xid = xid;
@@ -135,17 +159,37 @@ static const char
     WRK_Halt();
     WRK_Shutdown();
 
-    AZ(MQ_GlobalShutdown());
+    AZ(mqf.global_shutdown());
     LOG_Close();
 
+    /*
+     * Verify DATA_Reset() by checking that all data entry fields are in
+     * empty states after worker threads are shut down.
+     */
+    for (int i = 0; i < (1 << DEF_MAXOPEN_SCALE); i++) {
+        entry = &dtbl.entry[i];
+        CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+        MASSERT(entry->state == DATA_EMPTY);
+        MAZ(entry->end);
+        MAZ(*entry->data);
+        MAZ(entry->keylen);
+        MAZ(*entry->key);
+        MASSERT(entry->hasdata == false);
+        MASSERT(entry->incomplete == false);
+        MAZ(entry->xid);
+        MAZ(entry->tid);
+    }
+    
     return NULL;
 }
 
 static const char
 *all_tests(void)
 {
+    init();
     mu_run_test(test_worker_init);
     mu_run_test(test_worker_run);
+    fini();
     return NULL;
 }
 

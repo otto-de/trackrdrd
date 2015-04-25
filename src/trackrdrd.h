@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -39,6 +39,30 @@
 
 #include "vqueue.h"
 #include "varnishapi.h"
+
+/* message queue methods, typedefs match the interface in mq.h */
+typedef const char *global_init_f(unsigned nworkers, const char *config_fname);
+typedef const char *init_connections_f(void);
+typedef const char *worker_init_f(void **priv, int wrk_num);
+typedef int send_f(void *priv, const char *data, unsigned len,
+                    const char *key, unsigned keylen, const char **error);
+typedef const char *version_f(void *priv, char *version);
+typedef const char *client_id_f(void *priv, char *clientID);
+typedef const char *reconnect_f(void **priv);
+typedef const char *worker_shutdown_f(void **priv, int wrk_num);
+typedef const char *global_shutdown_f(void);
+
+struct mqf {
+    global_init_f	*global_init;
+    init_connections_f	*init_connections;
+    worker_init_f	*worker_init;
+    send_f		*send;
+    version_f		*version;
+    client_id_f		*client_id;
+    reconnect_f		*reconnect;
+    worker_shutdown_f	*worker_shutdown;
+    global_shutdown_f	*global_shutdown;
+} mqf;
 
 /* assert.c */
 
@@ -89,17 +113,6 @@ int WRK_Exited(void);
 void WRK_Halt(void);
 void WRK_Shutdown(void);
 
-/* mq.c */
-const char *MQ_GlobalInit(void);
-const char *MQ_InitConnections(void);
-const char *MQ_WorkerInit(void **priv);
-const char *MQ_Send(void *priv, const char *data, unsigned len);
-const char *MQ_Version(void *priv, char *version);
-const char *MQ_ClientID(void *priv, char *clientID);
-const char *MQ_Reconnect(void **priv);
-const char *MQ_WorkerShutdown(void **priv);
-const char *MQ_GlobalShutdown(void);
-
 /* data.c */
 typedef enum {
     DATA_EMPTY = 0,
@@ -123,6 +136,8 @@ struct dataentry_s {
     
     bool		        incomplete; /* expired or evacuated */
     char			*data;
+    char			*key;
+    unsigned			keylen;
 };
 typedef struct dataentry_s dataentry;
 
@@ -134,7 +149,11 @@ struct data_writer_stats_s {
     unsigned		submitted;	/* Submitted to worker threads */
     unsigned		wait_room;	/* waits for space in dtbl */
     unsigned		data_hi;	/* max string length of entry->data */
+    unsigned		key_hi;		/* max string length of entry->key */
     unsigned		data_overflows; /* config.maxdata exceeded */
+    unsigned		data_truncated; /* shm_reclen exceeded */
+    unsigned		key_overflows; 	/* config.maxkeylen exceeded */
+    unsigned		abandoned;	/* Worker threads abandoned */
 };
 
 /* stats protected by mutex */
@@ -173,6 +192,7 @@ typedef struct datatable_s datatable;
 datatable dtbl;
 
 int DATA_Init(void);
+void DATA_Reset(dataentry *entry);
 void DATA_Take_Freelist(struct freehead_s *dst);
 void DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned);
 void DATA_Dump1(dataentry *entry, int i);
@@ -258,6 +278,9 @@ struct config {
     unsigned	maxdata;  	/* size of char data buffer */
 #define DEF_MAXDATA 1024
 
+    unsigned	maxkeylen;	/* size of shard key buffer */
+#define DEF_MAXKEYLEN 128
+
     /*
      * queue-length goal:
      *
@@ -297,11 +320,12 @@ struct config {
     unsigned	hash_mlt;
 #define DEF_HASH_MLT 5
 
-    unsigned	n_mq_uris;
-    char	**mq_uri;
-    char	mq_qname[BUFSIZ];
+    char	mq_module[BUFSIZ];
+    char	mq_config_file[BUFSIZ];
     unsigned	nworkers;
     unsigned	restarts;
+    unsigned	restart_pause;
+    unsigned	thread_restarts;
     char	user_name[BUFSIZ];
     uid_t	uid;
     gid_t	gid;
@@ -309,7 +333,13 @@ struct config {
 
 void CONF_Init(void);
 int CONF_Add(const char *lval, const char *rval);
-int CONF_ReadFile(const char *file);
+/**
+ * Reads the default config file `/etc/trackrdrd.conf`, if present
+ *
+ * @returns 0 if the file does not exist or was successfully read,
+ *          >0 (errno) if the file exists but cannot be read,
+ *          <0 if the file was read but the contents could not be processed
+ */
 int CONF_ReadDefault(void);
 void CONF_Dump(void);
 
@@ -358,12 +388,16 @@ void MON_StatsInit(void);
 void MON_StatsUpdate(stats_update_t update);
 
 /* parse.c */
+
+/* Whether a VCL_Log entry contains a data payload or a shard key */
+typedef enum { VCL_LOG_DATA, VCL_LOG_KEY } vcl_log_t;
+
 int Parse_XID(const char *str, int len, unsigned *xid);
 int Parse_ReqStart(const char *ptr, int len, unsigned *xid);
 int Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid,
-    struct timespec *reqend_t);
+                 struct timespec *reqend_t);
 int Parse_VCL_Log(const char *ptr, int len, unsigned *xid,
-    char **data, int *datalen);
+                  char **data, int *datalen, vcl_log_t *type);
 
 /* generic init attributes */
 pthread_mutexattr_t attr_lock;

@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -56,7 +56,10 @@ log_output(void)
         "submitted=%u "
         "wait_room=%u "
         "data_hi=%u "
+        "key_hi=%u "
         "data_overflows=%u "
+        "data_truncated=%u "
+        "key_overflows=%u "
         "done=%u "
         "open=%u "
         "load=%.2f "
@@ -64,6 +67,7 @@ log_output(void)
         "reconnects=%u "
         "failed=%u "
         "restarts=%u "
+        "abandoned=%u "
         "occ_hi=%u "
         "occ_hi_this=%u ",
         dtbl.len,
@@ -71,7 +75,10 @@ log_output(void)
         dtbl.w_stats.submitted,
         dtbl.w_stats.wait_room,
         dtbl.w_stats.data_hi,
+        dtbl.w_stats.key_hi,
         dtbl.w_stats.data_overflows,
+        dtbl.w_stats.data_truncated,
+        dtbl.w_stats.key_overflows,
         dtbl.r_stats.done,
         dtbl.r_stats.open,
         (100.0 * (1.0 * dtbl.r_stats.done + 1.0 * dtbl.r_stats.open) / dtbl.len),
@@ -79,6 +86,7 @@ log_output(void)
         dtbl.r_stats.reconnects,
         dtbl.r_stats.failed,
         dtbl.r_stats.restarts,
+        dtbl.w_stats.abandoned,
         dtbl.r_stats.occ_hi,
         dtbl.r_stats.occ_hi_this
             );
@@ -86,8 +94,13 @@ log_output(void)
     /* locking would be overkill */
     dtbl.r_stats.occ_hi_this = 0;
 
-    if (config.monitor_workers)
+    if (config.monitor_workers) {
+        int wrk_running = WRK_Running();
+        if (wrk_running < config.nworkers)
+            LOG_Log(LOG_WARNING, "%d of %d workers running", wrk_running,
+                config.nworkers);
         WRK_Stats();
+    }
 }
 
 static void
