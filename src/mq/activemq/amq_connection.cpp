@@ -65,6 +65,8 @@ AMQ_Connection::AMQ_Connection(std::string& brokerURI) {
         throw NullPointerException(__FILE__, __LINE__,
                                    "Factory created for %s is NULL",
                                    brokerURI.c_str());
+    factory->setSendTimeout( 5000 ); // number of milliseconds to avoid blocking during F5 failover
+    factory->setCloseTimeout( 5000 );
        
     connection = factory->createConnection();
     if (connection == NULL)
@@ -81,7 +83,6 @@ AMQ_Connection::getConnection() {
 
 AMQ_Connection::~AMQ_Connection() {
     if (connection != NULL) {
-        connection->stop();
         connection->close();
 	delete connection;
 	connection = NULL;

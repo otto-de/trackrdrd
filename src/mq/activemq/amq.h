@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -29,41 +29,63 @@
  *
  */
 
-#ifndef _AMQ_CONNECTION_H
-#define _AMQ_CONNECTION_H
+#ifndef _AMQ_H
+#define _AMQ_H
+
+#include "amq_connection.h"
 
 #ifdef __cplusplus
 
 #include <activemq/core/ActiveMQConnectionFactory.h>
 #include <cms/Connection.h>
+#include <cms/Session.h>
+#include <cms/Queue.h>
+#include <cms/MessageProducer.h>
 
 using namespace activemq::core;
 using namespace cms;
 
-class AMQ_Connection {
+class AMQ_Worker {
 private:
-    static ActiveMQConnectionFactory* factory;
     Connection* connection;
-    AMQ_Connection() {};
+    Session* session;
+    Queue* queue;
+    MessageProducer* producer;
+    TextMessage* msg;
+    int num;
+    AMQ_Worker() {};
 
 public:
-    AMQ_Connection(std::string& brokerURI);
-    Connection* getConnection();
-    virtual ~AMQ_Connection();
+    static void shutdown();
+    
+    AMQ_Worker(Connection* connection, std::string& qName, int n,
+        Session::AcknowledgeMode ackMode, int deliveryMode);
+    int getNum();
+    virtual ~AMQ_Worker();
+    void send(std::string& text);
+    std::string getVersion();
+    std::string getClientID();
 };
 #else
-typedef struct AMQ_Connection AMQ_Connection;
+typedef struct AMQ_Worker AMQ_Worker;
 #endif
     
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-    const char *AMQ_ConnectionInit(AMQ_Connection **priv, char *uri);
-    const char *AMQ_ConnectionShutdown(AMQ_Connection *priv);
+    const char *AMQ_GlobalInit(void);
+    const char *AMQ_WorkerInit(AMQ_Worker **worker, AMQ_Connection *connection,
+                               char *qName, int num);
+    const char *AMQ_Send(AMQ_Worker *worker, const char *data, unsigned len);
+    const char *AMQ_Version(AMQ_Worker *worker, char *version);
+    const char *AMQ_ClientID(AMQ_Worker *worker, char *clientID);
+    const char *AMQ_GetNum(AMQ_Worker *worker, int *num);
+    const char *AMQ_WorkerShutdown(AMQ_Worker **worker);
+    const char *AMQ_GlobalShutdown(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _AMQ_CONNECTION_H */
+#endif /* _AMQ_H */
