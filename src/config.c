@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -44,6 +44,7 @@
 
 #include "trackrdrd.h"
 #include "libvarnish.h"
+#include "config_common.h"
 
 #define DEFAULT_USER "nobody"
 
@@ -114,16 +115,20 @@ CONF_Add(const char *lval, const char *rval)
     confString("varnish.name", varnish_name);
     confString("log.file", log_file);
     confString("varnish.bindump", varnish_bindump);
-    confString("mq.qname", mq_qname);
+    confString("mq.module", mq_module);
+    confString("mq.config_file", mq_config_file);
 
     confUnsigned("maxopen.scale", maxopen_scale);
     confUnsigned("maxdata", maxdata);
+    confUnsigned("maxkeylen", maxkeylen);
     confUnsigned("qlen.goal", qlen_goal);
     confUnsigned("hash.max_probes", hash_max_probes);
     confUnsigned("hash.ttl", hash_ttl);
     confUnsigned("hash.mlt", hash_mlt);
     confUnsigned("nworkers", nworkers);
     confUnsigned("restarts", restarts);
+    confUnsigned("restart.pause", restart_pause);
+    confUnsigned("thread.restarts", thread_restarts);
     confUnsigned("monitor.interval", monitor_interval);
 
     if (strcmp(lval, "maxdone") == 0) {
@@ -177,44 +182,7 @@ CONF_Add(const char *lval, const char *rval)
         return(EINVAL);
     }
 
-    if (strcmp(lval, "mq.uri") == 0) {
-        int n = config.n_mq_uris++;
-        config.mq_uri = (char **) realloc(config.mq_uri,
-            config.n_mq_uris * sizeof(char **));
-        if (config.mq_uri == NULL)
-            return(errno);
-        config.mq_uri[n] = (char *) malloc(strlen(rval) + 1);
-        if (config.mq_uri[n] == NULL)
-            return(errno);
-        strcpy(config.mq_uri[n], rval);
-        return(0);
-    }
-
     return EINVAL;
-}
-
-static int
-conf_ParseLine(char *ptr, char **lval, char **rval)
-{
-    char *endlval;
-    
-    *lval = ptr;
-    while(*++ptr && !isspace(*ptr) && *ptr != '=')
-        ;
-    if (*ptr == '\0')
-        return(1);
-    endlval = ptr;
-    while(isspace(*ptr) && *++ptr)
-        ;
-    if (ptr == '\0' || *ptr != '=')
-        return(1);
-    while(*++ptr && isspace(*ptr))
-        ;
-    if (ptr == '\0')
-        return(1);
-    *endlval = '\0';
-    *rval = ptr;
-    return(0);
 }
 
 void
@@ -232,17 +200,18 @@ CONF_Init(void)
     config.maxopen_scale = DEF_MAXOPEN_SCALE;
     config.maxdone = DEF_MAXDONE;
     config.maxdata = DEF_MAXDATA;
+    config.maxkeylen = DEF_MAXKEYLEN;
     config.qlen_goal = DEF_QLEN_GOAL;
     config.hash_max_probes = DEF_HASH_MAX_PROBES;
     config.hash_ttl = DEF_HASH_TTL;
     config.hash_mlt = DEF_HASH_MLT;
 
-    config.n_mq_uris = 0;
-    config.mq_uri = (char **) malloc (sizeof(char **));
-    AN(config.mq_uri);
-    config.mq_qname[0] = '\0';
+    config.mq_module[0] = '\0';
+    config.mq_config_file[0] = '\0';
     config.nworkers = 1;
     config.restarts = 1;
+    config.restart_pause = 1;
+    config.thread_restarts = 1;
     
     pw = getpwnam(DEFAULT_USER);
     if (pw == NULL)
@@ -253,56 +222,6 @@ CONF_Init(void)
     config.gid = pw->pw_gid;
 }
 
-int
-CONF_ReadFile(const char *file) {
-    FILE *in;
-    char line[BUFSIZ];
-    int linenum = 0;
-
-    in = fopen(file, "r");
-    if (in == NULL) {
-        perror(file);
-        return(-1);
-    }
-    
-    while (fgets(line, BUFSIZ, in) != NULL) {
-        char orig[BUFSIZ];
-        
-        linenum++;
-        char *comment = strchr(line, '#');
-        if (comment != NULL)
-            *comment = '\0';
-        if (strlen(line) == 0)
-            continue;
-    
-        char *ptr = line + strlen(line) - 1;
-        while (ptr != line && isspace(*ptr))
-            --ptr;
-        ptr[isspace(*ptr) ? 0 : 1] = '\0';
-        if (strlen(line) == 0)
-            continue;
-
-        ptr = line;
-        while (isspace(*ptr) && *++ptr)
-            ;
-        strcpy(orig, ptr);
-        char *lval, *rval;
-        if (conf_ParseLine(ptr, &lval, &rval) != 0) {
-            fprintf(stderr, "Cannot parse %s line %d: '%s'\n", file, linenum,
-                    orig);
-            return(-1);
-        }
-
-        int ret;
-        if ((ret = CONF_Add((const char *) lval, (const char *) rval)) != 0) {
-            fprintf(stderr, "Error in %s line %d (%s): '%s'\n", file, linenum,
-                strerror(ret), orig);
-            return(-1);
-        }
-    }
-    return(0);
-}
-
 /* XXX: stdout is /dev/null in child process */
 int
 CONF_ReadDefault(void)
@@ -311,7 +230,7 @@ CONF_ReadDefault(void)
         if (access(DEFAULT_CONFIG, R_OK) != 0)
             return(errno);
         printf("Reading config from %s\n", DEFAULT_CONFIG);
-        if (CONF_ReadFile(DEFAULT_CONFIG) != 0)
+        if (CONF_ReadFile(DEFAULT_CONFIG, CONF_Add) != 0)
             return -1;
     }
     return 0;
@@ -334,19 +253,17 @@ CONF_Dump(void)
     confdump("maxopen.scale = %u", config.maxopen_scale);
     confdump("maxdone = %u", config.maxdone);
     confdump("maxdata = %u", config.maxdata);
+    confdump("maxkeylen = %u", config.maxkeylen);
     confdump("qlen.goal = %u", config.qlen_goal);
     confdump("hash.max_probes = %u", config.hash_max_probes);
     confdump("hash.ttl = %u", config.hash_ttl);
     confdump("hash.mlt = %u", config.hash_mlt);
 
-    if (config.n_mq_uris > 0)
-        for (int i = 0; i < config.n_mq_uris; i++)
-            confdump("mq.uri = %s", config.mq_uri[i]);
-    else
-        LOG_Log0(LOG_DEBUG, "config: mq.uri = ");
-    
-    confdump("mq.qname = %s", config.mq_qname);
+    confdump("mq.module = %s", config.mq_module);
+    confdump("mq.config_file = %s", config.mq_config_file);
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
+    confdump("restart.pause = %u", config.restart_pause);
+    confdump("thread.restarts = %u", config.thread_restarts);
     confdump("user = %s", config.user_name);
 }
