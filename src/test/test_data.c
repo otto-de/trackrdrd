@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -36,7 +36,6 @@
 #include "../trackrdrd.h"
 
 int tests_run = 0;
-static char errmsg[BUFSIZ];
 
 static struct freehead_s local_freehead
     = VSTAILQ_HEAD_INITIALIZER(local_freehead);
@@ -49,13 +48,45 @@ static char
 
     printf("... testing data table initialization\n");
     
-    config.maxopen_scale = 10;
-    config.maxdone = 1024;
+    config.maxopen_scale = DEF_MAXOPEN_SCALE;
+    config.maxdone = DEF_MAXDONE;
+    config.maxdata = DEF_MAXDATA;
+    config.maxkeylen = DEF_MAXKEYLEN;
     err = DATA_Init();
-    sprintf(errmsg, "DATA_Init: %s", strerror(err));
-    mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "DATA_Init: expected table length 2048, got %d", dtbl.len);
-    mu_assert(errmsg, dtbl.len == 2048);
+    VMASSERT(err == 0, "DATA_Init: %s", strerror(err));
+    VMASSERT(dtbl.len == 2048, "DATA_Init: expected table length 2048, got %d",
+             dtbl.len);
+
+    for (int i = 0; i < dtbl.len; i++) {
+        MCHECK_OBJ_NOTNULL(&dtbl.entry[i], DATA_MAGIC);
+        MASSERT(dtbl.entry[i].state == DATA_EMPTY);
+        MASSERT(!dtbl.entry[i].hasdata);
+        MAN(dtbl.entry[i].data);
+        MAN(dtbl.entry[i].key);
+    }
+
+    return NULL;
+}
+
+static const char
+*test_data_set_get(void)
+{
+    char data[DEF_MAXDATA], key[DEF_MAXKEYLEN];
+    
+    printf("... testing data write and read\n");
+
+    for (int i = 0; i < dtbl.len; i++) {
+        memset(dtbl.entry[i].data, 'd', DEF_MAXDATA);
+        memset(dtbl.entry[i].key,  'k', DEF_MAXKEYLEN);
+    }
+
+    memset(data, 'd', DEF_MAXDATA);
+    memset(key,  'k', DEF_MAXKEYLEN);
+
+    for (int i = 0; i < dtbl.len; i++) {
+        MASSERT(memcmp(dtbl.entry[i].data, data, DEF_MAXDATA) == 0);
+        MASSERT(memcmp(dtbl.entry[i].key,  key,  DEF_MAXKEYLEN) == 0);
+    }
 
     return NULL;
 }
@@ -67,14 +98,14 @@ static const char
 
     DATA_Take_Freelist(&local_freehead);
     
-    mu_assert("Local freelist empty after take",
-        !VSTAILQ_EMPTY(&local_freehead));
+    MASSERT0(!VSTAILQ_EMPTY(&local_freehead),
+             "Local freelist empty after take");
     
-    sprintf(errmsg, "Global free count non-zero after take (%u)", dtbl.nfree);
-    mu_assert(errmsg, dtbl.nfree == 0);
+    VMASSERT(dtbl.nfree == 0, "Global free count non-zero after take (%u)",
+             dtbl.nfree);
 
-    mu_assert("Global free list non-empty after take",
-        VSTAILQ_EMPTY(&dtbl.freehead));
+    MASSERT0(VSTAILQ_EMPTY(&dtbl.freehead),
+             "Global free list non-empty after take");
 
     return NULL;
 }
@@ -86,15 +117,15 @@ static const char
 
     DATA_Return_Freelist(&local_freehead, 2048);
 
-    mu_assert("Local freelist non-empty after return",
-        VSTAILQ_EMPTY(&local_freehead));
+    MASSERT0(VSTAILQ_EMPTY(&local_freehead),
+             "Local freelist non-empty after return");
     
-    sprintf(errmsg, "Expected global free count == 2048 after return (%u)",
-        dtbl.nfree);
-    mu_assert(errmsg, dtbl.nfree == 2048);
+    VMASSERT(dtbl.nfree == 2048,
+             "Expected global free count == 2048 after return (%u)",
+             dtbl.nfree);
 
-    mu_assert("Global free list empty after take",
-        !VSTAILQ_EMPTY(&dtbl.freehead));
+    MASSERT0(!VSTAILQ_EMPTY(&dtbl.freehead),
+             "Global free list empty after take");
 
     return NULL;
 }
@@ -103,6 +134,7 @@ static const char
 *all_tests(void)
 {
     mu_run_test(test_data_init);
+    mu_run_test(test_data_set_get);
     mu_run_test(test_data_take);
     mu_run_test(test_data_return);
     return NULL;
