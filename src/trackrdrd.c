@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -69,6 +69,7 @@
 #include "miniobj.h"
 
 #include "trackrdrd.h"
+#include "config_common.h"
 #include "revision.h"
 #include "usage.h"
 
@@ -195,6 +196,11 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
             parent_shutdown(EXIT_FAILURE, 0);
         }
         
+        if (config.restart_pause > 0) {
+            LOG_Log(LOG_INFO, "Pausing %u seconds before restarting child",
+                    config.restart_pause);
+            TIM_sleep(config.restart_pause);
+        }
         child_pid = child_restart(child_pid, vd, endless, 0);
         restarts++;
     }
@@ -273,7 +279,7 @@ main(int argc, char * const *argv)
     if (c_arg) {
         strcpy(cli_config_filename, c_arg);
         printf("Reading config from %s\n", c_arg);
-        if (CONF_ReadFile(c_arg) != 0)
+        if (CONF_ReadFile(c_arg, CONF_Add) != 0)
             exit(EXIT_FAILURE);
     }
         
