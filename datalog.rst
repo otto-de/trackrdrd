@@ -20,6 +20,11 @@ Field              Description
 ``data_overflows`` How often the accumulated length of a record exceeded
                    ``maxdata``
 ------------------ ------------------------------------------------------------
+``data_truncated`` How often data from the Varnish log was truncated due to
+                   the presence of a null byte. This can happen if the data was
+                   already truncated in the log, due to exceeding
+                   ``shm_reclen``.
+------------------ ------------------------------------------------------------
 ``done``           Current number of records in state "done"
 ------------------ ------------------------------------------------------------
 ``open``           Current number of open records in the table
@@ -31,6 +36,12 @@ Field              Description
 ------------------ ------------------------------------------------------------
 ``reconnects``     How often worker threads reconnected to a message broker
                    after an unsuccessful send
+------------------ ------------------------------------------------------------
+``restarts``       How often worker threads were restarted after a message
+                   send, reconnect and resend all failed
+------------------ ------------------------------------------------------------
+``abandoned``      Number of worker threads that have been abandoned due to
+                   reaching the restart limit (``thread.restarts``)
 ------------------ ------------------------------------------------------------
 ``failed``         Number of failed sends (failure after reconnect)
 ------------------ ------------------------------------------------------------

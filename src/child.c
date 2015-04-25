@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -52,10 +52,10 @@
 #include <pwd.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <dlfcn.h>
 
 #include "vsb.h"
 #include "vpf.h"
-#include "vmb.h"
 
 #include "libvarnish.h"
 #include "vsl.h"
@@ -63,6 +63,7 @@
 #include "miniobj.h"
 
 #include "trackrdrd.h"
+#include "config_common.h"
 
 #define TRACK_TAGS "ReqStart,VCL_log,ReqEnd"
 
@@ -226,6 +227,7 @@ data_submit(dataentry *de)
 {
     CHECK_OBJ_NOTNULL(de, DATA_MAGIC);
     assert(de->state == DATA_DONE);
+    AZ(memchr(de->data, '\0', de->end));
     LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", de->end, de->data);
     if (de->hasdata == false) {
         de->state = DATA_EMPTY;
@@ -594,14 +596,13 @@ static inline dataentry
     CHECK_OBJ_NOTNULL(de, DATA_MAGIC);
     assert(de->state == DATA_EMPTY);
     hashentry *he = hash_insert(xid, de, tim);
-    CHECK_OBJ(he, HASH_MAGIC);
-
     if (! he) {
         LOG_Log(LOG_WARNING, "Insert: Could not insert hash for XID %d",
             xid);
         data_free(de);
         return (NULL);
     }
+    CHECK_OBJ(he, HASH_MAGIC);
 
     /* he being filled out by Hash_Insert, we need to look after de */
     de->xid	= xid;
@@ -622,6 +623,8 @@ static inline void
 append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
     int datalen)
 {
+    char *null;
+
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     /* Data overflow */
     if (entry->end + datalen + 1 > config.maxdata) {
@@ -632,6 +635,14 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
         dtbl.w_stats.data_overflows++;
         return;
     }
+    /* Null chars in the payload means that the data was truncated in the
+       log, due to exceeding shm_reclen. */
+    if ((null = memchr(data, '\0', datalen)) != NULL) {
+        datalen = null - data;
+        LOG_Log(LOG_ALERT, "%s: Data truncated in SHM log, XID=%d, data=[%.*s]",
+                VSL_tags[tag], xid, datalen, data);
+        dtbl.w_stats.data_truncated++;
+    }
         
     entry->data[entry->end] = '&';
     entry->end++;
@@ -639,6 +650,27 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
     entry->end += datalen;
     if (entry->end > dtbl.w_stats.data_hi)
         dtbl.w_stats.data_hi = entry->end;
+    return;
+}
+
+static inline void
+addkey(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *key,
+       int keylen)
+{
+    CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+    if (keylen > config.maxkeylen) {
+        LOG_Log(LOG_ALERT,
+                "%s: Key too long, XID=%d, length=%d, "
+                "DISCARDING key=[%.*s]", VSL_tags[tag], xid, keylen,
+                keylen, key);
+        dtbl.w_stats.key_overflows++;
+        return;
+    }
+        
+    memcpy(entry->key, key, keylen);
+    entry->keylen = keylen;
+    if (keylen > dtbl.w_stats.key_hi)
+        dtbl.w_stats.key_hi = keylen;
     return;
 }
 
@@ -668,6 +700,7 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     char *data, reqend_str[strlen(REQEND_T_VAR)+22];
     struct timespec reqend_t;
     float tim;
+    vcl_log_t data_type;
 
     static float tim_exp_check = 0.0;
 
@@ -690,9 +723,6 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
         return 1;
 
     wrk_running = WRK_Running();
-    if (wrk_running < config.nworkers)
-        LOG_Log(LOG_WARNING, "%d of %d workers running", wrk_running,
-            config.nworkers);
     
     /* spec != 'c' */
     if ((spec & VSL_S_CLIENT) == 0)
@@ -734,10 +764,16 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
             break;
         
         err = Parse_VCL_Log(&ptr[TRACKLOG_PREFIX_LEN], len-TRACKLOG_PREFIX_LEN,
-                            &xid, &data, &datalen);
-        AZ(err);
-        LOG_Log(LOG_DEBUG, "%s: XID=%u, data=[%.*s]", VSL_tags[tag],
-            xid, datalen, data);
+                            &xid, &data, &datalen, &data_type);
+        if (err != 0) {
+            LOG_Log(LOG_ERR,
+                    "Cannot parse VCL_Log entry, DISCARDING [%.*s]: %s",
+                    datalen, data, strerror(err));
+            htbl.drop_vcl_log++;
+        }
+
+        LOG_Log(LOG_DEBUG, "%s: XID=%u, %s=[%.*s]", VSL_tags[tag],
+                xid, data_type == VCL_LOG_DATA ? "data" : "key", datalen, data);
 
         he = hash_find(xid);
         if (he == NULL) {
@@ -751,8 +787,14 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
 
         check_entry(he, xid, fd);
         de = he->de;
-        append(de, tag, xid, data, datalen);
-        de->hasdata = true;
+
+        if (data_type == VCL_LOG_DATA) {
+            append(de, tag, xid, data, datalen);
+            de->hasdata = true;
+        }
+        else
+            addkey(de, tag, xid, data, datalen);
+
         break;
 
     case SLT_ReqEnd:
@@ -811,7 +853,8 @@ OSL_Track(void *priv, enum VSL_tag_e tag, unsigned fd, unsigned len,
     }
     pptr = ptr;
 
-    if (WRK_Exited() > 0)
+    if (WRK_Exited() - dtbl.w_stats.abandoned > 0
+        || (config.nworkers > 0 && dtbl.w_stats.abandoned == config.nworkers))
         return 1;
     
     return 0;
@@ -852,10 +895,11 @@ vsm_name(struct VSM_data *vd)
 void
 CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
 {
-    int errnum;
+    int errnum, giveup = 0;;
     const char *errmsg;
     pthread_t monitor;
     struct passwd *pw;
+    void *mqh;
 
     AZ(pthread_mutexattr_init(&attr_lock));
     AZ(pthread_condattr_init(&attr_cond));
@@ -875,7 +919,7 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
         if (! EMPTY(cli_config_filename))
             LOG_Log(LOG_INFO, "Reading config from %s", cli_config_filename);
             /* XXX: CONF_ReadFile prints err messages to stderr */
-            if (CONF_ReadFile(cli_config_filename) != 0) {
+        if (CONF_ReadFile(cli_config_filename, CONF_Add) != 0) {
                 LOG_Log(LOG_ERR, "Error reading config from %s",
                     cli_config_filename);
                 exit(EXIT_FAILURE);
@@ -886,6 +930,28 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     pw = getpwuid(geteuid());
     AN(pw);
     LOG_Log(LOG_INFO, "Running as %s", pw->pw_name);
+
+    /* read messaging module */
+    if (config.mq_module[0] == '\0') {
+        LOG_Log0(LOG_ALERT, "mq.module not found in config (required)");
+        exit(EXIT_FAILURE);
+    }
+    dlerror(); // to clear errors
+    mqh = dlopen(config.mq_module, RTLD_NOW);
+    if ((errmsg = dlerror()) != NULL) {
+        LOG_Log(LOG_ALERT, "error reading mq module %s: %s", config.mq_module,
+                errmsg);
+        exit(EXIT_FAILURE);
+    }
+
+#define METHOD(instm, intfm)                                            \
+    mqf.instm = dlsym(mqh, #intfm);                                     \
+    if ((errmsg = dlerror()) != NULL) {                                 \
+        LOG_Log(LOG_ALERT, "error loading mq method %s: %s", #intfm, errmsg); \
+        exit(EXIT_FAILURE);                                             \
+    }
+#include "methods.h"
+#undef METHOD
 
     /* install signal handlers */
     dump_action.sa_handler = dump;
@@ -927,13 +993,13 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     else
         LOG_Log0(LOG_INFO, "Monitoring thread not running");
 
-    errmsg = MQ_GlobalInit();
+    errmsg = mqf.global_init(config.nworkers, config.mq_config_file);
     if (errmsg != NULL) {
         LOG_Log(LOG_ERR, "Cannot initialize message broker access: %s", errmsg);
         exit(EXIT_FAILURE);
     }
 
-    errmsg = MQ_InitConnections();
+    errmsg = mqf.init_connections();
     if (errmsg != NULL) {
         LOG_Log(LOG_ERR, "Cannot initialize message broker connections: %s",
             errmsg);
@@ -975,10 +1041,16 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
     while (VSL_Dispatch(vd, OSL_Track, NULL) > 0)
         if (term || !endless)
             break;
-        else if (WRK_Exited() > 0) {
+        else if (dtbl.w_stats.abandoned == config.nworkers) {
+            LOG_Log0(LOG_ALERT, "All worker threads abandoned, giving up");
+            giveup = 1;
+            break;
+        }
+        else if (WRK_Exited() - dtbl.w_stats.abandoned > 0) {
             if ((errnum = WRK_Restart()) != 0) {
                 LOG_Log(LOG_ALERT, "Cannot restart worker threads, giving up "
                     "(%s)", strerror(errnum));
+                giveup = 1;
                 break;
             }
         }
@@ -989,12 +1061,18 @@ CHILD_Main(struct VSM_data *vd, int endless, int readconfig)
 
     if (term)
         LOG_Log0(LOG_INFO, "Termination signal received");
+    else if (giveup)
+        LOG_Log0(LOG_INFO, "Terminating due to worker thread failure");
     else if (endless)
         LOG_Log0(LOG_WARNING, "Varnish log closed");
 
     WRK_Halt();
     WRK_Shutdown();
-    AZ(MQ_GlobalShutdown());
+    if ((errmsg = mqf.global_shutdown()) != NULL)
+        LOG_Log(LOG_ALERT, "Message queue shutdown failed: %s", errmsg);
+    if (dlclose(mqh) != 0)
+        LOG_Log(LOG_ALERT, "Error closing mq module %s: %s", config.mq_module,
+                dlerror());
     if (config.monitor_interval > 0.0)
         MON_StatusShutdown(monitor);
     LOG_Log0(LOG_INFO, "Worker process exiting");
@@ -1152,6 +1230,52 @@ static const char
     mu_run_test(test_hash_init);
     mu_run_test(test_hash_insert);
     mu_run_test(test_hash_find);
+    return NULL;
+}
+
+TEST_RUNNER
+
+#endif
+
+#ifdef APPEND_TEST
+
+#include "minunit.h"
+
+int tests_run = 0;
+
+static char
+*test_append(void)
+{
+    dataentry *entry;
+    char data_with_null[8];
+
+    printf("... testing data append (expect an ALERT)\n");
+
+    config.maxdata = DEF_MAXDATA;
+    entry = calloc(1, sizeof(dataentry));
+    AN(entry);
+    entry->data = calloc(1, config.maxdata);
+    AN(entry->data);
+    entry->magic = DATA_MAGIC;
+    dtbl.w_stats.data_truncated = dtbl.w_stats.data_hi = 0;
+    strcpy(config.log_file, "-");
+    AZ(LOG_Open("test_append"));
+
+    memcpy(data_with_null, "foo\0bar", 8);
+    append(entry, SLT_VCL_Log, 12345678, data_with_null, 7);
+
+    MASSERT(memcmp(entry->data, "&foo\0\0", 6) == 0);
+    MASSERT(entry->end == 4);
+    MASSERT(dtbl.w_stats.data_truncated == 1);
+    MASSERT(dtbl.w_stats.data_hi == 4);
+
+    return NULL;
+}
+
+static const char
+*all_tests(void)
+{
+    mu_run_test(test_append);
     return NULL;
 }
 

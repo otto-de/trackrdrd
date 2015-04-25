@@ -5,11 +5,11 @@ Parameter            CLI Option Description                                     
                                 shared memory segment for the Varnish log. This parameter and ``varnish.bindump`` are
                                 mutually exclusive.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``mq.uri``                      URIs for the message broker. This is the only parameter that can appear more than once in None, this parameter is required.
-                                the configuration; if more than one MQ URIs are specified, than worker threads
-                                distribute their connections to the different message brokers.
+``mq.module``                   Name of the shared object implementing the MQ interface. May be an absolute path, or the  None, this parameter is required.
+                                name of a library that the dynamic linker finds according to the rules described in
+                                ld.so(8).
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``mq.qname``                    Name of the queue (destination) to which messages are sent at the message broker(s).      None, this parameter is required.
+``mq.config_file``              Path of a configuration file used by the MQ implementation                                None, this parameter is optional.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``nworkers``                    Number of worker threads used to send messages to the message broker(s).                  1
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
@@ -49,6 +49,14 @@ Parameter            CLI Option Description                                     
                                 set to be empty (by the line ``pid.file=``, with no value), then no PID file is written.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``restarts``                    Maximum number of restarts of the child process by the management process                 1
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``restart.pause``               Seconds to pause before restarting a child process                                        1
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``thread.restarts``             Maximum number of restarts of a worker thread by the child process. A thread is restarted 1
+                                after a message send, message system reconnect and message resend have all failed. If the
+                                restart limit for a thread is reached, then the thread goes into the state ``abandoned``
+                                and no more restarts are attempted. If all worker threads are abandoned, then the child
+                                process stops.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``monitor.interval``            Interval in seconds at which monitoring statistics are emitted to the log. If set to 0,   30
                                 then no statistics are logged.

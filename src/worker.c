@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -51,6 +51,7 @@ typedef enum {
     WRK_WAITING,
     WRK_SHUTTINGDOWN,
     WRK_EXITED,
+    WRK_ABANDONED,
     WRK_STATE_E_LIMIT
 } wrk_state_e;
 
@@ -60,7 +61,8 @@ static const char* statename[WRK_STATE_E_LIMIT] = {
     [WRK_RUNNING]	= "running",
     [WRK_WAITING]	= "waiting",
     [WRK_SHUTTINGDOWN]	= "shutting down",
-    [WRK_EXITED]	= "exited"
+    [WRK_EXITED]	= "exited",
+    [WRK_ABANDONED]	= "abandoned"
 };
 
 struct worker_data_s {
@@ -79,6 +81,7 @@ struct worker_data_s {
     unsigned waits;
     unsigned sends;
     unsigned fails;
+    unsigned recoverables;
     unsigned reconnects;
     unsigned restarts;
 };
@@ -96,17 +99,17 @@ static thread_data_t *thread_data;
 static pthread_mutex_t running_lock;
 
 static void
-wrk_log_connection(void *amq_worker, unsigned id)
+wrk_log_connection(void *mq_worker, unsigned id)
 {
     const char *err;
     char version[VERSION_LEN], clientID[CLIENT_ID_LEN];
 
-    err = MQ_Version(amq_worker, version);
+    err = mqf.version(mq_worker, version);
     if (err != NULL) {
         LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ version", id, err);
         version[0] = '\0';
     }
-    err = MQ_ClientID(amq_worker, clientID);
+    err = mqf.client_id(mq_worker, clientID);
     if (err != NULL) {
         LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ client ID", id, err);
         clientID[0] = '\0';
@@ -116,51 +119,70 @@ wrk_log_connection(void *amq_worker, unsigned id)
 }
 
 static inline void
-wrk_send(void **amq_worker, dataentry *entry, worker_data_t *wrk)
+wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
 {
     const char *err;
+    int errnum;
     
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     assert(entry->state == DATA_DONE);
-    AN(amq_worker);
+    AN(mq_worker);
 
     /* XXX: report entry->incomplete to backend ? */
-    err = MQ_Send(*amq_worker, entry->data, entry->end);
-    if (err != NULL) {
+    AZ(memchr(entry->data, '\0', entry->end));
+    errnum = mqf.send(*mq_worker, entry->data, entry->end,
+                      entry->key, entry->keylen, &err);
+    if (errnum != 0) {
         LOG_Log(LOG_WARNING, "Worker %d: Failed to send data: %s",
-            wrk->id, err);
-        LOG_Log(LOG_INFO, "Worker %d: Reconnecting", wrk->id);
-        err = MQ_Reconnect(amq_worker);
-        if (err != NULL) {
-            *amq_worker = NULL;
-            LOG_Log(LOG_ALERT, "Worker %d: Reconnect failed (%s)", wrk->id,
-                err);
-            LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
-                entry->end, entry->data);
+                wrk->id, err);
+        if (errnum > 0) {
+            wrk->recoverables++;
+            MON_StatsUpdate(STATS_FAILED);
         }
         else {
-            wrk->reconnects++;
-            wrk_log_connection(*amq_worker, wrk->id);
-            MON_StatsUpdate(STATS_RECONNECT);
-            err = MQ_Send(*amq_worker, entry->data, entry->end);
+            /* Non-recoverable error */
+            LOG_Log(LOG_INFO, "Worker %d: Reconnecting", wrk->id);
+            err = mqf.reconnect(mq_worker);
             if (err != NULL) {
-                wrk->fails++;
-                LOG_Log(LOG_ALERT,
-                    "Worker %d: Failed to send data after reconnect: %s",
-                    wrk->id, err);
+                wrk->status = EXIT_FAILURE;
+                LOG_Log(LOG_ALERT, "Worker %d: Reconnect failed (%s)", wrk->id,
+                        err);
                 LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
-                    entry->end, entry->data);
+                        entry->end, entry->data);
                 MON_StatsUpdate(STATS_FAILED);
+            }
+            else {
+                wrk->reconnects++;
+                wrk_log_connection(*mq_worker, wrk->id);
+                MON_StatsUpdate(STATS_RECONNECT);
+                errnum = mqf.send(*mq_worker, entry->data, entry->end,
+                                  entry->key, entry->keylen, &err);
+                if (errnum != 0) {
+                    LOG_Log(LOG_WARNING, "Worker %d: Failed to send data "
+                            "after reconnect: %s", wrk->id, err);
+                    if (errnum > 0) {
+                        wrk->recoverables++;
+                        MON_StatsUpdate(STATS_FAILED);
+                    }
+                    else {
+                        /* Fail after reconnect, give up */
+                        wrk->fails++;
+                        wrk->status = EXIT_FAILURE;
+                        LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]",
+                                wrk->id, entry->end, entry->data);
+                        MON_StatsUpdate(STATS_FAILED);
+                    }
+                }
             }
         }
     }
-    if (err == NULL) {
+    if (errnum == 0) {
         wrk->sends++;
         MON_StatsUpdate(STATS_SENT);
         LOG_Log(LOG_DEBUG, "Worker %d: Successfully sent data [%.*s]", wrk->id,
             entry->end, entry->data);
     }
-    entry->state = DATA_EMPTY;
+    DATA_Reset(entry);
     VSTAILQ_INSERT_TAIL(&wrk->wrk_freelist, entry, freelist);
     wrk->wrk_nfree++;
 
@@ -177,7 +199,7 @@ static void
 *wrk_main(void *arg)
 {
     worker_data_t *wrk = (worker_data_t *) arg;
-    void *amq_worker;
+    void *mq_worker;
     dataentry *entry;
     const char *err;
 
@@ -185,7 +207,7 @@ static void
     CHECK_OBJ_NOTNULL(wrk, WORKER_DATA_MAGIC);
     wrk->state = WRK_INITIALIZING;
 
-    err = MQ_WorkerInit(&amq_worker);
+    err = mqf.worker_init(&mq_worker, wrk->id);
     if (err != NULL) {
         LOG_Log(LOG_ALERT, "Worker %d: Cannot initialize queue connection: %s",
             wrk->id, err);
@@ -197,7 +219,7 @@ static void
         pthread_exit((void *) wrk);
     }
 
-    wrk_log_connection(amq_worker, wrk->id);
+    wrk_log_connection(mq_worker, wrk->id);
     VSTAILQ_INIT(&wrk->wrk_freelist);
     wrk->wrk_nfree = 0;
 
@@ -210,9 +232,9 @@ static void
         entry = SPMCQ_Deq();
         if (entry != NULL) {
             wrk->deqs++;
-            wrk_send(&amq_worker, entry, wrk);
+            wrk_send(&mq_worker, entry, wrk);
 
-            if (amq_worker == NULL)
+            if (wrk->status == EXIT_FAILURE)
                 break;
             continue;
         }
@@ -249,24 +271,22 @@ static void
 
     wrk->state = WRK_SHUTTINGDOWN;
 
-    if (amq_worker == NULL)
-        wrk->status = EXIT_FAILURE;
-    else {
+    if (wrk->status != EXIT_FAILURE) {
         /* Prepare to exit, drain the queue */
         while ((entry = SPMCQ_Deq()) != NULL) {
             wrk->deqs++;
-            wrk_send(&amq_worker, entry, wrk);
+            wrk_send(&mq_worker, entry, wrk);
         }
-
         wrk->status = EXIT_SUCCESS;
-        err = MQ_WorkerShutdown(&amq_worker);
-        if (err != NULL) {
-            LOG_Log(LOG_ALERT, "Worker %d: MQ worker shutdown failed: %s",
-                wrk->id, err);
-            wrk->status = EXIT_FAILURE;
-        }
     }
     
+    err = mqf.worker_shutdown(&mq_worker, wrk->id);
+    if (err != NULL) {
+        LOG_Log(LOG_ALERT, "Worker %d: MQ worker shutdown failed: %s",
+                wrk->id, err);
+        wrk->status = EXIT_FAILURE;
+    }
+
     AZ(pthread_mutex_lock(&running_lock));
     running--;
     exited++;
@@ -315,7 +335,7 @@ WRK_Init(void)
         wrk->magic = WORKER_DATA_MAGIC;
         wrk->id = i + 1;
         wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
-            = wrk->restarts = 0;
+            = wrk->restarts = wrk->recoverables = 0;
         wrk->state = WRK_NOTSTARTED;
     }
 
@@ -352,6 +372,14 @@ WRK_Restart(void)
         CHECK_OBJ_NOTNULL(thread_data[i].wrk_data, WORKER_DATA_MAGIC);
         wrk = thread_data[i].wrk_data;
         if (wrk->state == WRK_EXITED) {
+            if (config.thread_restarts != 0
+                && wrk->restarts == config.thread_restarts) {
+                LOG_Log(LOG_ALERT, "Worker %d: too many restarts, abandoning",
+                    wrk->id);
+                dtbl.w_stats.abandoned++;
+                wrk->state = WRK_ABANDONED;
+                continue;
+            }
             AZ(pthread_mutex_lock(&running_lock));
             exited--;
             AZ(pthread_mutex_unlock(&running_lock));
@@ -385,10 +413,11 @@ WRK_Stats(void)
     for (int i = 0; i < config.nworkers; i++) {
         wrk = thread_data[i].wrk_data;
         LOG_Log(LOG_INFO,
-            "Worker %d (%s): seen=%u waits=%u sent=%u reconnects=%u "
-            "restarts=%u failed=%d",
-            wrk->id, statename[wrk->state], wrk->deqs, wrk->waits, wrk->sends,
-            wrk->reconnects, wrk->restarts, wrk->fails);
+                "Worker %d (%s): seen=%u waits=%u sent=%u reconnects=%u "
+                "restarts=%u failed_recoverable=%u failed=%u",
+                wrk->id, statename[wrk->state], wrk->deqs, wrk->waits,
+                wrk->sends, wrk->reconnects, wrk->restarts, wrk->recoverables,
+                wrk->fails);
     }
 }
 

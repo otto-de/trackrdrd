@@ -58,11 +58,12 @@ using namespace cms;
 using namespace decaf::lang;
 using namespace decaf::lang::exceptions;
 
-AMQ_Worker::AMQ_Worker(Connection* cn, std::string& qName,
+AMQ_Worker::AMQ_Worker(Connection* cn, std::string& qName, int n,
     Session::AcknowledgeMode ackMode = Session::AUTO_ACKNOWLEDGE,
     int deliveryMode = DeliveryMode::NON_PERSISTENT) {
 
     connection = cn;
+    num = n;
     session = connection->createSession(ackMode);
     queue = session->createQueue(qName);
     producer = session->createProducer(queue);
@@ -84,6 +85,11 @@ AMQ_Worker::~AMQ_Worker() {
 	delete session;
 	session = NULL;
     }
+}
+
+int
+AMQ_Worker::getNum() {
+    return num;
 }
 
 void
@@ -120,12 +126,12 @@ AMQ_GlobalInit(void)
 }
 
 const char *
-AMQ_WorkerInit(AMQ_Worker **worker, AMQ_Connection *cn, char *qName)
+AMQ_WorkerInit(AMQ_Worker **worker, AMQ_Connection *cn, char *qName, int n)
 {
     try {
         Connection *conn = cn->getConnection();
         string queueName (qName);
-        std::auto_ptr<AMQ_Worker> w (new AMQ_Worker(conn, queueName));
+        std::auto_ptr<AMQ_Worker> w (new AMQ_Worker(conn, queueName, n));
         *worker = w.release();
         return NULL;
     }
@@ -162,6 +168,16 @@ AMQ_ClientID(AMQ_Worker *worker, char *clientID)
 {
     try {
         strcpy(clientID, worker->getClientID().c_str());
+        return NULL;
+    }
+    CATCHALL
+}
+
+const char *
+AMQ_GetNum(AMQ_Worker *worker, int *n)
+{
+    try {
+        *n = worker->getNum();
         return NULL;
     }
     CATCHALL
