@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2014 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -53,7 +53,7 @@ DATA_Init(void)
     dataentry *entryptr;
     char *bufptr;
     
-    unsigned bufsize = config.maxdata;
+    unsigned bufsize = config.maxdata + config.maxkeylen;
     
     /*
      * we want enough space to accomodate all open and done records
@@ -87,6 +87,7 @@ DATA_Init(void)
         dtbl.entry[i].state = DATA_EMPTY;
         dtbl.entry[i].hasdata = false;
         dtbl.entry[i].data = &dtbl.buf[i * bufsize];
+        dtbl.entry[i].key = &dtbl.buf[(i * bufsize) + config.maxdata];
         VSTAILQ_INSERT_TAIL(&dtbl.freehead, &dtbl.entry[i], freelist);
         dtbl.nfree++;
     }
@@ -95,6 +96,21 @@ DATA_Init(void)
 
     atexit(data_Cleanup);
     return(0);
+}
+
+void
+DATA_Reset(dataentry *entry)
+{
+    CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+    entry->state = DATA_EMPTY;
+    entry->end = 0;
+    *entry->data = '\0';
+    entry->keylen = 0;
+    *entry->key = '\0';
+    entry->hasdata = false;
+    entry->incomplete = false;
+    entry->xid = 0;
+    entry->tid = 0;
 }
 
 /* 
@@ -130,9 +146,10 @@ DATA_Dump1(dataentry *entry, int i)
 {
     if (entry->state == DATA_EMPTY)
         return;
-    LOG_Log(LOG_INFO, "Data entry %d: XID=%d tid=%d state=%s data=[%.*s]",
-        i, entry->xid, entry->tid, statename[entry->state], entry->end,
-        entry->data);
+    LOG_Log(LOG_INFO,
+            "Data entry %d: XID=%d tid=%d state=%s data=[%.*s] key=[%.*s]",
+            i, entry->xid, entry->tid, statename[entry->state], entry->end,
+            entry->data, entry->keylen, entry->key);
 }
 
 void

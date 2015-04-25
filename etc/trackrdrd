@@ -1,0 +1,137 @@
+#!/bin/bash
+
+### BEGIN INIT INFO
+# Provides:          trackrdrd
+# Required-Start:    $syslog $remote_fs
+# Should-Start:      $time ypbind smtp
+# Required-Stop:     $syslog $remote_fs
+# Should-Stop:       ypbind smtp
+# Default-Start:     3 5
+# Default-Stop:      0 1 2 6
+# Short-Description: Varnish log tracking reader demon
+# Description:       This is the Varnish log tracking reader demon,
+#	which reads data intended for tracking from the Varnish
+#	shared memory log, collects all data for each XID, and
+#	sends each data record to an ActiveMQ message broker.
+### END INIT INFO
+
+PIDFILE=/var/run/trackrdrd.pid
+
+TRACKRDRD_BIN=/var/opt/varnish_tracking/bin/trackrdrd
+
+# We use the default config /etc/trackrdrd.conf, no -c option needed
+#CONFIG=/var/opt/varnish_tracking/etc/run.conf
+#CMD="${TRACKRDRD_BIN} -c ${CONFIG}"
+CMD="${TRACKRDRD_BIN}"
+
+# Child process stops after receiving a request
+CURL=/usr/bin/curl
+VARNISH_PORT=81
+URL=http://localhost:${VARNISH_PORT}/ts-rcv?testSession=true
+
+START_RETRIES=10
+
+if [ ! -e ${TRACKRDRD_BIN} ]; then
+    echo "${TRACKRDRD_BIN} not installed"
+fi
+
+function start_trackrdrd {
+    START_CHECKS=0
+    echo -n "Checking if trackrdrd is running ..."
+    while [ ${START_CHECKS} -lt ${START_RETRIES} ]; do
+        checkproc ${TRACKRDRD_BIN}
+        if [ $? -ne 0 ]; then
+            break
+        fi
+        echo -n "."
+        START_CHECKS=$(( $START_CHECKS + 1 ))
+        sleep 1
+        continue
+    done
+    if [ ${START_CHECKS} -eq ${START_RETRIES} ]; then
+        echo " trackrdrd still running, giving up"
+        logger "trackrdrd still running, start FAILED"
+        exit 1
+    fi
+    echo ""
+    echo -n "Starting trackrdrd ... "
+    startproc -q ${CMD}
+    if [ $? -ne 0 ]; then
+        echo "FAILED (startproc returned $?)"
+	logger "trackrdrd start FAILED (startproc returned $?)"
+        exit 1
+    fi
+    echo "done."
+}
+
+function stop_trackrdrd {
+    echo -n "Shutting down trackrdrd ... "
+    killproc ${TRACKRDRD_BIN}
+    if [ $? -ne 0 ]; then
+	echo "FAILED (killproc returned $?)"
+        logger "trackrdrd stop FAILED (killproc returned $?)"
+        exit 1
+    fi
+    ${CURL} ${URL} >/dev/null 2&>1
+    echo "done."
+}
+
+function getstatus_trackrdrd {
+    checkproc ${TRACKRDRD_BIN}
+    if [ $? -ne 0 ]; then
+        echo "trackrdrd NOT RUNNING (checkproc returned $?)"
+        exit 1
+    fi
+    echo "trackrdrd running"
+}
+
+function check_varnishd {
+    pgrep -f varnishd.*pa_proxy >/dev/null
+    if [ $? -ne 0 ]; then
+        echo "varnishd not running"
+        exit 1
+    fi
+}
+
+case "$1" in
+    start)
+        check_varnishd
+	start_trackrdrd
+	exit 0
+        ;;
+    stop)
+        stop_trackrdrd
+	exit 0
+        ;;
+    restart)
+        check_varnishd
+        echo "Restarting trackrdrd"
+        stop_trackrdrd
+        start_trackrdrd
+	sleep 1
+        getstatus_trackrdrd
+	exit 0
+        ;;
+    reload)
+        check_varnishd
+        echo -n "Reloading service trackrdrd ... "
+        checkproc ${TRACKRDRD_BIN}
+        if [ $? -ne 0 ]; then
+            echo "FAILED trackrdrd NOT RUNNING"
+            exit 1
+        fi
+        kill -USR1 $(cat ${PIDFILE})
+        ${CURL} ${URL} >/dev/null 2&>1
+        getstatus_trackrdrd
+        exit 0
+        ;;
+    status)
+        getstatus_trackrdrd
+        exit 0
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload|status}"
+        exit 1
+        ;;
+esac
+# rc_exit
