@@ -78,6 +78,17 @@ PKG_CHECK_MODULES([AMQ], [activemq-cpp])
 PKG_CHECK_MODULES([APR], [apr-1])
 PKG_CHECK_MODULES([APU], [apr-util-1])
 
+# optionally choose the MQ plugins to build, by default all
+AC_ARG_ENABLE([kafka], [AS_HELP_STRING([--enable-kafka],
+                       [build the Kafka MQ plugin @<:@default=yes@:>@])],
+                       [], [enable_kafka=yes])
+AM_CONDITIONAL([KAFKA_OPT], [test "$enable_kafka" = yes])
+
+AC_ARG_ENABLE([activemq], [AS_HELP_STRING([--enable-activemq],
+                          [build the ActiveMQ MQ plugin @<:@default=yes@:>@])],
+                          [], [enable_activemq=yes])
+AM_CONDITIONAL([AMQ_OPT], [test "$enable_activemq" = yes])
+
 # From Varnish configure.ac
 # Now that we're done using the compiler to look for functions and
 # libraries, set CFLAGS to what we want them to be for our own code
