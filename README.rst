@@ -9,7 +9,7 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2014-09-04
+:Date:   2015-04-26
 :Version: 3.0
 :Manual section: 3
 
@@ -75,9 +75,9 @@ plugin -- a shared object that provides definitions for the functions
 declared in the MQ interface in ``include/mq.h``. See ``mq.h`` for
 documentation of the interface.
 
-The source distribution for ``trackrdrd`` includes an implementation
-of the MQ interface for ActiveMQ, see libtrackrdr-activemq(3) for
-details.
+The source distribution for ``trackrdrd`` includes implementations of
+the MQ interface for Kafka and ActiveMQ; see libtrackrdr-activemq(3)
+and libtrackrdr-kafka(3) for details.
 
 EXAMPLE
 =======
@@ -101,22 +101,21 @@ OPTIONS
 BUILD/INSTALL
 =============
 
-The source repository for ``trackrdrd`` is in the subdirectory
-``trackrdrd/`` of::
+The build requires a source directory for Varnish 3.0.x in which sources
+have been compiled. It also requires the unique XID patch available at::
 
-	git@repo.org:lhotse-tracking-varnish
-
-The build requires a source directory for Varnish in which sources
-have been compiled. Varnish sources with custom features for Otto
-are in::
-
-	git@repo.org:varnish-cache
+	https://code.uplex.de/uplex-varnish/unique-xids
 
 To build the messaging plugin for ActiveMQ (``libtrackrdr-activemq``)
 it is neccessary to link with the CMS or ActiveMQ-CPP library
 (``libactivemq-cpp``). The sources can be obtained from::
 
         http://activemq.apache.org/cms/
+
+The messaging plugin for Kafka (``libtrackrdr-kafka``) requires the
+rdkafka library (``librdkafka``)::
+
+        https://github.com/edenhill/librdkafka
 
 Building Varnish
 ----------------
@@ -130,18 +129,15 @@ The Varnish build requires the following tools/packages:
 * pcre-devel (so that Varnish can link to the runtime libs)
 * python-docutils (for rst2man)
 
-Check out the repository and switch to the branch ``3.0_bestats``, in
-which custom features for Otto are implemented::
+Check out the repository and apply the unique-xids patch.
 
-	$ git clone git@repo.org:varnish-cache
-	$ cd varnish-cache/
-	$ git checkout 3.0_bestats
-
-Varnish as deployed for Otto is built in 64-bit mode, and since
-``trackrdrd`` needs to link with its libraries, it must be built in
-64-bit mode as well. This means that the Varnish build for
-``trackrdrd`` must also be 64-bit; for ``gcc``, this is accomplished
-with ``CFLAGS=-m64``.
+The tracking reader and the Varnish instances against which it built
+and run must be built for the same architecture; in particular, they
+must match as to 32- or 64-bit modes (and 64-bit is strongly
+recommended for Varnish).  If the builds are executed on the same
+machine (with the same architecture on which they will run), then they
+will likely match by default. When in doubt, set compile-time flags
+such as ``CFLAGS=-m64`` for ``gcc``.
 
 The following sequence builds Varnish as needed for the ``trackrdrd``
 build::
@@ -153,9 +149,10 @@ build::
 Building and installing packaged MQ implementations
 ---------------------------------------------------
 
-The ``trackrdrd`` distribution includes an implementation of the MQ
-interface for ActiveMQ message brokers. For details of the build and
-its dependencies, see libtrackrdr-activemq(3) (``README.rst`` in
+The ``trackrdrd`` distribution includes implementations of the MQ
+interface for Kafka and ActiveMQ message brokers. For details of the
+builds and their dependencies, see libtrackrdr-kafka(3) and
+libtrackrdr-activemq(3) (``README.rst`` in ``src/mq/kafka`` and
 ``src/mq/activemq``).
 
 Since the global make targets for ``trackrdrd`` also build the MQ
@@ -177,18 +174,17 @@ step:
 
 * The path to the Varnish source directory must be given in the
   variable ``VARNISHSRC``.
-* The flag ``CXXFLAGS``, like ``CFLAGS``, must also be set to
-  ``-m64``, because C++ code is also compiled. It may be necessary to
-  add additional ``CXXFLAGS`` to compile the ActiveMQ API calls, for
-  example as obtained from ``pkg-config --cflags apr-1``.
+* For ActiveMQ, the flag ``CXXFLAGS`` should be set similarly to
+  ``CFLAGS``, because C++ code is also compiled. Settings for
+  ``CXXFLAGS`` can be obtained from ``pkg-config --cflags apr-1``.
 
 At minimum, run these steps::
 
-	$ git clone git@repo.org:lhotse-tracking-varnish
-	$ cd lhotse-tracking-varnish/trackrdrd/
+	$ git clone $TRACKRDRD_GIT_URL
+	$ cd trackrdrd
 	$ ./autogen.sh
 	$ CXXFLAGS=-m64 CFLAGS=-m64 ./configure \\
-          VARNISHSRC=/path/to/varnish-cache
+          VARNISHSRC=/path/to/compiled/varnish-cache
 	$ make
 
 For self-tests after the build, run::
@@ -213,23 +209,23 @@ For example, to specify a non-standard installation prefix, add the
 ``--prefix`` option::
 
 	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
-          VARNISHSRC=/path/to/varnish-cache \\
-	  --prefix=/path/to/varnish_tracking
+          VARNISHSRC=/path/to/varnish_build \\
+	  --prefix=/path/to/trackrdrd_install
 
-For Otto, runtime paths for Varnish libraries are at non-standard
-locations, so it is necessary to add the option
+If Varnish is installed at a non-standard location, it is necessary to
+set runtime paths to the Varnish libraries with the option
 ``LDFLAGS=-Wl,-rpath=$LIB_PATHS``::
 
-        $ export VARNISH_PREFIX=/path/to/varnish
+        $ export VARNISH_PREFIX=/path/to/varnish_install
 	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
-          VARNISHSRC=/path/to/varnish-cache \\
-	  --prefix=/path/to/varnish_tracking \\
+          VARNISHSRC=/path/to/varnish_build \\
+	  --prefix=/path/to/trackrdrd_install \\
           LDFLAGS=-Wl,-rpath=$VARNISH_PREFIX/lib/varnish:$VARNISH_PREFIX/lib
 
 Developers can add a number of options as an aid to compiling and debugging::
 
 	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
-          VARNISHSRC=/path/to/varnish-cache \\
+          VARNISHSRC=/path/to/varnish_build \\
           --enable-debugging-symbols --enable-werror \\
           --enable-developer-warnings --enable-extra-developer-warnings \\
           --enable-diagnostics
@@ -436,8 +432,8 @@ For both the software and this document are governed by a BSD 2-clause
 licence.
 
 
-| Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
-| Copyright (c) 2012-2014 Otto Gmbh & Co KG
+| Copyright (c) 2012-2015 UPLEX Nils Goroll Systemoptimierung
+| Copyright (c) 2012-2015 Otto Gmbh & Co KG
 | All rights reserved
 | Use only with permission
 
