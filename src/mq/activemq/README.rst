@@ -9,7 +9,7 @@ ActiveMQ implementation of the MQ interface for the Tracking Log Reader
 -----------------------------------------------------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2014-05-20
+:Date:   2015-04-26
 :Version: 3.0
 :Manual section: 3
 
@@ -44,10 +44,8 @@ BUILD/INSTALL
 =============
 
 The sources for ``libtrackrdr-activemq`` are provided in the source
-repository for ``trackrdrd``, in the subdirectory ``src/mq/activemq/``
-of::
-
-	git@repo.org:trackrdrd
+repository for ``trackrdrd``, in the subdirectory
+``src/mq/activemq/``.
 
 The sources for ActiveMQ-CPP can be obtained from::
 
@@ -80,7 +78,7 @@ the rest of ``trackrdrd``), it suffices to invoke ``make`` commands in
 the subdirectory ``src/mq/activemq`` (after having executed the
 ``configure`` script for ``trackrdrd``)::
 
-        # in trackrdrd/trackrdrd
+        # in the trackrdrd repo
 	$ cd src/mq/activemq
 	$ make
 
@@ -145,8 +143,8 @@ COPYRIGHT AND LICENCE
 For both the software and this document are governed by a BSD 2-clause
 licence.
 
-| Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
-| Copyright (c) 2012-2014 Otto Gmbh & Co KG
+| Copyright (c) 2012-2015 UPLEX Nils Goroll Systemoptimierung
+| Copyright (c) 2012-2015 Otto Gmbh & Co KG
 | All rights reserved
 | Use only with permission
 
