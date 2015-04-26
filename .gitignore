@@ -6,6 +6,7 @@ Makefile.in
 .libs/
 *.o
 *.lo
+*.Po
 *.la
 *~
 
@@ -39,4 +40,28 @@ TAGS
 src/revision.h
 src/trackrdrd
 src/usage.h
-trackrdrd.3
+*.3
+
+# Test binaries
+src/test/test_append
+src/test/test_config
+src/test/test_data
+src/test/test_hash
+src/test/test_mq
+src/test/test_parse
+src/test/test_spmcq
+src/test/test_worker
+src/mq/activemq/test/test_activemq
+src/mq/kafka/test/test_kafka
+src/mq/kafka/test/test_partition
+src/mq/kafka/test/test_send
+
+# Test artifacts
+src/test/stderr.txt
+src/test/testing.log
+src/test/trackrdrd.pid
+src/test/trackrdrd_001.conf.new
+src/test/trackrdrd_002.conf.new
+src/test/trackrdrd_003.conf.new
+src/mq/kafka/test/kafka.log
+src/mq/kafka/test/zoo.log
