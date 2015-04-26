@@ -1,7 +1,14 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = src src/test src/mq/activemq src/mq/activemq/test \
-	src/mq/kafka src/mq/kafka/test
+if AMQ_OPT
+MAYBE_AMQ = src/mq/activemq src/mq/activemq/test
+endif
+
+if KAFKA_OPT
+MAYBE_KAFKA = src/mq/kafka src/mq/kafka/test
+endif
+
+SUBDIRS = src src/test $(MAYBE_AMQ) $(MAYBE_KAFKA)
 
 if HAVE_RST2MAN
 dist_man_MANS = trackrdrd.3
