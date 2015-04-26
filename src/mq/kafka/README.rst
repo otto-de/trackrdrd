@@ -9,7 +9,7 @@ Kafka implementation of the MQ interface for the Tracking Log Reader
 --------------------------------------------------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2014-06-01
+:Date:   2015-04-26
 :Version: 3.0.0
 :Manual section: 3
 
@@ -46,10 +46,7 @@ BUILD/INSTALL
 =============
 
 The sources for ``libtrackrdr-kafka`` are provided in the source
-repository for ``trackrdrd``, in the subdirectory ``src/mq/kafka/``
-of::
-
-	git@repo.org:trackrdrd
+repository for ``trackrdrd``, in the subdirectory ``src/mq/kafka/``.
 
 The sources for the library dependencies can be obtained from:
 
@@ -87,7 +84,7 @@ the rest of ``trackrdrd``), it suffices to invoke ``make`` commands in
 the subdirectory ``src/mq/kafka`` (after having executed the
 ``configure`` script for ``trackrdrd``)::
 
-        # in trackrdrd/trackrdrd
+        # in the trackrdrd repo
 	$ cd src/mq/kafka
 	$ make
 
@@ -347,8 +344,8 @@ COPYRIGHT AND LICENCE
 Both the software and this document are governed by a BSD 2-clause
 licence.
 
-| Copyright (c) 2014 UPLEX Nils Goroll Systemoptimierung
-| Copyright (c) 2014 Otto Gmbh & Co KG
+| Copyright (c) 2014-2015 UPLEX Nils Goroll Systemoptimierung
+| Copyright (c) 2014-2015 Otto Gmbh & Co KG
 | All rights reserved
 | Use only with permission
 
