@@ -37,11 +37,8 @@
 #include "../trackrdrd.h"
 #include "vas.h"
 
-/* Automake exit code for "skipped" in make check */
-#define EXIT_SKIPPED 77
-
-#define MQ_MODULE "../mq/activemq/.libs/libtrackrdr-activemq.so"
-#define MQ_CONFIG "activemq.conf"
+#define MQ_MODULE "../mq/file/.libs/libtrackrdr-file.so"
+#define MQ_CONFIG "file_mq.conf"
 
 #define NWORKERS 1
 
@@ -92,8 +89,7 @@ static char
     config.nworkers = NWORKERS;
     strcpy(config.mq_config_file, MQ_CONFIG);
     err = mqf.global_init(config.nworkers, config.mq_config_file);
-    sprintf(errmsg, "MQ_GlobalInit: %s", err);
-    mu_assert(errmsg, err == NULL);
+    VMASSERT(err == NULL, "MQ_GlobalInit: %s", err);
 
     return NULL;
 }
@@ -106,12 +102,7 @@ static char
     printf("... testing MQ connection initialization\n");
 
     err = mqf.init_connections();
-    if (err != NULL && strstr(err, "Connection refused") != NULL) {
-        printf("Connection refused, ActiveMQ assumed not running\n");
-        exit(EXIT_SKIPPED);
-    }
-    sprintf(errmsg, "MQ_InitConnections: %s", err);
-    mu_assert(errmsg, err == NULL);
+    VMASSERT(err == NULL, "MQ_InitConnections: %s", err);
 
     return NULL;
 }
@@ -124,10 +115,8 @@ static const char
     printf("... test worker init\n");
 
     err = mqf.worker_init(&worker, NWORKERS);
-    sprintf(errmsg, "MQ_WorkerInit: %s", err);
-    mu_assert(errmsg, err == NULL);
-
-    mu_assert("Worker is NULL after MQ_WorkerInit", worker != NULL);
+    VMASSERT(err == NULL, "MQ_WorkerInit: %s", err);
+    MASSERT0(worker != NULL, "Worker is NULL after MQ_WorkerInit");
 
     return NULL;
 }
@@ -140,11 +129,10 @@ static const char
 
     printf("... testing version info\n");
 
-    mu_assert("MQ_Version: worker is NULL before call", worker != NULL);
+    MASSERT0(worker != NULL, "MQ_Version: worker is NULL before call");
     err = mqf.version(worker, version);
-    sprintf(errmsg, "MQ_Version: %s", err);
-    mu_assert(errmsg, err == NULL);
-    mu_assert("MQ_Version: version is empty", version[0] != '\0');
+    VMASSERT(err == NULL, "MQ_Version: %s", err);
+    MASSERT0(version[0] != '\0', "MQ_Version: version is empty");
 
     return NULL;
 }
@@ -157,11 +145,10 @@ static const char
 
     printf("... testing client ID info\n");
 
-    mu_assert("MQ_ClientID: worker is NULL before call", worker != NULL);
+    MASSERT0(worker != NULL, "MQ_ClientID: worker is NULL before call");
     err = mqf.client_id(worker, clientID);
-    sprintf(errmsg, "MQ_Version: %s", err);
-    mu_assert(errmsg, err == NULL);
-    mu_assert("MQ_Version: client ID is empty", clientID[0] != '\0');
+    VMASSERT(err == NULL, "MQ_ClientID: %s", err);
+    MASSERT0(clientID[0] != '\0', "MQ_ClientID: client ID is empty");
 
     return NULL;
 }
@@ -174,10 +161,9 @@ static const char
 
     printf("... testing message send\n");
 
-    mu_assert("MQ_Send: worker is NULL before call", worker != NULL);
+    MASSERT0(worker != NULL, "MQ_Send: worker is NULL before call");
     ret = mqf.send(worker, "foo bar baz quux", 16, "key", 3, &err);
-    sprintf(errmsg, "MQ_Send: %s", err);
-    mu_assert(errmsg, ret == 0);
+    VMASSERT(ret == 0, "MQ_Send: %s", err);
 
     return NULL;
 }
