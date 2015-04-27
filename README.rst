@@ -9,7 +9,7 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2015-04-26
+:Date:   2015-04-27
 :Version: 3.0
 :Manual section: 3
 
@@ -155,9 +155,11 @@ builds and their dependencies, see libtrackrdr-kafka(3) and
 libtrackrdr-activemq(3) (``README.rst`` in ``src/mq/kafka`` and
 ``src/mq/activemq``).
 
-Since the global make targets for ``trackrdrd`` also build the MQ
-implementations, it is necessary to configure the build for them as
-well, for example by setting ``CXXFLAGS`` to compile C++ sources.
+The global make targets for ``trackrdrd`` also build the MQ
+implementations, unless their builds are disabled in the ``configure``
+step as explained below. If they are enabled, then it is necessary to
+configure the build for them as well, for example by setting
+``CXXFLAGS`` to compile C++ sources.
 
 Building and installing trackrdrd
 ---------------------------------
@@ -205,8 +207,12 @@ be shown with::
 
 	$ configure --help
 
-For example, to specify a non-standard installation prefix, add the
-``--prefix`` option::
+To disable the build of the Kafka or ActiveMQ MQ implementations,
+specify the options ``--disable-kafka`` or ``disable-activemq`` for
+``configure``. Both are enabled by default.
+
+To specify a non-standard installation prefix, add the ``--prefix``
+option::
 
 	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
           VARNISHSRC=/path/to/varnish_build \\
