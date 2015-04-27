@@ -153,6 +153,7 @@ DX_INIT_DOXYGEN(trackrdrd, doxygen.cfg, doc)
 AC_CONFIG_FILES([
 	Makefile
 	src/Makefile
+        src/mq/file/Makefile
         src/test/Makefile
         src/mq/activemq/Makefile
         src/mq/activemq/test/Makefile
