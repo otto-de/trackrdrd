@@ -8,7 +8,7 @@ if KAFKA_OPT
 MAYBE_KAFKA = src/mq/kafka src/mq/kafka/test
 endif
 
-SUBDIRS = src src/test $(MAYBE_AMQ) $(MAYBE_KAFKA)
+SUBDIRS = src src/mq/file src/test $(MAYBE_AMQ) $(MAYBE_KAFKA)
 
 if HAVE_RST2MAN
 dist_man_MANS = trackrdrd.3
