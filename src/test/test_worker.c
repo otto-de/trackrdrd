@@ -44,13 +44,10 @@
 #define debug_print(fmt, ...) \
     do { if (DEBUG) fprintf(stderr, fmt, __VA_ARGS__); } while(0)
 
-/* Automake exit code for "skipped" in make check */
-#define EXIT_SKIPPED 77
-
 #define NWORKERS 5
 
-#define MQ_MODULE "../mq/activemq/.libs/libtrackrdr-activemq.so"
-#define MQ_CONFIG "activemq2.conf"
+#define MQ_MODULE "../mq/file/.libs/libtrackrdr-file.so"
+#define MQ_CONFIG "file_mq.conf"
 
 int tests_run = 0;
 static char errmsg[BUFSIZ];
@@ -108,10 +105,6 @@ static char
     mu_assert(errmsg, error == NULL);
     
     error = mqf.init_connections();
-    if (error != NULL && strstr(error, "Connection refused") != NULL) {
-        printf("Connection refused, ActiveMQ assumed not running\n");
-        exit(EXIT_SKIPPED);
-    }
     sprintf(errmsg, "MQ_InitConnections failed: %s", error);
     mu_assert(errmsg, error == NULL);
     
