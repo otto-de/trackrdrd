@@ -17,7 +17,10 @@ Tracking Log Reader demon
 SYNOPSIS
 ========
 
-.. include:: synopsis.txt
+  trackrdrd [[-n varnish_name] | [-f varnishlog_bindump]]
+            [-c config_file] [-u user] [-P pid_file]
+            [[-l log_file] | [-y syslog_facility]]
+            [-D] [-d] [-V] [-h]
 
 DESCRIPTION
 ===========
@@ -96,7 +99,68 @@ In this case, ``trackrdrd`` send this data to a message broker::
 OPTIONS
 =======
 
-.. include:: options.txt
+    -n varnish_logfile
+        Same as the -n option for varnishd and other Varnish binaries;
+        i.e. the 'varnish name' indicating the path of the mmap'd file
+        used by varnishd for the shared memory log. By default, the
+        host name is assumed (as with varnishd). Also set by the
+        config parameter 'varnish.name'. The -n and -f options are
+        mutually exclusive.
+
+    -c config_file
+        Path of a configuration file. If /etc/trackrdrd.conf exists
+        and is readable, then its values are read first. If a file is
+        specified by the -c option, then that file is read next, and
+        config values that it specifies override values specified in
+        /etc/trackrdrd.conf. Finally, config values specified on the
+        command line override values specified in any config file. If
+        no config files or other command line options are set, default
+        config values hold.
+
+    -u user
+        Owner of the child process. By default, the child process runs
+        as 'nobody'. Also set by the config parameter 'user'.
+
+    -P pid_file
+        Path of a file written by the management process that contains
+        its process ID. By default, no PID file is written. Also set
+        by the config parameter 'pid.file'.
+
+    -l log_file
+        Log file for status, warning, debug and error messages. If '-'
+        is specified, then log messages are written to stdout. By
+        default, syslog(3) is used for logging. Log levels correspond
+        to the 'priorities' defined by syslog(3). Also set by the config
+        parameter 'log.file'.
+
+    -y syslog_facility
+        Set the syslog facility; legal values are 'user' or 'local0'
+        through 'local7', and the default is 'local0'. Options -y and
+        -l are mutually exclusive. Also set by the config parameter
+        'syslog.facility'.
+
+    -D
+        Run as a non-demon single process (for testing and
+        debugging). By default, trackrdrd runs as a demon with a
+        management (parent) process and worker (child) process.
+
+    -f varnishlog_bindump
+        A binary dump of the Varnish SHM log produced by 'varnishlog
+        -w'. If this option is specified, trackrdrd reads from the
+        dump instead of a live SHM log (useful for debugging and
+        replaying traffic). The options -f and -n are mutually
+        exclusive; -n is the default. Also set by the config parameter
+        'varnish.bindump'.
+
+    -d
+       Sets the log level to LOG_DEBUG. The default log level is
+       LOG_INFO.
+
+    -V
+       Print version and exit
+
+    -h
+       Print usage and exit
 
 BUILD/INSTALL
 =============
@@ -323,7 +387,83 @@ implementation requires a configuration file). All other config
 parameters have default values, and some of them correspond to
 command-line options, as shown below.
 
-.. include:: config.rst
+==================== ========== ========================================================================================= =======
+Parameter            CLI Option Description                                                                               Default
+==================== ========== ========================================================================================= =======
+``varnish.name``     ``-n``     Like the ``-n`` option for Varnish, this is the path to the file that is mmap'd to the    default for Varnish (the host name)
+                                shared memory segment for the Varnish log. This parameter and ``varnish.bindump`` are
+                                mutually exclusive.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``mq.module``                   Name of the shared object implementing the MQ interface. May be an absolute path, or the  None, this parameter is required.
+                                name of a library that the dynamic linker finds according to the rules described in
+                                ld.so(8).
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``mq.config_file``              Path of a configuration file used by the MQ implementation                                None, this parameter is optional.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``nworkers``                    Number of worker threads used to send messages to the message broker(s).                  1
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``maxopen.scale``               log\ :sub:`2`\(max number of concurrent requests in Varnish). For example, if             10 (= 1024 concurrent requests)
+                                ``maxopen.scale`` = 10, then ``trackrdrd`` can support up to 1024 concurrent requests.
+                                More precisely, this number describes the maximum number of request XIDs for which
+                                ``ReqStart`` has been read, but not yet ``ReqEnd``. It should specify at least the next
+                                power of two larger than (``thread_pools`` * ``thread_pool_max``) in the Varnish
+                                configuration.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``maxdone``                     The maximum number of finished records waiting to be sent to message brokers. That is,    1024
+                                the largest number of request XIDs for which ``ReqEnd`` has been read, but the data have
+                                not yet been sent to a message queue.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``maxdata``                     The maximum length of a data record in characters. Should be at least as large the        1024
+                                Varnish parameter ``shm_reclen``.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``hash.max_probes``             The maximum number of insert or find probes used for the hash table of XIDs. Hash lookups 10
+                                fail if a hit is not found after this many probes.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``hash.ttl``                    Maximum time to live in seconds for an unfinished record. If ``ReqEnd`` is not read for   120
+                                a request XID within this time, then ``trackrdrd`` no longer waits for it, and schedules
+                                the data read thus far to be sent to a message broker. This should be a bit longer than
+                                the sum of all timeouts configured for a Varnish request.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``hash.mlt``                    Minimum lifetime of an open record in seconds. That is, after ``ReqStart`` has been read  5
+                                for a request XID, then ``trackrdrd`` will not evacuate it if space is needed in its hash
+                                table before this interval has elapsed.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``qlen.goal``                   A goal length for the internal queue from the reader thread to the worker thread.         ``maxdone``/2
+                                ``trackrdrd`` uses this value to determine whether a new worker thread should be started
+                                to support increasing load.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``user``             ``-u``     Owner of the child process                                                                ``nobody``, or the user starting ``trackrdrd``
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``pid.file``         ``-P``     Path to the file to which the management process writes its process ID. If the value is   ``/var/run/trackrdrd.pid``
+                                set to be empty (by the line ``pid.file=``, with no value), then no PID file is written.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``restarts``                    Maximum number of restarts of the child process by the management process                 1
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``restart.pause``               Seconds to pause before restarting a child process                                        1
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``thread.restarts``             Maximum number of restarts of a worker thread by the child process. A thread is restarted 1
+                                after a message send, message system reconnect and message resend have all failed. If the
+                                restart limit for a thread is reached, then the thread goes into the state ``abandoned``
+                                and no more restarts are attempted. If all worker threads are abandoned, then the child
+                                process stops.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``monitor.interval``            Interval in seconds at which monitoring statistics are emitted to the log. If set to 0,   30
+                                then no statistics are logged.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``monitor.workers``             Whether statistics about worker threads should be logged (boolean)                        false
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``log.file``         ``-l``     Log file for status, warning, debug and error messages, and monitoring statistics. If '-' ``syslog(3)``
+                                is specified, then log messages are written to stdout. This parameter and
+                                ``syslog.facility`` are mutually exclusive.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``syslog.facility``  ``-y``     See ``syslog(3)``; legal values are ``user`` or ``local0`` through ``local7``. This       ``local0``
+                                parameter and ``log.file`` are mutually exclusive. 
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``varnish.bindump``  ``-f``     A binary dump of the Varnish shared memory log obtained from ``varnishlog -w``. If a
+                                value is specified, ``trackrdrd`` reads from that file instead of a live Varnish log
+                                (useful for testing, debugging and replaying traffic). This parameter and
+                                ``varnish.name`` are mutually exclusive. 
+==================== ========== ========================================================================================= =======
 
 LOGGING AND MONITORING
 ======================
@@ -352,7 +492,46 @@ read, but not yet ``ReqEnd``. The fields ``open``, ``load`` and
 ``occ_hi`` is monotonic increasing; all other fields are cumulative
 counters:
 
-.. include:: hashlog.rst
+================= =============================================================
+Field             Description
+================= =============================================================
+``len``           Size of the hash table (2\ :sup:``maxopen.scale``\)
+----------------- -------------------------------------------------------------
+``seen``          Number of request records read (``ReqStart`` seen)
+----------------- -------------------------------------------------------------
+``drop_reqstart`` Number of records that could not be inserted into internal
+                  tables (no data from ``ReqStart`` inserted, nor any other
+                  data for that XID)
+----------------- -------------------------------------------------------------
+``drop_vcl_log``  How often data from ``VCL_log`` could not be inserted
+                  (usually because the XID could not be found)
+----------------- -------------------------------------------------------------
+``drop_reqend``   How often data from ``ReqStart`` could not be inserted
+                  (usually because the XID could not be found)
+----------------- -------------------------------------------------------------
+``expired``       Number of records for which ``hash.ttl`` expired (data sent
+                  to message broker without waiting for ``ReqEnd``)
+----------------- -------------------------------------------------------------
+``evacuated``     Number of records removed to recover space in the hash table
+                  (``hash.mlt`` expired, data possibly incomplete)
+----------------- -------------------------------------------------------------
+``open``          Current number of open records in the table
+----------------- -------------------------------------------------------------
+``load``          Current open records as percent (``open``/``len`` * 100)
+----------------- -------------------------------------------------------------
+``collisions``    Number of hash collisions
+----------------- -------------------------------------------------------------
+``insert_probes`` Number of hash insert probes
+----------------- -------------------------------------------------------------
+``find_probes``   Number of hash find probes
+----------------- -------------------------------------------------------------
+``fail``          Number of failed hash operations (insert or find)
+----------------- -------------------------------------------------------------
+``occ_hi``        Occupancy high watermark -- highest number of open records
+                  since startup
+----------------- -------------------------------------------------------------
+``occ_hi_this``   Occupancy high watermark in the current monitoring interval
+================= =============================================================
 
 The line prefixed by ``Data table`` describes the table of request
 records, including records in the open and done states -- for "done"
@@ -361,7 +540,58 @@ complete, but it has not yet been sent to a message broker. The fields
 ``open``, ``done``, ``load`` and ``occ_hi_this`` are gauges, and
 ``occ_hi`` is monotonic increasing; the rest are cumulative counters:
 
-.. include:: datalog.rst
+================== ============================================================
+Field              Description
+================== ============================================================
+``len``            Size of the data table
+                   (``maxdone`` + 2\ :sup:``maxopen.scale``\)
+------------------ ------------------------------------------------------------
+``nodata``         Number of request records that contained no data (nothing to
+                   track in a ``VCL_log`` entry). These records are discarded
+                   without sending a message to a message broker.
+------------------ ------------------------------------------------------------
+``submitted``      Number of records passed from the reader thread to worker
+                   threads to be sent to a message broker
+------------------ ------------------------------------------------------------
+``wait_room``      How often the reader thread had to wait for space in the
+                   data table
+------------------ ------------------------------------------------------------
+``data_hi``        Data high watermark -- longest record since startup (in
+                   bytes)
+------------------ ------------------------------------------------------------
+``data_overflows`` How often the accumulated length of a record exceeded
+                   ``maxdata``
+------------------ ------------------------------------------------------------
+``data_truncated`` How often data from the Varnish log was truncated due to
+                   the presence of a null byte. This can happen if the data was
+                   already truncated in the log, due to exceeding
+                   ``shm_reclen``.
+------------------ ------------------------------------------------------------
+``done``           Current number of records in state "done"
+------------------ ------------------------------------------------------------
+``open``           Current number of open records in the table
+------------------ ------------------------------------------------------------
+``load``           Current number records in the table as percent
+                   (100 * (``open`` + ``done``)/``len``)
+------------------ ------------------------------------------------------------
+``sent``           Number of records successfully sent to a message broker
+------------------ ------------------------------------------------------------
+``reconnects``     How often worker threads reconnected to a message broker
+                   after an unsuccessful send
+------------------ ------------------------------------------------------------
+``restarts``       How often worker threads were restarted after a message
+                   send, reconnect and resend all failed
+------------------ ------------------------------------------------------------
+``abandoned``      Number of worker threads that have been abandoned due to
+                   reaching the restart limit (``thread.restarts``)
+------------------ ------------------------------------------------------------
+``failed``         Number of failed sends (failure after reconnect)
+------------------ ------------------------------------------------------------
+``occ_hi``         Occupancy high watermark -- highest number of records (open
+                   and done) since startup
+------------------ ------------------------------------------------------------
+``occ_hi_this``    Occupancy high watermark in the current monitoring interval
+================== ============================================================
 
 If worker threads are monitored, then the running state if logged for
 each worker thread, one of:
@@ -382,7 +612,58 @@ pending records, or has not yet been awakened to handle more records.
 The remaining fields in a log line for a worker thread are cumulative
 counters:
 
-.. include:: workerlog.rst
+================== ============================================================
+Field              Description
+================== ============================================================
+``len``            Size of the data table
+                   (``maxdone`` + 2\ :sup:``maxopen.scale``\)
+------------------ ------------------------------------------------------------
+``nodata``         Number of request records that contained no data (nothing to
+                   track in a ``VCL_log`` entry). These records are discarded
+                   without sending a message to a message broker.
+------------------ ------------------------------------------------------------
+``submitted``      Number of records passed from the reader thread to worker
+                   threads to be sent to a message broker
+------------------ ------------------------------------------------------------
+``wait_room``      How often the reader thread had to wait for space in the
+                   data table
+------------------ ------------------------------------------------------------
+``data_hi``        Data high watermark -- longest record since startup (in
+                   bytes)
+------------------ ------------------------------------------------------------
+``data_overflows`` How often the accumulated length of a record exceeded
+                   ``maxdata``
+------------------ ------------------------------------------------------------
+``data_truncated`` How often data from the Varnish log was truncated due to
+                   the presence of a null byte. This can happen if the data was
+                   already truncated in the log, due to exceeding
+                   ``shm_reclen``.
+------------------ ------------------------------------------------------------
+``done``           Current number of records in state "done"
+------------------ ------------------------------------------------------------
+``open``           Current number of open records in the table
+------------------ ------------------------------------------------------------
+``load``           Current number records in the table as percent
+                   (100 * (``open`` + ``done``)/``len``)
+------------------ ------------------------------------------------------------
+``sent``           Number of records successfully sent to a message broker
+------------------ ------------------------------------------------------------
+``reconnects``     How often worker threads reconnected to a message broker
+                   after an unsuccessful send
+------------------ ------------------------------------------------------------
+``restarts``       How often worker threads were restarted after a message
+                   send, reconnect and resend all failed
+------------------ ------------------------------------------------------------
+``abandoned``      Number of worker threads that have been abandoned due to
+                   reaching the restart limit (``thread.restarts``)
+------------------ ------------------------------------------------------------
+``failed``         Number of failed sends (failure after reconnect)
+------------------ ------------------------------------------------------------
+``occ_hi``         Occupancy high watermark -- highest number of records (open
+                   and done) since startup
+------------------ ------------------------------------------------------------
+``occ_hi_this``    Occupancy high watermark in the current monitoring interval
+================== ============================================================
 
 SIGNALS
 =======
@@ -390,7 +671,30 @@ SIGNALS
 The management and child process respond to the following signals (all
 other signals have the default handlers):
 
-.. include:: signals.rst
+====== ========== ============
+Signal Parent     Child
+====== ========== ============
+TERM   Shutdown   Shutdown
+------ ---------- ------------
+INT    Shutdown   Shutdown
+------ ---------- ------------
+HUP    Graceful   Ignore
+       restart
+------ ---------- ------------
+USR1   Graceful   Dump data
+       restart    table to log
+------ ---------- ------------
+USR2   Ignore     Ignore
+------ ---------- ------------
+ABRT   Abort with Abort with
+       stacktrace stacktrace
+------ ---------- ------------
+SEGV   Abort with Abort with
+       stacktrace stacktrace
+------ ---------- ------------
+BUS    Abort with Abort with
+       stacktrace stacktrace
+====== ========== ============
 
 Shutdown proceeds as described above in `STARTUP AND SHUTDOWN`_.
 
