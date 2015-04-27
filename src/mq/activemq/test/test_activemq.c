@@ -37,7 +37,7 @@
 /* Automake exit code for "skipped" in make check */
 #define EXIT_SKIPPED 77
 
-#define AMQ_CONFIG "../../../test/activemq.conf"
+#define AMQ_CONFIG "activemq.conf"
 #define NWORKERS 1
 
 int tests_run = 0;
