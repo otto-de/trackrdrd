@@ -44,6 +44,7 @@ static const char *level2name[LOG_DEBUG+1];
 static void
 syslog_setlevel(int level)
 {
+    logconf.level = level;
     setlogmask(LOG_UPTO(level));
 }
 
@@ -68,11 +69,13 @@ stdio_log(int level, const char *msg, ...)
     
     if (level > logconf.level)
         return;
+    flockfile(logconf.out);
     fprintf(logconf.out, "%s: ", level2name[level]);
     va_start(ap, msg);
     (void) vfprintf(logconf.out, msg, ap);
     va_end(ap);
     fprintf(logconf.out, "\n");
+    funlockfile(logconf.out);
     fflush(logconf.out);
 }
 
@@ -97,6 +100,7 @@ int LOG_Open(const char *progname)
         logconf.close = closelog;
         openlog(progname, LOG_PID | LOG_CONS | LOG_NDELAY | LOG_NOWAIT,
                 config.syslog_facility);
+        logconf.level = LOG_INFO;
         setlogmask(LOG_UPTO(LOG_INFO));
         atexit(closelog);
         return(0);
@@ -118,4 +122,10 @@ int LOG_Open(const char *progname)
     stdio_initnames();
     
     return(0);
+}
+
+int
+LOG_GetLevel(void)
+{
+    return logconf.level;
 }

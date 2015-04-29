@@ -72,7 +72,7 @@
 #define TRACKLOG_PREFIX "track "
 #define TRACKLOG_PREFIX_LEN (sizeof(TRACKLOG_PREFIX)-1)
 #define REQEND_T_VAR "req_endt"
-#define REQEND_T_LEN (sizeof(REQEND_T_VAR "=1430176881.682097")-1)
+#define REQEND_T_LEN (sizeof(REQEND_T_VAR "=1430176881.682097"))
 
 #define DISPATCH_EOL 0
 #define DISPATCH_RETURN_OK 0
@@ -312,7 +312,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
             assert(t->type == VSL_t_req);
             assert(VSL_CLIENT(t->c->rec.ptr));
 
-            if (t == pt[0]) {
+            if (de->end == 0) {
                 de->xid = t->vxid;
                 snprintf(de->data, config.maxdata, "XID=%u", t->vxid);
                 de->end = strlen(de->data);
@@ -320,7 +320,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
                     len_hi = de->end;
             }
 
-            len = VSL_LEN(t->c->rec.ptr);
+            len = VSL_LEN(t->c->rec.ptr) - 1;
             payload = VSL_CDATA(t->c->rec.ptr);
             xid = VSL_ID(t->c->rec.ptr);
             tag = VSL_TAG(t->c->rec.ptr);
@@ -392,7 +392,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 
     snprintf(reqend_str, REQEND_T_LEN, "%s=%u.%06lu", REQEND_T_VAR,
              (unsigned) de->reqend_t.tv_sec, de->reqend_t.tv_usec);
-    append(de, SLT_Timestamp, de->xid, reqend_str, REQEND_T_LEN);
+    append(de, SLT_Timestamp, de->xid, reqend_str, REQEND_T_LEN - 1);
     de->occupied = 1;
     MON_StatsUpdate(STATS_OCCUPANCY);
     data_submit(de);
@@ -420,6 +420,7 @@ CHILD_Main(int readconfig)
     struct VSL_cursor *cursor;
 
     MON_StatsInit();
+    debug = (LOG_GetLevel() == LOG_DEBUG);
         
     LOG_Log0(LOG_NOTICE, "Worker process starting");
 

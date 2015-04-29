@@ -289,6 +289,7 @@ struct logconf {
 } logconf;
 
 int LOG_Open(const char *progname);
+int LOG_GetLevel(void);
 /* XXX: __VA_ARGS__ can't be empty ... */
 #define LOG_Log0(level, msg) logconf.log(level, msg)
 #define LOG_Log(level, msg, ...) logconf.log(level, msg, __VA_ARGS__)
