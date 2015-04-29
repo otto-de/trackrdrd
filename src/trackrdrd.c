@@ -53,10 +53,6 @@
 #include <sys/types.h>
 #include <pwd.h>
 
-#ifdef HAVE_DAEMON_H
-#include "daemon.h"
-#endif
-
 #include "vas.h"
 
 #include "trackrdrd.h"
@@ -323,7 +319,7 @@ main(int argc, char * const *argv)
         exit(EXIT_FAILURE);
     }
 
-#ifdef HAVE_DAEMON_H
+#ifdef HAVE_DAEMON
     if (!D_flag && daemon(0, 0) == -1) {
         perror("daemon()");
         if (pfh != NULL)
