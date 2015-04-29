@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012-2014 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2015 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2015 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -33,11 +33,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <errno.h>
+
 #include "trackrdrd.h"
 #include "vas.h"
 #include "miniobj.h"
-
-static const char *statename[3] = { "EMPTY", "OPEN", "DONE" };
 
 static void
 data_Cleanup(void)
@@ -59,13 +59,11 @@ DATA_Init(void)
      * we want enough space to accomodate all open and done records
      *
      */
-    unsigned entries = (1 << config.maxopen_scale) + config.maxdone;
-
-    entryptr = (dataentry *) calloc(entries, sizeof(dataentry));
+    entryptr = (dataentry *) calloc(config.maxdone, sizeof(dataentry));
     if (entryptr == NULL)
         return(errno);
 
-    bufptr = (char *) calloc(entries, bufsize);
+    bufptr = (char *) calloc(config.maxdone, bufsize);
     if (bufptr == NULL) {
         free(entryptr);
         return(errno);
@@ -73,25 +71,23 @@ DATA_Init(void)
 
     memset(&dtbl, 0, sizeof(datatable));
     dtbl.magic	= DATATABLE_MAGIC;
-    dtbl.len	= entries;
+    dtbl.len	= config.maxdone;
 
     VSTAILQ_INIT(&dtbl.freehead);
-    AZ(pthread_mutex_init(&dtbl.freelist_lock, &attr_lock));
+    AZ(pthread_mutex_init(&dtbl.freelist_lock, NULL));
 
     dtbl.entry	= entryptr;
     dtbl.buf	= bufptr;
     dtbl.nfree  = 0;
 
-    for (unsigned i = 0; i < entries; i++) {
+    for (unsigned i = 0; i < config.maxdone; i++) {
         dtbl.entry[i].magic = DATA_MAGIC;
-        dtbl.entry[i].state = DATA_EMPTY;
-        dtbl.entry[i].hasdata = false;
         dtbl.entry[i].data = &dtbl.buf[i * bufsize];
         dtbl.entry[i].key = &dtbl.buf[(i * bufsize) + config.maxdata];
         VSTAILQ_INSERT_TAIL(&dtbl.freehead, &dtbl.entry[i], freelist);
         dtbl.nfree++;
     }
-    assert(dtbl.nfree == entries);
+    assert(dtbl.nfree == config.maxdone);
     assert(VSTAILQ_FIRST(&dtbl.freehead));
 
     atexit(data_Cleanup);
@@ -102,15 +98,15 @@ void
 DATA_Reset(dataentry *entry)
 {
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-    entry->state = DATA_EMPTY;
+    entry->occupied = 0;
     entry->end = 0;
     *entry->data = '\0';
     entry->keylen = 0;
     *entry->key = '\0';
-    entry->hasdata = false;
-    entry->incomplete = false;
+    entry->hasdata = 0;
     entry->xid = 0;
-    entry->tid = 0;
+    entry->reqend_t.tv_sec = 0;
+    entry->reqend_t.tv_usec = 0;
 }
 
 /* 
@@ -118,13 +114,17 @@ DATA_Reset(dataentry *entry)
  * allocation
  */
 
-void
+unsigned
 DATA_Take_Freelist(struct freehead_s *dst)
 {
+    unsigned nfree;
+
     AZ(pthread_mutex_lock(&dtbl.freelist_lock));
-    VSTAILQ_CONCAT(dst, &dtbl.freehead);
+    nfree = dtbl.nfree;
     dtbl.nfree = 0;
+    VSTAILQ_CONCAT(dst, &dtbl.freehead);
     AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
+    return nfree;
 }
 
 /*
@@ -142,19 +142,16 @@ DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned)
 }
 
 void
-DATA_Dump1(dataentry *entry, int i)
-{
-    if (entry->state == DATA_EMPTY)
-        return;
-    LOG_Log(LOG_INFO,
-            "Data entry %d: XID=%d tid=%d state=%s data=[%.*s] key=[%.*s]",
-            i, entry->xid, entry->tid, statename[entry->state], entry->end,
-            entry->data, entry->keylen, entry->key);
-}
-
-void
 DATA_Dump(void)
 {
-    for (int i = 0; i < dtbl.len; i++)
-        DATA_Dump1(&dtbl.entry[i], i);
+    for (int i = 0; i < dtbl.len; i++) {
+        dataentry *entry = &dtbl.entry[i];
+
+        if (!OCCUPIED(entry))
+            continue;
+        LOG_Log(LOG_INFO,
+                "Data entry %d: XID=%u data=[%.*s] key=[%.*s] reqend_t=%u.%06u",
+                i, entry->xid, entry->end, entry->data, entry->keylen,
+                entry->key, entry->reqend_t.tv_sec, entry->reqend_t.tv_usec);
+    }
 }

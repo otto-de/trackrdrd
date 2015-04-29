@@ -1,10 +1,6 @@
 /*-
- * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012-2014 Otto Gmbh & Co KG
- * All rights reserved
- * Use only with permission
- *
- * Author: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ * Copyright (c) 2005 Pawel Jakub Dawidek <pjd@FreeBSD.org>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -15,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -27,37 +23,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * Derived from:
+ * $FreeBSD: src/lib/libutil/libutil.h,v 1.41 2005/08/24 17:21:38 pjd Exp $
  */
 
-#include <syslog.h>
-#include <unistd.h>
-#include <errno.h>
+#ifndef VPF_H_INCLUDED
+#define VPF_H_INCLUDED
 
-#ifdef __linux__
-#include <sys/prctl.h>
+struct vpf_fh;
+
+struct vpf_fh *VPF_Open(const char *path, mode_t mode, pid_t *pidptr);
+int VPF_Write(struct vpf_fh *pfh);
+int VPF_Close(struct vpf_fh *pfh);
+int VPF_Remove(struct vpf_fh *pfh);
+
 #endif
-
-#include "vas.h"
-
-#include "trackrdrd.h"
-
-/*--------------------------------------------------------------------*/
-
-/* cf. varnish mgt_sandbox       */
-/* XXX: currently only for Linux */
-
-void
-PRIV_Sandbox(void)
-{
-    if (geteuid() == 0) {
-        XXXAZ(setgid(config.gid));
-        XXXAZ(setuid(config.uid));
-    }
-    else
-        LOG_Log0(LOG_INFO, "Not running as root, no privilege separation");
-
-#ifdef __linux__
-    if (prctl(PR_SET_DUMPABLE, 1) != 0)
-        LOG_Log0(LOG_INFO, "Could not set dumpable bit, core dumps turned off");
-#endif
-}

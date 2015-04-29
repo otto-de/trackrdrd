@@ -40,141 +40,11 @@
 
 #include "../trackrdrd.h"
 
-#define MAX_RANDOM_XIDS (1 << 17)
-
 int tests_run = 0;
-static char errmsg[BUFSIZ];
-
-static char
-*test_random_xids(void)
-{
-    char s[10];
-    int len, err;
-    
-    srand48(time(NULL));
-    unsigned xid = (unsigned int) lrand48();
-    if (xid == 0)
-        xid = 1;
-    printf("... parsing %d sequential XIDs from random start\n",
-        MAX_RANDOM_XIDS);
-    
-    for (int i = 0; i < MAX_RANDOM_XIDS; i++) {
-        sprintf(s, "%d%c", xid, (char) random());
-        len = (int) log10(xid) + 1;
-
-        unsigned result;
-        err = Parse_XID(s, len, &result);
-        sprintf(errmsg, "%d: %s", xid, strerror(err));
-        mu_assert(errmsg, err == 0);
-        sprintf(errmsg, "%d: Parse_XID returned %d", xid, result);
-        mu_assert(errmsg, xid == result);
-    }
-    return NULL;
-}
-
-static char
-*test_xid_corners(void)
-{
-    unsigned xid;
-    int err;
-    
-    printf("... testing XID corner cases\n");
-
-    err = Parse_XID("0", 1, &xid);
-    sprintf(errmsg, "0: %s", strerror(err));
-    mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "0: Parse_XID returned %d", xid);
-    mu_assert(errmsg, xid == 0);
-
-    err = Parse_XID("4294967295", 10, &xid);
-    sprintf(errmsg, "4294967295: %s", strerror(err));
-    mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "4294967295: Parse_XID returned %d", xid);
-    mu_assert(errmsg, xid == 4294967295);
-    
-    err = Parse_XID("-1", 2, &xid);
-    sprintf(errmsg, "-1: Expected EINVAL, got %d", err);
-    mu_assert(errmsg, err == EINVAL);
-
-    err = Parse_XID("foo", 3, &xid);
-    sprintf(errmsg, "foo: Expected EINVAL, got %d", err);
-    mu_assert(errmsg, err == EINVAL);
-
-    err = Parse_XID("4294967296", 10, &xid);
-    sprintf(errmsg, "2^32: Expected ERANGE, got %d", err);
-    mu_assert(errmsg, err == ERANGE);
-
-    return(NULL);
-}
-
-static char
-*test_reqstart(void)
-{
-    unsigned xid;
-    int err;
-
-    printf("... testing Parse_ReqStart\n");
-
-    #define REQSTART "127.0.0.1 40756 1253687608"
-    err = Parse_ReqStart(REQSTART, strlen(REQSTART), &xid);
-    sprintf(errmsg, "ReqStart %s: %s", REQSTART, strerror(err));
-    mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "ReqStart %s: returned XID=%d", REQSTART, xid);
-    mu_assert(errmsg, xid == 1253687608);
-
-    #define REQSTART2 "127.0.0.1 56431 18217014 "
-    err = Parse_ReqStart(REQSTART2, strlen(REQSTART2)-1, &xid);
-    sprintf(errmsg, "ReqStart %s: %s", REQSTART2, strerror(err));
-    mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "ReqStart %s: returned XID=%d", REQSTART2, xid);
-    mu_assert(errmsg, xid == 18217014);
-
-    #define REQSTART3 "127.0.0.1 53890 18228551 "
-    err = Parse_ReqStart(REQSTART3, strlen(REQSTART3)-1, &xid);
-    sprintf(errmsg, "ReqStart %s: %s", REQSTART3, strerror(err));
-    mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "ReqStart %s: returned XID=%d", REQSTART3, xid);
-    mu_assert(errmsg, xid == 18228551);
-    
-    err = Parse_ReqStart("1253687608", 10, &xid);
-    sprintf(errmsg, "ReqStart 1253687608: expected EINVAL, got %d", err);
-    mu_assert(errmsg, err == EINVAL);
-
-    return NULL;
-}
-
-static char
-*test_reqend(void)
-{
-    unsigned xid;
-    int err;
-    struct timespec reqend_t;
-
-    printf("... testing Parse_ReqEnd\n");
-
-    #define REQEND "1253687608 1348291555.658257008 1348291555.670388222 -0.012122154 NaN NaN"
-
-    err = Parse_ReqEnd(REQEND, strlen(REQEND), &xid, &reqend_t);
-    sprintf(errmsg, "ReqEnd %s: %s", REQEND, strerror(err));
-    mu_assert(errmsg, err == 0);
-    sprintf(errmsg, "ReqEnd %s: returned XID=%d", REQEND, xid);
-    mu_assert(errmsg, xid == 1253687608);
-    sprintf(errmsg, "ReqEnd %s: returned end_t=%d.%lu", REQEND,
-        (int) reqend_t.tv_sec, reqend_t.tv_nsec);
-    mu_assert(errmsg, reqend_t.tv_sec == 1348291555
-        && reqend_t.tv_nsec == 670388222);
-
-    err = Parse_ReqEnd("1253687608", 10, &xid, &reqend_t);
-    sprintf(errmsg, "ReqEnd 1253687608: expected EINVAL, got %d", err);
-    mu_assert(errmsg, err == EINVAL);
-
-    return NULL;
-}
 
 static char
 *test_vcl_log(void)
 {
-    unsigned xid;
     int err, len;
     char *data;
     vcl_log_t type;
@@ -182,19 +52,18 @@ static char
     printf("... testing Parse_VCL_Log\n");
 
     #define VCLLOG "1253687608 url=%2Frdrtestapp%2F"
-    err = Parse_VCL_Log(VCLLOG, strlen(VCLLOG), &xid, &data, &len, &type);
+    err = Parse_VCL_Log(VCLLOG, strlen(VCLLOG), &data, &len, &type);
     VMASSERT(err == 0, "VCL_Log %s: %s", VCLLOG, strerror(err));
-    MASSERT(xid == 1253687608);
     MASSERT(len == 20);
     MASSERT(type == VCL_LOG_DATA);
     VMASSERT(strncmp(data, "url=%2Frdrtestapp%2F", 20) == 0,
              "VCL_Log %s: returned data=[%.*s]", VCLLOG, len, data);
 
-    err = Parse_VCL_Log("foo", 3, &xid, &data, &len, &type);
+    err = Parse_VCL_Log("foo", 3, &data, &len, &type);
     VMASSERT(err == EINVAL, "VCL_Log foo: expected EINVAL, got %d", err);
 
     #define VCLLOG_INVALID "foo url=%2Frdrtestapp%2F"
-    err = Parse_VCL_Log(VCLLOG_INVALID, 3, &xid, &data, &len, &type);
+    err = Parse_VCL_Log(VCLLOG_INVALID, 3, &data, &len, &type);
     VMASSERT(err == EINVAL, "VCL_Log %s: expected EINVAL, got %d",
              VCLLOG_INVALID, err);
 
@@ -217,27 +86,24 @@ static char
         "1234567890123456789012345678901234567890123456789012345678901234" \
         "1234567890123456789012345678901234567890123456789012345678901234"
     #define VCLLOG_LONG "1253687608 foo=" LONG_STRING
-    err = Parse_VCL_Log(VCLLOG_LONG, 1039, &xid, &data, &len, &type);
+    err = Parse_VCL_Log(VCLLOG_LONG, 1039, &data, &len, &type);
     VMASSERT(err == 0, "VCL_Log long string: %s", strerror(err));
-    MASSERT(xid == 1253687608);
     MASSERT(len == 1028);
     MASSERT(type == VCL_LOG_DATA);
     VMASSERT(strncmp(data, "foo=" LONG_STRING, 1028) == 0,
              "VCL_Log long string: returned data=[%.*s]", len, data);
 
     #define VCLKEY "1253687608 key foobarbazquux"
-    err = Parse_VCL_Log(VCLKEY, strlen(VCLKEY), &xid, &data, &len, &type);
+    err = Parse_VCL_Log(VCLKEY, strlen(VCLKEY), &data, &len, &type);
     VMASSERT(err == 0, "VCL_Log %s: %s", VCLKEY, strerror(err));
-    MASSERT(xid == 1253687608);
     MASSERT(len == 13);
     MASSERT(type == VCL_LOG_KEY);
     VMASSERT(strncmp(data, "foobarbazquux", 13) == 0,
              "VCL_Log %s: returned data=[%.*s]", VCLKEY, len, data);
 
     #define VCLKEY_LONG "1253687608 key " LONG_STRING
-    err = Parse_VCL_Log(VCLKEY_LONG, 1039, &xid, &data, &len, &type);
+    err = Parse_VCL_Log(VCLKEY_LONG, 1039, &data, &len, &type);
     VMASSERT(err == 0, "VCL_Log long key: %s", strerror(err));
-    MASSERT(xid == 1253687608);
     MASSERT(len == 1024);
     MASSERT(type == VCL_LOG_KEY);
     VMASSERT(strncmp(data, LONG_STRING, 1024) == 0,
@@ -246,14 +112,34 @@ static char
     return NULL;
 }
 
+static char
+*test_timestamp(void)
+{
+    int err;
+    struct timeval tv;
+
+    printf("... testing Parse_Timestamp\n");
+
+    #define TS "Resp: 1430176881.682097 0.000281 0.000082"
+    err = Parse_Timestamp(TS, strlen(TS), &tv);
+    VMASSERT(err == 0, "Parse_Timestamp %s: %s", TS, strerror(err));
+    MASSERT(tv.tv_sec == 1430176881);
+    MASSERT(tv.tv_usec == 682097);
+
+    #define TS0 "Resp: 1430176881.000001 0.000281 0.000082"
+    err = Parse_Timestamp(TS0, strlen(TS0), &tv);
+    VMASSERT(err == 0, "Parse_Timestamp %s: %s", TS0, strerror(err));
+    MASSERT(tv.tv_sec == 1430176881);
+    MASSERT(tv.tv_usec == 1);
+
+    return NULL;
+}
+
 static const char
 *all_tests(void)
 {
-    mu_run_test(test_random_xids);
-    mu_run_test(test_xid_corners);
-    mu_run_test(test_reqstart);
-    mu_run_test(test_reqend);
     mu_run_test(test_vcl_log);
+    mu_run_test(test_timestamp);
     return NULL;
 }
 

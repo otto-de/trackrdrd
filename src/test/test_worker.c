@@ -36,9 +36,7 @@
 #include "minunit.h"
 
 #include "../trackrdrd.h"
-#include "vas.h"
-#include "miniobj.h"
-#include "libvarnish.h"
+#include "../vtim.h"
 
 #define DEBUG 0
 #define debug_print(fmt, ...) \
@@ -50,8 +48,15 @@
 #define MQ_CONFIG "file_mq.conf"
 
 int tests_run = 0;
-static char errmsg[BUFSIZ];
 static void *mqh;
+
+/* Called from worker.c, but we don't want to pull in all of monitor.c's
+   dependecies. */
+void
+MON_StatsUpdate(stats_update_t update)
+{
+    (void) update;
+}
 
 static void
 init(void)
@@ -93,7 +98,6 @@ static char
 
     printf("... testing worker initialization\n");
 
-    config.maxopen_scale = DEF_MAXOPEN_SCALE;
     config.maxdone = DEF_MAXDONE;
     config.maxdata = DEF_MAXDATA;
     config.maxkeylen = DEF_MAXKEYLEN;
@@ -101,20 +105,17 @@ static char
     strcpy(config.mq_config_file, MQ_CONFIG);
 
     error = mqf.global_init(config.nworkers, config.mq_config_file);
-    sprintf(errmsg, "MQ_GlobalInit failed: %s", error);
-    mu_assert(errmsg, error == NULL);
+    VMASSERT(error == NULL, "MQ_GlobalInit failed: %s", error);
     
     error = mqf.init_connections();
-    sprintf(errmsg, "MQ_InitConnections failed: %s", error);
-    mu_assert(errmsg, error == NULL);
+    VMASSERT(error == NULL, "MQ_InitConnections failed: %s", error);
     
     err = WRK_Init();
-    sprintf(errmsg, "WRK_Init: %s", strerror(err));
-    mu_assert(errmsg, err == 0);
+    VMASSERT(err == 0, "WRK_Init: %s", strerror(err));
 
-    AZ(LOG_Open("test_worker"));
-    AZ(DATA_Init());
-    AZ(SPMCQ_Init());
+    MAZ(LOG_Open("test_worker"));
+    MAZ(DATA_Init());
+    MAZ(SPMCQ_Init());
 
     return NULL;
 }
@@ -134,45 +135,45 @@ static const char
     while ((wrk_running = WRK_Running()) < NWORKERS) {
         if (wrk_wait++ > 10)
             break;
-        TIM_sleep(1);
+        VTIM_sleep(1);
     }
-    sprintf(errmsg, "%d of %d worker threads running", wrk_running, NWORKERS);
-    mu_assert(errmsg, wrk_running == NWORKERS);
+    VMASSERT(wrk_running == NWORKERS,
+             "%d of %d worker threads running", wrk_running, NWORKERS);
 
-    for (int i = 0; i < (1 << DEF_MAXOPEN_SCALE); i++) {
+    for (int i = 0; i < config.maxdone; i++) {
         entry = &dtbl.entry[i];
-        CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+        MCHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         entry->xid = xid;
         sprintf(entry->data, "XID=%d&foo=bar&baz=quux&record=%d", xid, i+1);
         entry->end = strlen(entry->data);
-        entry->state = DATA_DONE;
+        entry->occupied = 1;
         SPMCQ_Enq(entry);
     }
     
     WRK_Halt();
     WRK_Shutdown();
 
-    AZ(mqf.global_shutdown());
+    MAZ(mqf.global_shutdown());
     LOG_Close();
 
     /*
      * Verify DATA_Reset() by checking that all data entry fields are in
      * empty states after worker threads are shut down.
      */
-    for (int i = 0; i < (1 << DEF_MAXOPEN_SCALE); i++) {
+    for (int i = 0; i < config.maxdone; i++) {
         entry = &dtbl.entry[i];
-        CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-        MASSERT(entry->state == DATA_EMPTY);
+        MCHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+        MASSERT(!OCCUPIED(entry));
         MAZ(entry->end);
         MAZ(*entry->data);
         MAZ(entry->keylen);
         MAZ(*entry->key);
-        MASSERT(entry->hasdata == false);
-        MASSERT(entry->incomplete == false);
+        MAZ(entry->hasdata);
         MAZ(entry->xid);
-        MAZ(entry->tid);
+        MAZ(entry->reqend_t.tv_sec);
+        MAZ(entry->reqend_t.tv_usec);
     }
-    
+
     return NULL;
 }
 

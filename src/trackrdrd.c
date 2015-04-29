@@ -53,29 +53,25 @@
 #include <sys/types.h>
 #include <pwd.h>
 
-#ifndef HAVE_EXECINFO_H
-#include "compat/execinfo.h"
-#else
-#include <execinfo.h>
+#ifdef HAVE_DAEMON_H
+#include "daemon.h"
 #endif
-#include "compat/daemon.h"
 
-#include "vsb.h"
-#include "vpf.h"
-
-#include "libvarnish.h"
-#include "vsl.h"
-#include "varnishapi.h"
-#include "miniobj.h"
+#include "vas.h"
 
 #include "trackrdrd.h"
 #include "config_common.h"
-#include "revision.h"
+#include "vcs_version.h"
 #include "usage.h"
+#include "vpf.h"
+#include "vtim.h"
 
 static volatile sig_atomic_t reload;
 
 static struct sigaction restart_action;
+
+static const char *version = PACKAGE_STRING " revision " VCS_Version
+    " branch " VCS_Branch;
 
 /*--------------------------------------------------------------------*/
 
@@ -110,38 +106,38 @@ parent_shutdown(int status, pid_t child_pid)
 }
 
 static pid_t
-child_restart(pid_t child_pid, struct VSM_data *vd, int endless, int readconfig)
+child_restart(pid_t child_pid, int readconfig)
 {
     int errnum;
     
     if (readconfig) {
-        LOG_Log(LOG_INFO, "Sending TERM signal to worker process %d",
-            child_pid);
+        LOG_Log(LOG_NOTICE, "Sending TERM signal to worker process %d",
+                child_pid);
         if ((errnum = kill(child_pid, SIGTERM)) != 0) {
             LOG_Log(LOG_ALERT, "Signal TERM delivery to process %d failed: %s",
-                strerror(errnum));
+                    strerror(errnum));
             parent_shutdown(EXIT_FAILURE, 0);
         }
     }
-    LOG_Log0(LOG_INFO, "Restarting child process");
+    LOG_Log0(LOG_NOTICE, "Restarting child process");
     child_pid = fork();
     if (child_pid == -1) {
         LOG_Log(LOG_ALERT, "Cannot fork: %s", strerror(errno));
         parent_shutdown(EXIT_FAILURE, child_pid);
     }
     else if (child_pid == 0)
-        CHILD_Main(vd, endless, readconfig);
+        CHILD_Main(readconfig);
 
     return child_pid;
 }   
 
 static void
-parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
+parent_main(pid_t child_pid)
 {
     int restarts = 0, status;
     pid_t wpid;
 
-    LOG_Log0(LOG_INFO, "Management process starting");
+    LOG_Log0(LOG_NOTICE, "Management process starting");
 
     restart_action.sa_handler = restart;
     AZ(sigemptyset(&restart_action.sa_mask));
@@ -163,7 +159,7 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
                 if (term)
                     parent_shutdown(EXIT_SUCCESS, child_pid);
                 else if (reload) {
-                    child_pid = child_restart(child_pid, vd, endless, reload);
+                    child_pid = child_restart(child_pid, reload);
                     reload = 0;
                     continue;
                 }
@@ -174,34 +170,34 @@ parent_main(pid_t child_pid, struct VSM_data *vd, int endless)
                     continue;
                 }
             }
-            LOG_Log(LOG_ERR, "Cannot wait for worker processes: %s",
-                strerror(errno));
+            LOG_Log(LOG_ALERT, "Cannot wait for worker processes: %s",
+                    strerror(errno));
             parent_shutdown(EXIT_FAILURE, child_pid);
         }
         AZ(WIFSTOPPED(status));
         AZ(WIFCONTINUED(status));
         if (WIFEXITED(status))
             LOG_Log(LOG_WARNING, "Worker process %d exited with status %d",
-                wpid, WEXITSTATUS(status));
+                    wpid, WEXITSTATUS(status));
         if (WIFSIGNALED(status))
             LOG_Log(LOG_WARNING,
-                "Worker process %d exited due to signal %d (%s)",
-                wpid, WTERMSIG(status), strsignal(WTERMSIG(status)));
+                    "Worker process %d exited due to signal %d (%s)",
+                    wpid, WTERMSIG(status), strsignal(WTERMSIG(status)));
 
         if (wpid != child_pid)
             continue;
         
         if (config.restarts && restarts > config.restarts) {
-            LOG_Log(LOG_ERR, "Too many restarts: %d", restarts);
+            LOG_Log(LOG_ALERT, "Too many restarts: %d", restarts);
             parent_shutdown(EXIT_FAILURE, 0);
         }
         
         if (config.restart_pause > 0) {
-            LOG_Log(LOG_INFO, "Pausing %u seconds before restarting child",
+            LOG_Log(LOG_NOTICE, "Pausing %u seconds before restarting child",
                     config.restart_pause);
-            TIM_sleep(config.restart_pause);
+            VTIM_sleep(config.restart_pause);
         }
-        child_pid = child_restart(child_pid, vd, endless, 0);
+        child_pid = child_restart(child_pid, 0);
         restarts++;
     }
 }
@@ -216,14 +212,10 @@ usage(int status)
 int
 main(int argc, char * const *argv)
 {
-    int c, d_flag = 0, D_flag = 0, endless = 1, err;
+    int c, d_flag = 0, D_flag = 0, err;
     const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
         *y_arg = NULL, *c_arg = NULL, *u_arg = NULL;
-    struct VSM_data *vd;
     pid_t child_pid;
-
-    vd = VSM_New();
-    VSL_Setup(vd);
 
     CONF_Init();
     if ((err = CONF_ReadDefault()) != 0) {
@@ -240,7 +232,7 @@ main(int argc, char * const *argv)
             P_arg = optarg;
             break;
         case 'V':
-            printf(PACKAGE_STRING " revision " REVISION "\n");
+            fprintf(stderr, "%s\n", version);
             exit(EXIT_SUCCESS);
         case 'n':
             n_arg = optarg;
@@ -312,41 +304,33 @@ main(int argc, char * const *argv)
         strcpy(config.log_file, l_arg);
     if (f_arg) {
         strcpy(config.varnish_bindump, f_arg);
-        endless = 0;
     }
-        
-    if (f_arg && VSL_Arg(vd, 'r', f_arg) <= 0)
-        exit(EXIT_FAILURE);
-    else if (!EMPTY(config.varnish_name)
-        && VSL_Arg(vd, 'n', config.varnish_name) <= 0)
-        exit(EXIT_FAILURE);
         
     if (LOG_Open(PACKAGE_NAME) != 0) {
         exit(EXIT_FAILURE);
     }
 
-    VAS_Fail = ASRT_Fail;
-        
     if (d_flag)
         LOG_SetLevel(LOG_DEBUG);
-    LOG_Log0(LOG_INFO,
-        "initializing (v" PACKAGE_VERSION " revision " REVISION ")");
+    LOG_Log(LOG_INFO, "initializing (%s)", version);
 
     CONF_Dump();
         
     if (!EMPTY(config.pid_file)
         && (pfh = VPF_Open(config.pid_file, 0644, NULL)) == NULL) {
-        LOG_Log(LOG_ERR, "Cannot write pid file %s: %s\n",
-            config.pid_file, strerror(errno));
+        LOG_Log(LOG_CRIT, "Cannot write pid file %s: %s\n",
+                config.pid_file, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
-    if (!D_flag && varnish_daemon(0, 0) == -1) {
+#ifdef HAVE_DAEMON_H
+    if (!D_flag && daemon(0, 0) == -1) {
         perror("daemon()");
         if (pfh != NULL)
             VPF_Remove(pfh);
         exit(EXIT_FAILURE);
     }
+#endif
 
     if (pfh != NULL)
         VPF_Write(pfh);
@@ -361,26 +345,26 @@ main(int argc, char * const *argv)
     default_action.sa_handler = SIG_DFL;
 
     HNDL_Init(argv[0]);
-    
+
     if (!D_flag) {
         child_pid = fork();
         switch(child_pid) {
         case -1:
-            LOG_Log(LOG_ALERT,
+            LOG_Log(LOG_ERR,
                 "Cannot fork (%s), running as single process",
                 strerror(errno));
-            CHILD_Main(vd, endless, 0);
+            CHILD_Main(0);
             break;
         case 0:
-            CHILD_Main(vd, endless, 0);
+            CHILD_Main(0);
             break;
         default:
-            parent_main(child_pid, vd, endless);
+            parent_main(child_pid);
             break;
         }
     }
     else {
-        LOG_Log0(LOG_INFO, "Running as non-demon single process");
-        CHILD_Main(vd, endless, 0);
+        LOG_Log0(LOG_NOTICE, "Running as single process");
+        CHILD_Main(0);
     }
 }

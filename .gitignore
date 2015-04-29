@@ -37,7 +37,7 @@ Makefile.in
 TAGS
 
 # auto-generated files
-src/revision.h
+src/vcs_version.h
 src/trackrdrd
 src/usage.h
 *.3

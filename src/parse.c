@@ -36,70 +36,21 @@
 
 #include "trackrdrd.h"
 
-#define Parse_UnsignedDec(str,len,xid) Parse_XID((str),(len),(xid))
+#include "vas.h"
 
-int
-Parse_XID(const char *str, int len, unsigned *xid)
+static int
+parse_UnsignedDec(const char *str, int len, unsigned *num)
 {
     unsigned new;
-    *xid = 0;
+    *num = 0;
     for (int i = 0; i < len; i++) {
         if (!isdigit(str[i]))
             return EINVAL;
-        new = *xid * 10 + (str[i] - '0');
-        if (new < *xid)
+        new = *num * 10 + (str[i] - '0');
+        if (new < *num)
             return ERANGE;
-        else
-            *xid = new;
+        *num = new;
     }
-    return 0;
-}
-
-int
-Parse_ReqStart(const char *ptr, int len, unsigned *xid)
-{
-    int i;
-    for (i = len-1; ptr[i] != ' '; i--)
-        if (i == 0)
-            return EINVAL;
-    return Parse_XID(&ptr[i+1], len-i-1, xid);
-}
-
-int
-Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid,
-    struct timespec *reqend_t)
-{
-    int err;
-    char *blank, *reqend_tstr, *dot;
-    
-    blank = memchr(ptr, ' ', len);
-    if (blank == NULL)
-        return EINVAL;
-    err = Parse_XID(ptr, blank-ptr, xid);
-    if (err != 0)
-        return err;
-    
-    reqend_tstr = memchr(blank + 1, ' ', len-(blank-ptr));
-    if (reqend_tstr == NULL)
-        return EINVAL;
-    else
-        reqend_tstr++;
-    dot = memchr(reqend_tstr, '.', len-(reqend_tstr-ptr));
-    if (dot == NULL)
-        return EINVAL;
-    blank = memchr(dot + 1, ' ', len-(dot-ptr));
-    if (blank == NULL)
-        return EINVAL;
-    err = Parse_UnsignedDec(reqend_tstr, dot-reqend_tstr,
-        (unsigned *)&reqend_t->tv_sec);
-    reqend_t->tv_sec &= 0x0ffffffff;
-    if (err != 0)
-        return err;
-    err = Parse_UnsignedDec(dot+1, blank-dot-1,
-        (unsigned *) &reqend_t->tv_nsec);
-    if (err != 0)
-        return err;
-    reqend_t->tv_nsec &= 0x0ffffffff;
     return 0;
 }
 
@@ -107,22 +58,34 @@ Parse_ReqEnd(const char *ptr, unsigned len, unsigned *xid,
    len is length from that char to end of data
 */
 int
-Parse_VCL_Log(const char *ptr, int len, unsigned *xid,
-              char **data, int *datalen, vcl_log_t *type)
+Parse_VCL_Log(const char *ptr, int len, char **data, int *datalen,
+              vcl_log_t *type)
 {
     *type = VCL_LOG_DATA;
     char *blank = memchr(ptr, ' ', len);
     if (blank == NULL)
         return EINVAL;
-    int err = Parse_XID(ptr, blank-ptr, xid);
-    if (err != 0)
-        return err;
     if (strncmp(blank + 1, "key ", 4) == 0) {
         blank += 4;
         *type = VCL_LOG_KEY;
     }
     *data = blank + 1;
-    *datalen = ptr + len - blank - 1;
+    *datalen = ptr + len - *data;
     return(0);
 }
 
+int
+Parse_Timestamp(const char *ptr, int len, struct timeval *t)
+{
+    unsigned num;
+    const char *p = ptr + (sizeof("Resp: ") - 1);
+
+    char *dot = memchr(p, '.', len);
+    AZ(parse_UnsignedDec(p, dot - p, &num));
+    t->tv_sec = num;
+    char *blank = memchr(dot + 1, ' ', len - (dot - p));
+    AZ(parse_UnsignedDec(dot + 1, blank - dot - 1, &num));
+    assert(num < 1000000);
+    t->tv_usec = num;
+    return(0);
+}

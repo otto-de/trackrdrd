@@ -1,8 +1,9 @@
-INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) -I$(top_srcdir)/include
+INCLUDES = -I${VARNISH_SHARE_INCLUDE} -I${VARNISH_PKG_INCLUDE} \
+	-I$(top_srcdir)/include
 
 bin_PROGRAMS = trackrdrd
 
-nodist_trackrdrd_SOURCES = revision.h usage.h
+nodist_trackrdrd_SOURCES = usage.h vcs_version.h
 
 trackrdrd_SOURCES = \
 	trackrdrd.h \
@@ -19,48 +20,18 @@ trackrdrd_SOURCES = \
 	sandbox.c \
 	child.c \
 	handler.c \
-	assert.c
+	assert.c \
+	vtim.h \
+	vtim.c
 
 trackrdrd_LDADD = \
-	$(VARNISHSRC)/lib/libvarnishcompat/libvarnishcompat.la \
-	$(VARNISHSRC)/lib/libvarnishapi/libvarnishapi.la \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	${PTHREAD_LIBS}
+	${PTHREAD_LIBS} @VARNISH_LIBS@ \
+	-L${VARNISH_PKG_LIB}/varnish -lvarnish
 
 trackrdrd_LDFLAGS = -ldl
 
-BUILT_SOURCES = revision.h usage.h
-MAINTAINERCLEANFILES = revision.h usage.h
-
-# Derive a revision name from the git commit
-# Adopted from Varnish include/Makefile.am
-revision.h: FORCE
-	@if [ -d "$(top_srcdir)/../.git" ]; then \
-		V="$$(git show -s --pretty=format:%h)" \
-		H="$$(head -n 1 revision.h 2>/dev/null || true)"; \
-		if [ "/* $$V */" != "$$H" ]; then \
-		( \
-		  echo "/* $$V */" ;\
-		  echo '/*' ;\
-		  echo ' * NB:  This file is machine generated, DO NOT EDIT!' ;\
-		  echo ' *' ;\
-		  echo ' * Run make to regenerate' ;\
-		  echo ' *'  ;\
-		  echo ' */' ;\
-		  echo "/* $$V */" ;\
-		  echo '' ;\
-		  echo "#define REVISION \"$$V\"" \
-		) > revision.h ; \
-		fi \
-	else \
-		if [ ! -f revision.h ]; then \
-		( \
-		  echo "/* NOGIT */" ; \
-		  echo '/* No git commit ID available, see include/Makefile.am for explanation */' ; \
-		  echo '#define REVISION "NOGIT"' \
-		) >  revision.h ; \
-		fi \
-	fi
+BUILT_SOURCES = usage.h vcs_version.h
+MAINTAINERCLEANFILES = usage.h vcs_version.h 
 
 usage.h: $(top_srcdir)/synopsis.txt $(top_srcdir)/options.txt
 	( \
@@ -80,5 +51,38 @@ usage.h: $(top_srcdir)/synopsis.txt $(top_srcdir)/options.txt
 	) >> usage.h
 	sed -e 's/.*/\"&\\n\"/' $(top_srcdir)/options.txt >> usage.h
 	echo ';' >> usage.h
+
+# Derive a revision name from the git commit
+# Adopted from Varnish include/Makefile.am
+vcs_version.h: FORCE
+	@if [ -d "$(top_srcdir)/.git" ]; then \
+		V="$$(git show -s --pretty=format:%h)" \
+		B="$$(git rev-parse --abbrev-ref HEAD)" \
+		H="$$(head -n 1 vcs_version.h 2>/dev/null || true)"; \
+		if [ "/* $$V */" != "$$H" ]; then \
+		( \
+		  echo "/* $$V */" ;\
+		  echo '/*' ;\
+		  echo ' * NB:  This file is machine generated, DO NOT EDIT!' ;\
+		  echo ' *' ;\
+		  echo ' * Run make to regenerate' ;\
+		  echo ' *'  ;\
+		  echo ' */' ;\
+		  echo "/* $$V */" ;\
+		  echo '' ;\
+		  echo "#define VCS_Version \"$$V\"" ; \
+		  echo "#define VCS_Branch \"$$B\"" \
+		) > vcs_version.h ; \
+		fi \
+	else \
+		if [ ! -f vcs_version.h ]; then \
+		( \
+		  echo "/* NOGIT */" ; \
+		  echo '/* No git commit ID available, see include/Makefile.am for explanation */' ; \
+		  echo '#define VCS_Version "NOGIT"' ; \
+		  echo '#define VCS_Branch "NOGIT"' \
+		) >  vcs_version.h ; \
+		fi \
+	fi
 
 FORCE:

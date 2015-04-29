@@ -1,13 +1,13 @@
 /*-
- * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012-2014 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2015 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2015 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
  * Authors: Geoffrey Simmons <geoffrey.simmons@uplex.de>
  *	    Nils Goroll <nils.goroll@uplex.de>
  *
- * Portions adopted from varnishlog.c from the Varnish project
+ * Portions adopted from vas.c from the Varnish project
  *	Author: Poul-Henning Kamp <phk@phk.freebsd.dk>
  * 	Copyright (c) 2006 Verdens Gang AS
  * 	Copyright (c) 2006-2011 Varnish Software AS
@@ -38,18 +38,40 @@
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <errno.h>
 
 #include "trackrdrd.h"
 
-void
-ASRT_Fail(const char *func, const char *file, int line, const char *cond,
-    int err, int xxx)
+#include "vas.h"
+
+static void __attribute__((__noreturn__))
+VAS_Fail_default(const char *func, const char *file, int line, const char *cond,
+                 int err, enum vas_e type)
 {
-    (void) xxx;
-    
-    LOG_Log(LOG_ALERT, "Condition (%s) failed in %s(), %s line %d",
-        cond, func, file, line);
+    switch(type) {
+    case VAS_ASSERT:
+        LOG_Log(LOG_ALERT, "Condition (%s) failed in %s(), %s line %d",
+                cond, func, file, line);
+        break;
+    case VAS_MISSING:
+        LOG_Log(LOG_ALERT, "Missing error handling code, condition (%s) failed "
+                "in %s(), %s line %d", cond, func, file, line);
+        break;
+    case VAS_INCOMPLETE:
+        LOG_Log(LOG_ALERT, "Incomplete code in %s(), %s line %d",
+                cond, func, file, line);
+        break;
+    case VAS_WRONG:
+        LOG_Log(LOG_ALERT, "Wrong turn in %s(), %s line %d: %s",
+                func, file, line, cond);
+        break;
+    default:
+        assert(0 != 0);
+        break;
+    }
     if (err)
         LOG_Log(LOG_ALERT, "errno = %d (%s)", err, strerror(err));
     abort();
 }
+
+vas_f *VAS_Fail __attribute__((__noreturn__)) = VAS_Fail_default;

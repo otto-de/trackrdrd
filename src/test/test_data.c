@@ -37,6 +37,8 @@
 
 int tests_run = 0;
 
+static unsigned nfree = 0;
+
 static struct freehead_s local_freehead
     = VSTAILQ_HEAD_INITIALIZER(local_freehead);
 
@@ -48,21 +50,24 @@ static char
 
     printf("... testing data table initialization\n");
     
-    config.maxopen_scale = DEF_MAXOPEN_SCALE;
     config.maxdone = DEF_MAXDONE;
     config.maxdata = DEF_MAXDATA;
     config.maxkeylen = DEF_MAXKEYLEN;
     err = DATA_Init();
     VMASSERT(err == 0, "DATA_Init: %s", strerror(err));
-    VMASSERT(dtbl.len == 2048, "DATA_Init: expected table length 2048, got %d",
-             dtbl.len);
+    MASSERT(dtbl.len == DEF_MAXDONE);
 
     for (int i = 0; i < dtbl.len; i++) {
         MCHECK_OBJ_NOTNULL(&dtbl.entry[i], DATA_MAGIC);
-        MASSERT(dtbl.entry[i].state == DATA_EMPTY);
-        MASSERT(!dtbl.entry[i].hasdata);
+        MASSERT(!OCCUPIED(&dtbl.entry[i]));
+        MAZ(dtbl.entry[i].hasdata);
         MAN(dtbl.entry[i].data);
         MAN(dtbl.entry[i].key);
+        MAZ(dtbl.entry[i].xid);
+        MAZ(dtbl.entry[i].end);
+        MAZ(dtbl.entry[i].keylen);
+        MAZ(dtbl.entry[i].reqend_t.tv_sec);
+        MAZ(dtbl.entry[i].reqend_t.tv_usec);
     }
 
     return NULL;
@@ -96,8 +101,10 @@ static const char
 {
     printf("... testing freelist take\n");
 
-    DATA_Take_Freelist(&local_freehead);
-    
+    nfree = DATA_Take_Freelist(&local_freehead);
+
+    MASSERT(nfree == config.maxdone);
+
     MASSERT0(!VSTAILQ_EMPTY(&local_freehead),
              "Local freelist empty after take");
     
@@ -115,14 +122,12 @@ static const char
 {
     printf("... testing freelist return\n");
 
-    DATA_Return_Freelist(&local_freehead, 2048);
+    DATA_Return_Freelist(&local_freehead, nfree);
 
     MASSERT0(VSTAILQ_EMPTY(&local_freehead),
              "Local freelist non-empty after return");
     
-    VMASSERT(dtbl.nfree == 2048,
-             "Expected global free count == 2048 after return (%u)",
-             dtbl.nfree);
+    MASSERT(dtbl.nfree == DEF_MAXDONE);
 
     MASSERT0(!VSTAILQ_EMPTY(&dtbl.freehead),
              "Global free list empty after take");

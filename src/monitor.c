@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012-2014 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2015 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2015 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -40,67 +40,43 @@
 
 static int run;
 
+static pthread_mutex_t	mutex;
+static unsigned		occ;
+static unsigned		sent;		/* Sent successfully to MQ */
+static unsigned		failed;		/* MQ send fails */
+static unsigned		reconnects;	/* Reconnects to MQ */
+static unsigned		restarts;	/* Worker thread restarts */
+static unsigned		occ_hi;		/* Occupancy high water mark */ 
+static unsigned		occ_hi_this;	/* Occupancy high water mark
+                                           this reporting interval*/
+
 static void
 log_output(void)
 {
+    int wrk_running = WRK_Running();
+
+    LOG_Log(LOG_INFO, "Data table: len=%u occ=%u occ_hi=%u occ_hi_this=%u "
+            "global_free=%u",
+            dtbl.len, occ, occ_hi, occ_hi_this, dtbl.nfree);
 
     /* Eliminate the dependency of trackrdrd.o for unit tests */
 #ifndef TEST_DRIVER
-    HASH_Stats();
+    RDR_Stats();
 #endif
     
-    LOG_Log(LOG_INFO,
-        "Data table: "
-        "len=%u "
-        "nodata=%u "
-        "submitted=%u "
-        "wait_room=%u "
-        "data_hi=%u "
-        "key_hi=%u "
-        "data_overflows=%u "
-        "data_truncated=%u "
-        "key_overflows=%u "
-        "done=%u "
-        "open=%u "
-        "load=%.2f "
-        "sent=%u "
-        "reconnects=%u "
-        "failed=%u "
-        "restarts=%u "
-        "abandoned=%u "
-        "occ_hi=%u "
-        "occ_hi_this=%u ",
-        dtbl.len,
-        dtbl.w_stats.nodata,
-        dtbl.w_stats.submitted,
-        dtbl.w_stats.wait_room,
-        dtbl.w_stats.data_hi,
-        dtbl.w_stats.key_hi,
-        dtbl.w_stats.data_overflows,
-        dtbl.w_stats.data_truncated,
-        dtbl.w_stats.key_overflows,
-        dtbl.r_stats.done,
-        dtbl.r_stats.open,
-        (100.0 * (1.0 * dtbl.r_stats.done + 1.0 * dtbl.r_stats.open) / dtbl.len),
-        dtbl.r_stats.sent,
-        dtbl.r_stats.reconnects,
-        dtbl.r_stats.failed,
-        dtbl.r_stats.restarts,
-        dtbl.w_stats.abandoned,
-        dtbl.r_stats.occ_hi,
-        dtbl.r_stats.occ_hi_this
-            );
+    if (wrk_running < config.nworkers)
+        LOG_Log(LOG_WARNING, "%d of %d workers running", wrk_running,
+                config.nworkers);
+    /* XXX: seen, bytes sent */
+    LOG_Log(LOG_INFO, "Workers: running=%d sent=%lu failed=%u reconnects=%u "
+            "restarts=%u abandoned=%u",
+            wrk_running, sent, failed, reconnects, restarts, failed, abandoned);
 
     /* locking would be overkill */
-    dtbl.r_stats.occ_hi_this = 0;
+    occ_hi_this = 0;
 
-    if (config.monitor_workers) {
-        int wrk_running = WRK_Running();
-        if (wrk_running < config.nworkers)
-            LOG_Log(LOG_WARNING, "%d of %d workers running", wrk_running,
-                config.nworkers);
+    if (config.monitor_workers)
         WRK_Stats();
-    }
 }
 
 static void
@@ -130,13 +106,12 @@ void
         if (nanosleep(&t, NULL) != 0) {
             if (errno == EINTR) {
                 if (run == 0)
-    	    break;
-                LOG_Log0(LOG_INFO, "Monitoring thread interrupted");
+                    break;
+                LOG_Log0(LOG_WARNING, "Monitoring thread interrupted");
                 continue;
             }
             else {
-                LOG_Log(LOG_WARNING, "Monitoring thread: %s\n",
-                        strerror(errno));
+                LOG_Log(LOG_ERR, "Monitoring thread: %s\n", strerror(errno));
                 err = errno;
                 pthread_exit(&err);
             }
@@ -161,60 +136,50 @@ MON_StatusShutdown(pthread_t monitor)
     run = 0;
     AZ(pthread_cancel(monitor));
     AZ(pthread_join(monitor, NULL));
-    AZ(pthread_mutex_destroy(&dtbl.r_stats.mutex));
+    AZ(pthread_mutex_destroy(&mutex));
 }
 
 void
 MON_StatsInit(void)
 {
-    AZ(pthread_mutex_init(&dtbl.r_stats.mutex, &attr_lock));
+    AZ(pthread_mutex_init(&mutex, NULL));
 }
 
 void
 MON_StatsUpdate(stats_update_t update)
 {
-    AZ(pthread_mutex_lock(&dtbl.r_stats.mutex));
+    AZ(pthread_mutex_lock(&mutex));
     switch(update) {
         
     case STATS_SENT:
-        dtbl.r_stats.sent++;
-        dtbl.r_stats.done--;
+        sent++;
+        occ--;
         break;
         
     case STATS_FAILED:
-        dtbl.r_stats.failed++;
-        dtbl.r_stats.done--;
+        failed++;
+        occ--;
         break;
         
-    case STATS_DONE:
-        dtbl.r_stats.done++;
-        dtbl.r_stats.open--;
-        break;
-
     case STATS_RECONNECT:
-        dtbl.r_stats.reconnects++;
+        reconnects++;
         break;
 
     case STATS_OCCUPANCY:
-        dtbl.r_stats.open++;
-        if (dtbl.r_stats.open + dtbl.r_stats.done > dtbl.r_stats.occ_hi)
-            dtbl.r_stats.occ_hi = dtbl.r_stats.open + dtbl.r_stats.done;
-        if (dtbl.r_stats.open + dtbl.r_stats.done > dtbl.r_stats.occ_hi_this)
-            dtbl.r_stats.occ_hi_this = dtbl.r_stats.open + dtbl.r_stats.done;
-        break;
-
-    case STATS_NODATA:
-        dtbl.w_stats.nodata++;
-        dtbl.r_stats.done--;
+        occ++;
+        if (occ > occ_hi)
+            occ_hi = occ;
+        if (occ > occ_hi_this)
+            occ_hi_this = occ;
         break;
 
     case STATS_RESTART:
-        dtbl.r_stats.restarts++;
+        restarts++;
         break;
         
     default:
         /* Unreachable */
         AN(NULL);
     }
-    AZ(pthread_mutex_unlock(&dtbl.r_stats.mutex));
+    AZ(pthread_mutex_unlock(&mutex));
 }

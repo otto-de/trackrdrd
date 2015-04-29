@@ -66,9 +66,9 @@ spmcq_cleanup(void)
 int
 SPMCQ_Init(void)
 {
-    if (pthread_mutex_init(&spmcq_lock, &attr_lock) != 0)
+    if (pthread_mutex_init(&spmcq_lock, NULL) != 0)
         return(errno);
-    if (pthread_mutex_init(&spmcq_deq_lock, &attr_lock) != 0)
+    if (pthread_mutex_init(&spmcq_deq_lock, NULL) != 0)
         return(errno);
     
     qlen_goal = config.qlen_goal;
@@ -144,11 +144,11 @@ spmcq_wrk_len_ratio(int working, int running)
     return working * qlen_goal / running;
 }
 
-bool
+unsigned
 SPMCQ_NeedWorker(int running)
 {
     if (running == 0)
-        return false;
+        return 0;
     return spmcq_len() > spmcq_wrk_len_ratio(running - spmcq_datawaiter,
                                              running);
 }

@@ -39,8 +39,6 @@
 
 #include "trackrdrd.h"
 
-#include "libvarnish.h"
-
 static const char *level2name[LOG_DEBUG+1];
 
 static void

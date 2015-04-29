@@ -43,8 +43,9 @@
 #include <stdbool.h>
 
 #include "trackrdrd.h"
-#include "libvarnish.h"
 #include "config_common.h"
+
+#include "vas.h"
 
 #define DEFAULT_USER "nobody"
 
@@ -118,13 +119,9 @@ CONF_Add(const char *lval, const char *rval)
     confString("mq.module", mq_module);
     confString("mq.config_file", mq_config_file);
 
-    confUnsigned("maxopen.scale", maxopen_scale);
     confUnsigned("maxdata", maxdata);
     confUnsigned("maxkeylen", maxkeylen);
     confUnsigned("qlen.goal", qlen_goal);
-    confUnsigned("hash.max_probes", hash_max_probes);
-    confUnsigned("hash.ttl", hash_ttl);
-    confUnsigned("hash.mlt", hash_mlt);
     confUnsigned("nworkers", nworkers);
     confUnsigned("restarts", restarts);
     confUnsigned("restart.pause", restart_pause);
@@ -197,14 +194,10 @@ CONF_Init(void)
     config.syslog_facility = LOG_LOCAL0;
     config.monitor_interval = 30;
     config.monitor_workers = false;
-    config.maxopen_scale = DEF_MAXOPEN_SCALE;
     config.maxdone = DEF_MAXDONE;
     config.maxdata = DEF_MAXDATA;
     config.maxkeylen = DEF_MAXKEYLEN;
     config.qlen_goal = DEF_QLEN_GOAL;
-    config.hash_max_probes = DEF_HASH_MAX_PROBES;
-    config.hash_ttl = DEF_HASH_TTL;
-    config.hash_mlt = DEF_HASH_MLT;
 
     config.mq_module[0] = '\0';
     config.mq_config_file[0] = '\0';
@@ -250,14 +243,10 @@ CONF_Dump(void)
     confdump("syslog.facility = %s", config.syslog_facility_name);
     confdump("monitor.interval = %u", config.monitor_interval);
     confdump("monitor.workers = %s", config.monitor_workers ? "true" : "false");
-    confdump("maxopen.scale = %u", config.maxopen_scale);
     confdump("maxdone = %u", config.maxdone);
     confdump("maxdata = %u", config.maxdata);
     confdump("maxkeylen = %u", config.maxkeylen);
     confdump("qlen.goal = %u", config.qlen_goal);
-    confdump("hash.max_probes = %u", config.hash_max_probes);
-    confdump("hash.ttl = %u", config.hash_ttl);
-    confdump("hash.mlt = %u", config.hash_mlt);
 
     confdump("mq.module = %s", config.mq_module);
     confdump("mq.config_file = %s", config.mq_config_file);

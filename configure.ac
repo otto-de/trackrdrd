@@ -1,6 +1,6 @@
 AC_PREREQ(2.63)
-AC_COPYRIGHT([Copyright (c) 2012-2014 Otto Gmbh & Co KG])
-AC_INIT([trackrdrd], [3.0])
+AC_COPYRIGHT([Copyright (c) 2012-2015 Otto Gmbh & Co KG])
+AC_INIT([trackrdrd], [4.0])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(src/trackrdrd.c)
 AM_CONFIG_HEADER(config.h)
@@ -45,6 +45,21 @@ AM_CONDITIONAL(HAVE_RST2MAN, [test "x$RST2MAN" != "xno"])
 # Check for pkg-config
 PKG_PROG_PKG_CONFIG
 
+PKG_CHECK_MODULES([VARNISH], [varnishapi >= 4.0.0],
+                  [ac_varnish_pkgdatadir=`$PKG_CONFIG --variable=pkgdatadir varnishapi`],
+                  [AC_MSG_ERROR([Varnish >= 4.0.0 installation is required])])
+if test "x$ac_varnish_pkgdatadir" = x; then
+   AC_MSG_ERROR([couldn't get Varnish data dir from pkg-config])
+fi
+ac_varnish_pkgincludedir=`$PKG_CONFIG --variable=pkgincludedir varnishapi`
+ac_varnish_libdir=`$PKG_CONFIG --variable=libdir varnishapi`
+AC_SUBST(VARNISH_CFLAGS)
+AC_SUBST(VARNISH_LIBS)
+AC_SUBST(VARNISH_PKG_INCLUDE, $ac_varnish_pkgincludedir)
+AC_SUBST(VARNISH_SHARE_INCLUDE, "$ac_varnish_pkgdatadir/include")
+AC_SUBST(VARNISH_PKG_LIB, $ac_varnish_libdir)
+AC_SUBST(VARNISH_LIBVARNISH_LIB, "-L$ac_varnish_libdir/varnish")
+
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([execinfo.h])
@@ -62,17 +77,6 @@ case $target in
         AC_CHECK_FUNCS([daemon])
         ;;
 esac
-
-# Varnish source tree
-AC_ARG_VAR([VARNISHSRC], [path to Varnish source tree (mandatory)])
-if test "x$VARNISHSRC" = x; then
-	AC_MSG_ERROR([No Varnish source tree specified])
-fi
-VARNISHSRC=`cd $VARNISHSRC && pwd`
-AC_CHECK_FILE([$VARNISHSRC/include/varnishapi.h],
-	[],
-	[AC_MSG_FAILURE(["$VARNISHSRC" is not a Varnish source directory])]
-)
 
 PKG_CHECK_MODULES([AMQ], [activemq-cpp])
 PKG_CHECK_MODULES([APR], [apr-1])
@@ -94,17 +98,70 @@ AM_CONDITIONAL([AMQ_OPT], [test "$enable_activemq" = yes])
 # libraries, set CFLAGS to what we want them to be for our own code
 
 # This corresponds to FreeBSD's WARNS level 6
-DEVELOPER_CFLAGS="-Wall -Wstrict-prototypes -Wmissing-prototypes -Wpointer-arith -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wshadow -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wnested-externs -Wredundant-decls -Wformat"
+DEVELOPER_CFLAGS=" \
+	-Werror \
+	-Wall \
+	-Wno-format-y2k \
+	-W \
+	-Wstrict-prototypes \
+	-Wmissing-prototypes \
+	-Wpointer-arith \
+	-Wreturn-type \
+	-Wcast-qual \
+	-Wwrite-strings \
+	-Wswitch \
+	-Wshadow \
+	-Wunused-parameter \
+	-Wcast-align \
+	-Wchar-subscripts \
+	-Wnested-externs \
+	-Wextra \
+	-Wno-sign-compare \
+"
 
 # Added for compiling C++ for ActiveMQ.
 # -Wstrict-prototypes, -Wmissing-prototypes & -Wnested-externs invalid for C++
 # activemq-cpp fails on -Wshadow and -Wcast-qual
-DEVELOPER_CXXFLAGS="-Wall -Wpointer-arith -Wreturn-type -Wwrite-strings -Wswitch -Wcast-align -Wunused-parameter -Wchar-subscripts -Winline -Wredundant-decls -Wformat"
+DEVELOPER_CXXFLAGS=" \
+	-Werror \
+	-Wall \
+	-Wno-format-y2k \
+	-W \
+	-Wpointer-arith \
+	-Wreturn-type \
+	-Wwrite-strings \
+	-Wswitch \
+	-Wunused-parameter \
+	-Wcast-align \
+	-Wchar-subscripts \
+	-Wextra \
+	-Wno-sign-compare \
+"
 
-# Additional flags for GCC 4
-EXTRA_DEVELOPER_CFLAGS="-Wextra -Wno-missing-field-initializers -Wno-sign-compare"
+# These are not compliable yet
+DEVELOPER_GCC_CFLAGS="-Wold-style-definition -Wredundant-decls "
+#DEVELOPER_CFLAGS="${DEVELOPER_CFLAGS} ${DEVELOPER_GCC_CFLAGS}"
+
+# These are compilable
+DEVELOPER_CLANG_CFLAGS="-Wmissing-variable-declarations -Wno-string-plus-int"
+# -Wno-empty-body
+#DEVELOPER_CFLAGS="${DEVELOPER_CFLAGS} ${DEVELOPER_CLANG_CFLAGS}"
+
+# --enable-stack-protector
+AC_ARG_ENABLE(stack-protector,
+       AS_HELP_STRING([--enable-stack-protector],[enable stack protector (default is YES)]),
+       [],
+       [enable_stack_protector=yes])
+
+if test "x$enable_stack_protector" != "xno"; then
+	AX_CHECK_COMPILE_FLAG([-fstack-protector],
+		AX_CHECK_LINK_FLAG([-fstack-protector],
+			[DEVELOPER_CFLAGS="${DEVELOPER_CFLAGS} -fstack-protector"], [], []),
+		[], [])
+fi
 
 # --enable-developer-warnings
+# cf. Varnish configure.ac, which checks compile flags more carefully
 AC_ARG_ENABLE(developer-warnings,
         AS_HELP_STRING([--enable-developer-warnings],[enable strict warnings (default is NO)]),
         CFLAGS="${CFLAGS} ${DEVELOPER_CFLAGS}"
@@ -116,26 +173,6 @@ AC_ARG_ENABLE(debugging-symbols,
         AS_HELP_STRING([--enable-debugging-symbols],[enable debugging symbols (default is NO)]),
         CFLAGS="${CFLAGS} -O0 -g -fno-inline"
         CXXFLAGS="${CXXFLAGS} -O0 -g -fno-inline"
-        )
-
-# --enable-diagnostics
-AC_ARG_ENABLE(diagnostics,
-        AS_HELP_STRING([--enable-diagnostics],[enable run-time diagnostics (default is NO)]),
-        CFLAGS="${CFLAGS} -DDIAGNOSTICS"
-        CXXFLAGS="${CXXFLAGS} -DDIAGNOSTICS"
-        )
-
-# --enable-extra-developer-warnings
-AC_ARG_ENABLE(extra-developer-warnings,
-        AS_HELP_STRING([--enable-extra-developer-warnings],[enable even stricter warnings (default is NO)]),
-        [],
-        [enable_extra_developer_warnings=no])
-
-# --enable-werror
-AC_ARG_ENABLE(werror,
-        AS_HELP_STRING([--enable-werror],[use -Werror (default is NO)]),
-        CFLAGS="${CFLAGS} -Werror"
-        CXXFLAGS="${CXXFLAGS} -Werror"
         )
 
 ## From activemq-cpp configure.ac
