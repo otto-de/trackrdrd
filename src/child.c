@@ -438,11 +438,14 @@ CHILD_Main(int readconfig)
             exit(EXIT_FAILURE);
         }
     }
-    
+
     PRIV_Sandbox();
     pw = getpwuid(geteuid());
     AN(pw);
     LOG_Log(LOG_NOTICE, "Running as %s", pw->pw_name);
+
+    if (debug)
+        CONF_Dump();
 
     /* read messaging module */
     if (config.mq_module[0] == '\0') {
