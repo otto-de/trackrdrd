@@ -58,7 +58,7 @@ get_partition(const void *keydata, size_t keylen, int32_t partition_cnt)
     keystr[keylen] = '\0';
     errno = 0;
     key = strtoul(keystr, &endptr, 16);
-    if (errno != 0 || *endptr != '\0' || key < 0 || key > UINT32_MAX)
+    if (errno != 0 || *endptr != '\0' || key > UINT32_MAX)
         return -1;
     if ((partition_cnt & (partition_cnt - 1)) == 0)
         /* partition_cnt is a power of 2 */

@@ -47,7 +47,6 @@
 #define DEFAULT_USER "nobody"
 #define DEFAULT_PID_FILE "/var/run/trackrdrd.pid"
 #define DEFAULT_RESTART_PAUSE 1
-#define DEFAULT_HASH_MAX_PROBES 10
 
 #define confdump(str,val) \
     i += sprintf(verbose_buffer + i, str"\n", (val))
@@ -73,14 +72,10 @@ getConfigContent(void)
     confdump("syslog.facility = %s", config.syslog_facility_name);
     confdump("monitor.interval = %u", config.monitor_interval);
     confdump("monitor.workers = %s", config.monitor_workers ? "true" : "false");
-    confdump("maxopen.scale = %u", config.maxopen_scale);
     confdump("maxdone = %u", config.maxdone);
     confdump("maxdata = %u", config.maxdata);
     confdump("maxkeylen = %u", config.maxkeylen);
     confdump("qlen.goal = %u", config.qlen_goal);
-    confdump("hash.max_probes = %u", config.hash_max_probes);
-    confdump("hash.ttl = %u", config.hash_ttl);
-    confdump("hash.mlt = %u", config.hash_mlt);
 
     confdump("mq.module = %s", config.mq_module);
     confdump("mq.config_file = %s", config.mq_config_file);
@@ -121,9 +116,6 @@ static char
         "Default pid file name expected: \"%s\", but found: \"%s\"",
         DEFAULT_PID_FILE, config.user_name);
     MASSERT(DEFAULT_RESTART_PAUSE == config.restart_pause);
-    VMASSERT(DEFAULT_HASH_MAX_PROBES == config.hash_max_probes,
-        "Default hash_max_probes expected: \"%i\", but found: \"%i\"",
-        DEFAULT_HASH_MAX_PROBES, config.hash_max_probes);
     return NULL;
 }
 
@@ -194,7 +186,7 @@ static const char
 
     returnIfNotNull(
         readAndFindError("trackrdrd_010.conf",
-                         "Error in trackrdrd_010.conf line 16 "
+                         "Error in trackrdrd_010.conf line 12 "
                          "(Invalid argument): "
                          "'unknown.module = /my/path/module.so'\n"));
     return NULL;

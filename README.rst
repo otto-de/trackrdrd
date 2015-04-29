@@ -13,6 +13,16 @@ Tracking Log Reader demon
 :Version: 3.0
 :Manual section: 3
 
+**IMPORTANT NOTE: A new version of the Tracking Reader that is
+compatible with Varnish version 4 is currently under development in
+the master branch, but it WILL NOT WORK in its present form, and this
+documentation has not been updated.**
+
+Use branch 3.0 for a version that is compatible with Varnish 3.0.x.
+
+Check back here again if you're looking for a version that runs with
+Varnish 4. When this message goes away, and the documentation is
+updated, you can give it a try.
 
 SYNOPSIS
 ========

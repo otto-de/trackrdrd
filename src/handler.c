@@ -42,10 +42,9 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <errno.h>
 
-#ifndef HAVE_EXECINFO_H
-#include "compat/execinfo.h"
-#else
+#ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
 #endif
 
@@ -65,6 +64,8 @@ HNDL_Terminate(int sig)
     (void) sig;
     term = 1;
 }
+
+#ifdef HAVE_EXECINFO_H
 
 /*
  * This hack is almost verbatim from varnishd.c -- attempt to run nm(1) on
@@ -172,19 +173,27 @@ stacktrace(void)
     }
 }
 
+#endif
+
 void
 HNDL_Init(const char *a0)
 {
+#ifdef HAVE_EXECINFO_H
     symbol_hack(a0);
+#else
+    (void) a0;
+#endif
 }
 
 void
 HNDL_Abort(int sig)
 {
     AZ(sigaction(SIGABRT, &default_action, NULL));
-    LOG_Log(LOG_ALERT, "Received signal %d (%s), stacktrace follows", sig,
-        strsignal(sig));
+    LOG_Log(LOG_ALERT, "Received signal %d (%s)", sig, strsignal(sig));
+#ifdef HAVE_EXECINFO_H
+    LOG_Log0(LOG_NOTICE, "Stacktrace follows");
     stacktrace();
+#endif
     DATA_Dump();
     MON_Output();
     LOG_Log0(LOG_ALERT, "Aborting");

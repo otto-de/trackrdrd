@@ -1,9 +1,9 @@
-INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) -I$(top_srcdir)/include
+AM_CPPFLAGS = @VARNISH_CFLAGS@ -I$(top_srcdir)/include
 
-TESTS = test_parse test_data test_hash test_append test_mq test_spmcq	\
-	test_config test_spmcq_loop.sh test_worker regress.sh
+TESTS = test_parse test_data test_append test_mq test_spmcq	\
+	test_config test_spmcq_loop.sh test_worker # regress.sh
 
-check_PROGRAMS = test_parse test_data test_hash test_append test_mq	\
+check_PROGRAMS = test_parse test_data test_append test_mq	\
 	test_spmcq test_config test_worker
 
 test_parse_SOURCES = \
@@ -13,7 +13,8 @@ test_parse_SOURCES = \
 
 test_parse_LDADD = \
 	-lm \
-	../parse.$(OBJEXT)
+	../parse.$(OBJEXT) \
+	../assert.$(OBJEXT)
 
 test_data_SOURCES = \
 	minunit.h \
@@ -21,40 +22,15 @@ test_data_SOURCES = \
 	../trackrdrd.h
 
 test_data_LDADD = \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	../data.$(OBJEXT)
-
-test_hash_SOURCES = \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	../child.c \
-	../trackrdrd.h
-
-test_hash_LDADD = \
-	-ldl \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	$(VARNISHSRC)/lib/libvarnishapi/libvarnishapi.la \
-	../worker.$(OBJEXT) \
-	../log.$(OBJEXT) \
-	../spmcq.$(OBJEXT) \
 	../data.$(OBJEXT) \
-	../assert.$(OBJEXT) \
-	../monitor.$(OBJEXT) \
-	../parse.$(OBJEXT) \
-	../config.$(OBJEXT) \
-	../config_common.$(OBJEXT) \
-	../sandbox.$(OBJEXT)
-
-test_hash_CFLAGS = -DTEST_DRIVER
+	../assert.$(OBJEXT)
 
 test_append_SOURCES = \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
 	../child.c \
 	../trackrdrd.h
 
 test_append_LDADD = \
-	-ldl \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	$(VARNISHSRC)/lib/libvarnishapi/libvarnishapi.la \
+	-ldl -lm \
 	../worker.$(OBJEXT) \
 	../log.$(OBJEXT) \
 	../spmcq.$(OBJEXT) \
@@ -64,9 +40,11 @@ test_append_LDADD = \
 	../parse.$(OBJEXT) \
 	../config.$(OBJEXT) \
 	../config_common.$(OBJEXT) \
-	../sandbox.$(OBJEXT)
+	../sandbox.$(OBJEXT) \
+	../vtim.$(OBJEXT) \
+	@VARNISH_LIBS@
 
-test_append_CFLAGS = -DAPPEND_TEST
+test_append_CFLAGS = -DTEST_DRIVER
 
 test_mq_SOURCES = \
 	minunit.h \
@@ -77,7 +55,7 @@ test_mq_SOURCES = \
 test_mq_LDADD = \
 	-ldl \
 	-lm \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la
+	@VARNISH_LIBS@
 
 test_spmcq_SOURCES = \
 	minunit.h \
@@ -85,8 +63,8 @@ test_spmcq_SOURCES = \
 	../trackrdrd.h
 
 test_spmcq_LDADD = \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
-	../spmcq.$(OBJEXT)
+	../spmcq.$(OBJEXT) \
+	../assert.$(OBJEXT)
 
 test_config_SOURCES = \
 	minunit.h \
@@ -99,21 +77,19 @@ test_config_SOURCES = \
 	../trackrdrd.h
 
 test_config_LDADD = \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la
-
+	../assert.$(OBJEXT) \
+	-lm
 
 test_worker_SOURCES = \
 	minunit.h \
 	test_worker.c \
-	../monitor.c \
 	../trackrdrd.h
 
 test_worker_LDADD = \
-	-ldl \
-	$(VARNISHSRC)/lib/libvarnish/libvarnish.la \
+	-ldl -lm \
 	../worker.$(OBJEXT) \
 	../log.$(OBJEXT) \
 	../spmcq.$(OBJEXT) \
-	../data.$(OBJEXT)
-
-test_worker_CFLAGS = -DTEST_DRIVER
+	../data.$(OBJEXT) \
+	../assert.$(OBJEXT) \
+	../vtim.$(OBJEXT)

@@ -1,4 +1,4 @@
-INCLUDES = -I$(VARNISHSRC)/include -I$(VARNISHSRC) -I$(top_srcdir)/include
+AM_CPPFLAGS = @VARNISH_CFLAGS@ -I$(top_srcdir)/include
 
 TESTS = test_activemq
 

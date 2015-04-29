@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <syslog.h>
 #include <string.h>
+#include <errno.h>
 
 #include "trackrdrd.h"
 #include "vas.h"
@@ -125,10 +126,9 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
     int errnum;
     
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-    assert(entry->state == DATA_DONE);
+    assert(OCCUPIED(entry));
     AN(mq_worker);
 
-    /* XXX: report entry->incomplete to backend ? */
     AZ(memchr(entry->data, '\0', entry->end));
     errnum = mqf.send(*mq_worker, entry->data, entry->end,
                       entry->key, entry->keylen, &err);
@@ -180,7 +180,7 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
         wrk->sends++;
         MON_StatsUpdate(STATS_SENT);
         LOG_Log(LOG_DEBUG, "Worker %d: Successfully sent data [%.*s]", wrk->id,
-            entry->end, entry->data);
+                entry->end, entry->data);
     }
     DATA_Reset(entry);
     VSTAILQ_INSERT_TAIL(&wrk->wrk_freelist, entry, freelist);
@@ -340,15 +340,12 @@ WRK_Init(void)
     }
 
     spmcq_datawaiter = 0;
-    AZ(pthread_mutex_init(&spmcq_datawaiter_lock, &attr_lock));
-    AZ(pthread_cond_init(&spmcq_datawaiter_cond, &attr_cond));
+    AZ(pthread_mutex_init(&spmcq_datawaiter_lock, NULL));
+    AZ(pthread_cond_init(&spmcq_datawaiter_cond, NULL));
 
     spmcq_roomwaiter = 0;
-    AZ(pthread_mutex_init(&spmcq_roomwaiter_lock, &attr_lock));
-    AZ(pthread_cond_init(&spmcq_roomwaiter_cond, &attr_cond));
-
-    AZ(pthread_mutexattr_destroy(&attr_lock));
-    AZ(pthread_condattr_destroy(&attr_cond)); 
+    AZ(pthread_mutex_init(&spmcq_roomwaiter_lock, NULL));
+    AZ(pthread_cond_init(&spmcq_roomwaiter_cond, NULL));
 
     atexit(wrk_cleanup);
     return 0;
@@ -376,7 +373,7 @@ WRK_Restart(void)
                 && wrk->restarts == config.thread_restarts) {
                 LOG_Log(LOG_ALERT, "Worker %d: too many restarts, abandoning",
                     wrk->id);
-                dtbl.w_stats.abandoned++;
+                abandoned++;
                 wrk->state = WRK_ABANDONED;
                 continue;
             }

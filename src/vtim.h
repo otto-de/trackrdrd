@@ -1,10 +1,9 @@
 /*-
- * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012-2014 Otto Gmbh & Co KG
- * All rights reserved
- * Use only with permission
+ * Copyright (c) 2006 Verdens Gang AS
+ * Copyright (c) 2006-2011 Varnish Software AS
+ * All rights reserved.
  *
- * Author: Geoffrey Simmons <geoffrey.simmons@uplex.de>
+ * Author: Poul-Henning Kamp <phk@phk.freebsd.dk>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,35 +28,12 @@
  *
  */
 
-#include <syslog.h>
-#include <unistd.h>
-#include <errno.h>
-
-#ifdef __linux__
-#include <sys/prctl.h>
-#endif
-
-#include "vas.h"
-
-#include "trackrdrd.h"
-
-/*--------------------------------------------------------------------*/
-
-/* cf. varnish mgt_sandbox       */
-/* XXX: currently only for Linux */
-
-void
-PRIV_Sandbox(void)
-{
-    if (geteuid() == 0) {
-        XXXAZ(setgid(config.gid));
-        XXXAZ(setuid(config.uid));
-    }
-    else
-        LOG_Log0(LOG_INFO, "Not running as root, no privilege separation");
-
-#ifdef __linux__
-    if (prctl(PR_SET_DUMPABLE, 1) != 0)
-        LOG_Log0(LOG_INFO, "Could not set dumpable bit, core dumps turned off");
-#endif
-}
+/* from libvarnish/vtim.c */
+#define VTIM_FORMAT_SIZE 30
+void VTIM_format(double t, char *p);
+double VTIM_parse(const char *p);
+double VTIM_mono(void);
+double VTIM_real(void);
+void VTIM_sleep(double t);
+struct timespec VTIM_timespec(double t);
+struct timeval VTIM_timeval(double t);
