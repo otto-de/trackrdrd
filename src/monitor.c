@@ -41,13 +41,14 @@
 static int run;
 
 static pthread_mutex_t	mutex;
-static unsigned		occ;
-static unsigned	long	sent;		/* Sent successfully to MQ */
-static unsigned	long	failed;		/* MQ send fails */
-static unsigned	long	reconnects;	/* Reconnects to MQ */
-static unsigned	long	restarts;	/* Worker thread restarts */
-static unsigned		occ_hi;		/* Occupancy high water mark */ 
-static unsigned		occ_hi_this;	/* Occupancy high water mark
+static unsigned		occ = 0;
+static unsigned	long	sent = 0;	/* Sent successfully to MQ */
+static unsigned	long	bytes = 0;	/* Total bytes successfully sent */
+static unsigned	long	failed = 0;	/* MQ send fails */
+static unsigned	long	reconnects = 0;	/* Reconnects to MQ */
+static unsigned	long	restarts = 0;	/* Worker thread restarts */
+static unsigned		occ_hi = 0;	/* Occupancy high water mark */ 
+static unsigned		occ_hi_this = 0;/* Occupancy high water mark
                                            this reporting interval*/
 
 static void
@@ -75,9 +76,9 @@ log_output(void)
     /* XXX: seen, bytes sent */
     LOG_Log(LOG_INFO, "Workers: active=%d running=%d waiting=%d running_hi=%d "
             "exited=%d abandoned=%u reconnects=%lu restarts=%lu sent=%lu "
-            "failed=%lu",
+            "failed=%lu bytes=%lu",
             wrk_active, wrk_running, spmcq_datawaiter, wrk_running_hi,
-            WRK_Exited(), abandoned, reconnects, restarts, sent, failed);
+            WRK_Exited(), abandoned, reconnects, restarts, sent, failed, bytes);
 
     /* locking would be overkill */
     occ_hi_this = 0;
@@ -153,13 +154,14 @@ MON_StatsInit(void)
 }
 
 void
-MON_StatsUpdate(stats_update_t update)
+MON_StatsUpdate(stats_update_t update, unsigned n)
 {
     AZ(pthread_mutex_lock(&mutex));
     switch(update) {
         
     case STATS_SENT:
         sent++;
+        bytes += n;
         occ--;
         break;
         

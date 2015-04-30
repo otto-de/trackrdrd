@@ -78,13 +78,14 @@ struct worker_data_s {
     unsigned		wrk_nfree;
 
     /* stats */
-    unsigned deqs;
-    unsigned waits;
-    unsigned sends;
-    unsigned fails;
-    unsigned recoverables;
-    unsigned reconnects;
-    unsigned restarts;
+    unsigned long deqs;
+    unsigned long waits;
+    unsigned long sends;
+    unsigned long bytes;
+    unsigned long fails;
+    unsigned long recoverables;
+    unsigned long reconnects;
+    unsigned long restarts;
 };
 
 typedef struct worker_data_s worker_data_t;
@@ -137,7 +138,7 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
                 wrk->id, err);
         if (errnum > 0) {
             wrk->recoverables++;
-            MON_StatsUpdate(STATS_FAILED);
+            MON_StatsUpdate(STATS_FAILED, 0);
         }
         else {
             /* Non-recoverable error */
@@ -149,12 +150,12 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
                         err);
                 LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
                         entry->end, entry->data);
-                MON_StatsUpdate(STATS_FAILED);
+                MON_StatsUpdate(STATS_FAILED, 0);
             }
             else {
                 wrk->reconnects++;
                 wrk_log_connection(*mq_worker, wrk->id);
-                MON_StatsUpdate(STATS_RECONNECT);
+                MON_StatsUpdate(STATS_RECONNECT, 0);
                 errnum = mqf.send(*mq_worker, entry->data, entry->end,
                                   entry->key, entry->keylen, &err);
                 if (errnum != 0) {
@@ -162,7 +163,7 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
                             "after reconnect: %s", wrk->id, err);
                     if (errnum > 0) {
                         wrk->recoverables++;
-                        MON_StatsUpdate(STATS_FAILED);
+                        MON_StatsUpdate(STATS_FAILED, 0);
                     }
                     else {
                         /* Fail after reconnect, give up */
@@ -170,7 +171,7 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
                         wrk->status = EXIT_FAILURE;
                         LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]",
                                 wrk->id, entry->end, entry->data);
-                        MON_StatsUpdate(STATS_FAILED);
+                        MON_StatsUpdate(STATS_FAILED, 0);
                     }
                 }
             }
@@ -178,7 +179,8 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
     }
     if (errnum == 0) {
         wrk->sends++;
-        MON_StatsUpdate(STATS_SENT);
+        wrk->bytes += entry->end;
+        MON_StatsUpdate(STATS_SENT, entry->end);
         LOG_Log(LOG_DEBUG, "Worker %d: Successfully sent data [%.*s]", wrk->id,
                 entry->end, entry->data);
     }
@@ -335,7 +337,7 @@ WRK_Init(void)
         wrk->magic = WORKER_DATA_MAGIC;
         wrk->id = i + 1;
         wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
-            = wrk->restarts = wrk->recoverables = 0;
+            = wrk->restarts = wrk->recoverables = wrk->bytes = 0;
         wrk->state = WRK_NOTSTARTED;
     }
 
@@ -384,7 +386,7 @@ WRK_Restart(void)
             wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
                 = 0;
             wrk->restarts++;
-            MON_StatsUpdate(STATS_RESTART);
+            MON_StatsUpdate(STATS_RESTART, 0);
             wrk->state = WRK_NOTSTARTED;
             if (pthread_create(&thread_data[i].worker, NULL, wrk_main, wrk)
                 != 0) {
@@ -410,11 +412,11 @@ WRK_Stats(void)
     for (int i = 0; i < config.nworkers; i++) {
         wrk = thread_data[i].wrk_data;
         LOG_Log(LOG_INFO,
-                "Worker %d (%s): seen=%u waits=%u sent=%u reconnects=%u "
-                "restarts=%u failed_recoverable=%u failed=%u",
+                "Worker %d (%s): seen=%lu waits=%lu sent=%lu bytes=%lu "
+                "reconnects=%lu restarts=%lu failed_recoverable=%lu failed=%lu",
                 wrk->id, statename[wrk->state], wrk->deqs, wrk->waits,
-                wrk->sends, wrk->reconnects, wrk->restarts, wrk->recoverables,
-                wrk->fails);
+                wrk->sends, wrk->bytes, wrk->reconnects, wrk->restarts,
+                wrk->recoverables, wrk->fails);
     }
 }
 

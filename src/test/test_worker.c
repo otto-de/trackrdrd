@@ -53,9 +53,10 @@ static void *mqh;
 /* Called from worker.c, but we don't want to pull in all of monitor.c's
    dependecies. */
 void
-MON_StatsUpdate(stats_update_t update)
+MON_StatsUpdate(stats_update_t update, unsigned n)
 {
     (void) update;
+    (void) n;
 }
 
 static void

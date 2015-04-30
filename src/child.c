@@ -411,7 +411,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
              (unsigned) de->reqend_t.tv_sec, de->reqend_t.tv_usec);
     append(de, SLT_Timestamp, de->xid, reqend_str, REQEND_T_LEN - 1);
     de->occupied = 1;
-    MON_StatsUpdate(STATS_OCCUPANCY);
+    MON_StatsUpdate(STATS_OCCUPANCY, 0);
     data_submit(de);
         
     if (term)
