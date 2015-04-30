@@ -210,7 +210,6 @@ data_submit(dataentry *de)
 
     CHECK_OBJ_NOTNULL(de, DATA_MAGIC);
     assert(OCCUPIED(de));
-    assert(de->hasdata);
     AZ(memchr(de->data, '\0', de->end));
     if (debug)
         LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", de->end, de->data);
@@ -307,7 +306,7 @@ addkey(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *key,
 static int
 dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 {
-    int status = DISPATCH_RETURN_OK;
+    int status = DISPATCH_RETURN_OK, hasdata = 0;
     dataentry *de = NULL;
     char reqend_str[REQEND_T_LEN];
     int32_t vxid;
@@ -324,7 +323,6 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     }
     CHECK_OBJ(de, DATA_MAGIC);
     assert(!OCCUPIED(de));
-    de->hasdata = 0;
     seen++;
 
     for (struct VSL_transaction *t = pt[0]; t != NULL; t = *++pt) {
@@ -385,7 +383,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 
                 if (data_type == VCL_LOG_DATA) {
                     append(de, tag, xid, data, datalen);
-                    de->hasdata = 1;
+                    hasdata = 1;
                 }
                 else
                     addkey(de, tag, xid, data, datalen);
@@ -416,7 +414,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
         }
     }
 
-    if (!de->hasdata) {
+    if (!hasdata) {
         no_data++;
         data_free(de);
         return status;
