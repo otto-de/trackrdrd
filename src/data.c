@@ -111,7 +111,6 @@ DATA_Reset(dataentry *entry)
     *entry->data = '\0';
     entry->keylen = 0;
     *entry->key = '\0';
-    entry->hasdata = 0;
 }
 
 /* 

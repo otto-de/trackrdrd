@@ -114,20 +114,18 @@ void WRK_Shutdown(void);
 
 unsigned global_nfree;
 
-/* XXX: do we need xid, hasdata, reqend_t? all temp in dispatch? */
 struct dataentry_s {
     unsigned 			magic;
 #define DATA_MAGIC 0xb41cb1e1
     VSTAILQ_ENTRY(dataentry_s)	freelist;
     VSTAILQ_ENTRY(dataentry_s)	spmcq;
 
-    unsigned			end;	/* End of string index in data */
-    unsigned			keylen;
-    
     char			*data;
     char			*key;
-    unsigned			occupied:1;
-    unsigned			hasdata:1;
+
+    unsigned			end;	/* End of string index in data */
+    unsigned			keylen;
+    char			occupied;
 };
 typedef struct dataentry_s dataentry;
 

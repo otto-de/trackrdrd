@@ -60,7 +60,6 @@ static char
     for (int i = 0; i < config.max_records; i++) {
         MCHECK_OBJ_NOTNULL(&entrytbl[i], DATA_MAGIC);
         MASSERT(!OCCUPIED(&entrytbl[i]));
-        MAZ(entrytbl[i].hasdata);
         MAN(entrytbl[i].data);
         MAN(entrytbl[i].key);
         MAZ(entrytbl[i].end);

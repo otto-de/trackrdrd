@@ -166,7 +166,6 @@ static const char
         MAZ(*entry->data);
         MAZ(entry->keylen);
         MAZ(*entry->key);
-        MAZ(entry->hasdata);
     }
 
     return NULL;
