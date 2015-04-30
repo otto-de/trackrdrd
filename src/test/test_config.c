@@ -73,7 +73,7 @@ getConfigContent(void)
     confdump("monitor.interval = %u", config.monitor_interval);
     confdump("monitor.workers = %s", config.monitor_workers ? "true" : "false");
     confdump("max.records = %u", config.max_records);
-    confdump("maxdata = %u", config.maxdata);
+    confdump("max.reclen = %u", config.max_reclen);
     confdump("maxkeylen = %u", config.maxkeylen);
     confdump("qlen.goal = %u", config.qlen_goal);
 

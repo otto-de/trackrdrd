@@ -119,7 +119,7 @@ CONF_Add(const char *lval, const char *rval)
     confString("mq.module", mq_module);
     confString("mq.config_file", mq_config_file);
 
-    confUnsigned("maxdata", maxdata);
+    confUnsigned("max.reclen", max_reclen);
     confUnsigned("maxkeylen", maxkeylen);
     confUnsigned("qlen.goal", qlen_goal);
     confUnsigned("nworkers", nworkers);
@@ -207,7 +207,7 @@ CONF_Init(void)
     config.monitor_interval = 30;
     config.monitor_workers = false;
     config.max_records = DEF_MAX_RECORDS;
-    config.maxdata = DEF_MAXDATA;
+    config.max_reclen = DEF_MAX_RECLEN;
     config.maxkeylen = DEF_MAXKEYLEN;
     config.qlen_goal = DEF_QLEN_GOAL;
     config.idle_pause = DEF_IDLE_PAUSE;
@@ -258,7 +258,7 @@ CONF_Dump(int level)
     confdump(level, "monitor.workers = %s",
              config.monitor_workers ? "true" : "false");
     confdump(level, "max.records = %u", config.max_records);
-    confdump(level, "maxdata = %u", config.maxdata);
+    confdump(level, "max.reclen = %u", config.max_reclen);
     confdump(level, "maxkeylen = %u", config.maxkeylen);
     confdump(level, "qlen.goal = %u", config.qlen_goal);
 

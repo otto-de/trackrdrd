@@ -52,7 +52,7 @@ static char
     printf("... testing data table initialization\n");
     
     config.max_records = DEF_MAX_RECORDS;
-    config.maxdata = DEF_MAXDATA;
+    config.max_reclen = DEF_MAX_RECLEN;
     config.maxkeylen = DEF_MAXKEYLEN;
     err = DATA_Init();
     VMASSERT(err == 0, "DATA_Init: %s", strerror(err));
@@ -76,20 +76,20 @@ static char
 static const char
 *test_data_set_get(void)
 {
-    char data[DEF_MAXDATA], key[DEF_MAXKEYLEN];
+    char data[DEF_MAX_RECLEN], key[DEF_MAXKEYLEN];
     
     printf("... testing data write and read\n");
 
     for (int i = 0; i < config.max_records; i++) {
-        memset(entrytbl[i].data, 'd', DEF_MAXDATA);
+        memset(entrytbl[i].data, 'd', DEF_MAX_RECLEN);
         memset(entrytbl[i].key,  'k', DEF_MAXKEYLEN);
     }
 
-    memset(data, 'd', DEF_MAXDATA);
+    memset(data, 'd', DEF_MAX_RECLEN);
     memset(key,  'k', DEF_MAXKEYLEN);
 
     for (int i = 0; i < config.max_records; i++) {
-        MASSERT(memcmp(entrytbl[i].data, data, DEF_MAXDATA) == 0);
+        MASSERT(memcmp(entrytbl[i].data, data, DEF_MAX_RECLEN) == 0);
         MASSERT(memcmp(entrytbl[i].key,  key,  DEF_MAXKEYLEN) == 0);
     }
 

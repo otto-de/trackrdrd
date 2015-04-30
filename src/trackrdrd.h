@@ -179,8 +179,8 @@ struct config {
     unsigned	max_records;	/* max number of buffered records */
 #define DEF_MAX_RECORDS 1024
     
-    unsigned	maxdata;  	/* size of char data buffer */
-#define DEF_MAXDATA 1024
+    unsigned	max_reclen;  	/* size of char data buffer */
+#define DEF_MAX_RECLEN 1024
 
     unsigned	maxkeylen;	/* size of shard key buffer */
 #define DEF_MAXKEYLEN 128

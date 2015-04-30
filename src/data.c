@@ -67,7 +67,7 @@ data_Cleanup(void)
 int
 DATA_Init(void)
 {
-    unsigned bufsize = config.maxdata + config.maxkeylen;
+    unsigned bufsize = config.max_reclen + config.maxkeylen;
     
     /*
      * we want enough space to accomodate all open and done records
@@ -91,7 +91,7 @@ DATA_Init(void)
     for (unsigned i = 0; i < config.max_records; i++) {
         entrytbl[i].magic = DATA_MAGIC;
         entrytbl[i].data = &buf[i * bufsize];
-        entrytbl[i].key = &buf[(i * bufsize) + config.maxdata];
+        entrytbl[i].key = &buf[(i * bufsize) + config.max_reclen];
         VSTAILQ_INSERT_TAIL(&freehead, &entrytbl[i], freelist);
         global_nfree++;
     }
