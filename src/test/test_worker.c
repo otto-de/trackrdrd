@@ -167,8 +167,6 @@ static const char
         MAZ(entry->keylen);
         MAZ(*entry->key);
         MAZ(entry->hasdata);
-        MAZ(entry->reqend_t.tv_sec);
-        MAZ(entry->reqend_t.tv_usec);
     }
 
     return NULL;

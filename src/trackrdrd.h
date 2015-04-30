@@ -121,7 +121,6 @@ struct dataentry_s {
     VSTAILQ_ENTRY(dataentry_s)	freelist;
     VSTAILQ_ENTRY(dataentry_s)	spmcq;
 
-    struct timeval		reqend_t;
     unsigned			end;	/* End of string index in data */
     unsigned			keylen;
     
