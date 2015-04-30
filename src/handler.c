@@ -58,13 +58,6 @@
 
 /*--------------------------------------------------------------------*/
 
-void
-HNDL_Terminate(int sig)
-{
-    (void) sig;
-    term = 1;
-}
-
 #ifdef HAVE_EXECINFO_H
 
 /*

@@ -79,14 +79,10 @@ struct mqf {
                 strerror(errno));					\
     } while(0)
 
-volatile sig_atomic_t term;
-
-struct sigaction terminate_action, ignore_action, stacktrace_action,
-    default_action;
+struct sigaction ignore_action, stacktrace_action, default_action;
 
 void HNDL_Init(const char *a0);
 void HNDL_Abort(int sig);
-void HNDL_Terminate(int sig);
 
 /* sandbox.c */
 
@@ -275,7 +271,7 @@ int CONF_Add(const char *lval, const char *rval);
  *          <0 if the file was read but the contents could not be processed
  */
 int CONF_ReadDefault(void);
-void CONF_Dump(void);
+void CONF_Dump(int level);
 
 /* log.c */
 typedef void log_log_t(int level, const char *msg, ...);
