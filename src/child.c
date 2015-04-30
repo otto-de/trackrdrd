@@ -399,7 +399,8 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
                             reqend_t.tv_usec);
 
                 if (reqend_t.tv_sec > latest_t.tv_sec
-                    || reqend_t.tv_usec > latest_t.tv_usec)
+                    || (reqend_t.tv_sec == latest_t.tv_sec
+                        && reqend_t.tv_usec > latest_t.tv_usec))
                     memcpy(&latest_t, &reqend_t, sizeof(struct timeval));
                 break;
 
