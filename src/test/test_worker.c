@@ -101,7 +101,7 @@ static char
     printf("... testing worker initialization\n");
 
     config.max_records = DEF_MAX_RECORDS;
-    config.maxdata = DEF_MAXDATA;
+    config.max_reclen = DEF_MAX_RECLEN;
     config.maxkeylen = DEF_MAXKEYLEN;
     config.nworkers = NWORKERS;
     strcpy(config.mq_config_file, MQ_CONFIG);

@@ -259,7 +259,7 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
 
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     /* Data overflow */
-    if (entry->end + datalen + 1 > config.maxdata) {
+    if (entry->end + datalen + 1 > config.max_reclen) {
         LOG_Log(LOG_ERR, "%s: Data too long, XID=%d, current length=%d, "
             "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
             datalen, data);
@@ -345,7 +345,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 
             if (de->end == 0) {
                 de->xid = t->vxid;
-                snprintf(de->data, config.maxdata, "XID=%u", t->vxid);
+                snprintf(de->data, config.max_reclen, "XID=%u", t->vxid);
                 de->end = strlen(de->data);
                 if (de->end > len_hi)
                     len_hi = de->end;
@@ -757,10 +757,10 @@ static char
 
     printf("... testing data append (expect an ERR)\n");
 
-    config.maxdata = DEF_MAXDATA;
+    config.max_reclen = DEF_MAX_RECLEN;
     entry = calloc(1, sizeof(dataentry));
     AN(entry);
-    entry->data = calloc(1, config.maxdata);
+    entry->data = calloc(1, config.max_reclen);
     AN(entry->data);
     entry->magic = DATA_MAGIC;
     truncated = len_hi = 0;
