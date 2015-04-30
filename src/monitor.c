@@ -42,10 +42,10 @@ static int run;
 
 static pthread_mutex_t	mutex;
 static unsigned		occ;
-static unsigned		sent;		/* Sent successfully to MQ */
-static unsigned		failed;		/* MQ send fails */
-static unsigned		reconnects;	/* Reconnects to MQ */
-static unsigned		restarts;	/* Worker thread restarts */
+static unsigned	long	sent;		/* Sent successfully to MQ */
+static unsigned	long	failed;		/* MQ send fails */
+static unsigned	long	reconnects;	/* Reconnects to MQ */
+static unsigned	long	restarts;	/* Worker thread restarts */
 static unsigned		occ_hi;		/* Occupancy high water mark */ 
 static unsigned		occ_hi_this;	/* Occupancy high water mark
                                            this reporting interval*/
@@ -53,7 +53,12 @@ static unsigned		occ_hi_this;	/* Occupancy high water mark
 static void
 log_output(void)
 {
-    int wrk_running = WRK_Running();
+    static int wrk_running_hi = 0;
+    int wrk_active = WRK_Running();
+    int wrk_running = wrk_active - spmcq_datawaiter;
+
+    if (wrk_running > wrk_running_hi)
+        wrk_running_hi = wrk_running;
 
     LOG_Log(LOG_INFO, "Data table: len=%u occ=%u occ_hi=%u occ_hi_this=%u "
             "global_free=%u",
@@ -64,13 +69,15 @@ log_output(void)
     RDR_Stats();
 #endif
     
-    if (wrk_running < config.nworkers)
-        LOG_Log(LOG_WARNING, "%d of %d workers running", wrk_running,
+    if (wrk_active < config.nworkers)
+        LOG_Log(LOG_WARNING, "%d of %d workers active", wrk_running,
                 config.nworkers);
     /* XXX: seen, bytes sent */
-    LOG_Log(LOG_INFO, "Workers: running=%d sent=%lu failed=%u reconnects=%u "
-            "restarts=%u abandoned=%u",
-            wrk_running, sent, failed, reconnects, restarts, failed, abandoned);
+    LOG_Log(LOG_INFO, "Workers: active=%d running=%d waiting=%d running_hi=%d "
+            "exited=%d abandoned=%u reconnects=%lu restarts=%lu sent=%lu "
+            "failed=%lu",
+            wrk_active, wrk_running, spmcq_datawaiter, wrk_running_hi,
+            WRK_Exited(), abandoned, reconnects, restarts, sent, failed);
 
     /* locking would be overkill */
     occ_hi_this = 0;
