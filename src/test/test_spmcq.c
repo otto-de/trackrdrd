@@ -44,7 +44,7 @@
 
 #define NCON 10
 
-#define TABLE_SIZE (DEF_MAXDONE)
+#define TABLE_SIZE (DEF_MAX_RECORDS)
 
 int run;
 
@@ -81,7 +81,7 @@ static void
     srand48(time(NULL));
     unsigned xid = (unsigned int) lrand48();
 
-    for (int i = 0; i < config.maxdone; i++) {
+    for (int i = 0; i < config.max_records; i++) {
         entries[i].xid = xid;
         debug_print("Producer: enqueue %d (xid = %u)\n", ++enqs, xid);
         SPMCQ_Enq(&entries[i]);
@@ -170,7 +170,7 @@ static char
         return(errmsg);
     }
     
-    config.maxdone = DEF_MAXDONE;
+    config.max_records = DEF_MAX_RECORDS;
     err = SPMCQ_Init();
     sprintf(errmsg, "SPMCQ_Init: %s", strerror(err));
     mu_assert(errmsg, err == 0);

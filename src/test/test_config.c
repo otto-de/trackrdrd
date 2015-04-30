@@ -72,7 +72,7 @@ getConfigContent(void)
     confdump("syslog.facility = %s", config.syslog_facility_name);
     confdump("monitor.interval = %u", config.monitor_interval);
     confdump("monitor.workers = %s", config.monitor_workers ? "true" : "false");
-    confdump("maxdone = %u", config.maxdone);
+    confdump("max.records = %u", config.max_records);
     confdump("maxdata = %u", config.maxdata);
     confdump("maxkeylen = %u", config.maxkeylen);
     confdump("qlen.goal = %u", config.qlen_goal);

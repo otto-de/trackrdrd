@@ -128,14 +128,14 @@ CONF_Add(const char *lval, const char *rval)
     confUnsigned("thread.restarts", thread_restarts);
     confUnsigned("monitor.interval", monitor_interval);
 
-    if (strcmp(lval, "maxdone") == 0) {
+    if (strcmp(lval, "max.records") == 0) {
         unsigned int i;
         int err = conf_getUnsignedInt(rval, &i);
         if (err != 0)
             return err;
-        config.maxdone = i;
+        config.max_records = i;
         if (!qlen_configured)
-            config.qlen_goal = config.maxdone >> 1;
+            config.qlen_goal = config.max_records >> 1;
         return(0);
     }
 
@@ -206,7 +206,7 @@ CONF_Init(void)
     config.syslog_facility = LOG_LOCAL0;
     config.monitor_interval = 30;
     config.monitor_workers = false;
-    config.maxdone = DEF_MAXDONE;
+    config.max_records = DEF_MAX_RECORDS;
     config.maxdata = DEF_MAXDATA;
     config.maxkeylen = DEF_MAXKEYLEN;
     config.qlen_goal = DEF_QLEN_GOAL;
@@ -257,7 +257,7 @@ CONF_Dump(int level)
     confdump(level, "monitor.interval = %u", config.monitor_interval);
     confdump(level, "monitor.workers = %s",
              config.monitor_workers ? "true" : "false");
-    confdump(level, "maxdone = %u", config.maxdone);
+    confdump(level, "max.records = %u", config.max_records);
     confdump(level, "maxdata = %u", config.maxdata);
     confdump(level, "maxkeylen = %u", config.maxkeylen);
     confdump(level, "qlen.goal = %u", config.qlen_goal);
