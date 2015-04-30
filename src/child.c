@@ -311,6 +311,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     dataentry *de = NULL;
     char reqend_str[REQEND_T_LEN];
     int32_t vxid;
+    struct timeval latest_t = { 0 };
     (void) priv;
 
     if (all_wrk_abandoned())
@@ -323,8 +324,6 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     }
     CHECK_OBJ(de, DATA_MAGIC);
     assert(!OCCUPIED(de));
-    AZ(de->reqend_t.tv_sec);
-    AZ(de->reqend_t.tv_usec);
     de->hasdata = 0;
     seen++;
 
@@ -399,9 +398,9 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
                             VSL_tags[tag], xid, (unsigned) reqend_t.tv_sec,
                             reqend_t.tv_usec);
 
-                if (reqend_t.tv_sec > de->reqend_t.tv_sec
-                    || reqend_t.tv_usec > de->reqend_t.tv_usec)
-                    memcpy(&de->reqend_t, &reqend_t, sizeof(struct timeval));
+                if (reqend_t.tv_sec > latest_t.tv_sec
+                    || reqend_t.tv_usec > latest_t.tv_usec)
+                    memcpy(&latest_t, &reqend_t, sizeof(struct timeval));
                 break;
 
             case SLT_VSL:
@@ -423,7 +422,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     }
 
     snprintf(reqend_str, REQEND_T_LEN, "%s=%u.%06lu", REQEND_T_VAR,
-             (unsigned) de->reqend_t.tv_sec, de->reqend_t.tv_usec);
+             (unsigned) latest_t.tv_sec, latest_t.tv_usec);
     append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
     de->occupied = 1;
     MON_StatsUpdate(STATS_OCCUPANCY, 0);
