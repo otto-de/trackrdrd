@@ -39,6 +39,18 @@
 #include "vas.h"
 #include "miniobj.h"
 
+/* Preprend head2 before head1, result in head1, head2 empty afterward */
+#define	VSTAILQ_PREPEND(head1, head2) do {                      \
+        if (VSTAILQ_EMPTY((head2)))                             \
+            break;                                              \
+	if (VSTAILQ_EMPTY((head1)))                             \
+            (head1)->vstqh_last = (head2)->vstqh_last;          \
+	else                                                    \
+            *(head2)->vstqh_last = VSTAILQ_FIRST((head1));      \
+        VSTAILQ_FIRST((head1)) = VSTAILQ_FIRST((head2));        \
+        VSTAILQ_INIT((head2));                                  \
+} while (0)
+
 static void
 data_Cleanup(void)
 {
@@ -122,7 +134,7 @@ DATA_Take_Freelist(struct freehead_s *dst)
     AZ(pthread_mutex_lock(&dtbl.freelist_lock));
     nfree = dtbl.nfree;
     dtbl.nfree = 0;
-    VSTAILQ_CONCAT(dst, &dtbl.freehead);
+    VSTAILQ_PREPEND(dst, &dtbl.freehead);
     AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
     return nfree;
 }
@@ -136,7 +148,7 @@ void
 DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned)
 {
     AZ(pthread_mutex_lock(&dtbl.freelist_lock));
-    VSTAILQ_CONCAT(&dtbl.freehead, returned);
+    VSTAILQ_PREPEND(&dtbl.freehead, returned);
     dtbl.nfree += nreturned;
     AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
 }
