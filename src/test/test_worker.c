@@ -129,9 +129,6 @@ static const char
 
     printf("... testing run of %d workers\n", NWORKERS);
 
-    srand48(time(NULL));
-    unsigned xid = (unsigned int) lrand48();
-
     WRK_Start();
     int wrk_running, wrk_wait = 0;
     while ((wrk_running = WRK_Running()) < NWORKERS) {
@@ -145,8 +142,7 @@ static const char
     for (int i = 0; i < config.max_records; i++) {
         entry = &entrytbl[i];
         MCHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-        entry->xid = xid;
-        sprintf(entry->data, "XID=%d&foo=bar&baz=quux&record=%d", xid, i+1);
+        sprintf(entry->data, "foo=bar&baz=quux&record=%d", i+1);
         entry->end = strlen(entry->data);
         entry->occupied = 1;
         SPMCQ_Enq(entry);
@@ -171,7 +167,6 @@ static const char
         MAZ(entry->keylen);
         MAZ(*entry->key);
         MAZ(entry->hasdata);
-        MAZ(entry->xid);
         MAZ(entry->reqend_t.tv_sec);
         MAZ(entry->reqend_t.tv_usec);
     }

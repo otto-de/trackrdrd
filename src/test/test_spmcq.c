@@ -29,10 +29,11 @@
  *
  */
 
-#include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include "minunit.h"
 
@@ -57,7 +58,7 @@ typedef enum {
 } fail_e;
 
 typedef struct {
-    unsigned sum;
+    uintptr_t sum;
     fail_e fail;
 } prod_con_data_t;
 
@@ -78,20 +79,15 @@ static void
 
     (void) arg;
 
-    srand48(time(NULL));
-    unsigned xid = (unsigned int) lrand48();
-
     for (int i = 0; i < config.max_records; i++) {
-        entries[i].xid = xid;
-        debug_print("Producer: enqueue %d (xid = %u)\n", ++enqs, xid);
+        debug_print("Producer: enqueue %d\n", ++enqs);
         SPMCQ_Enq(&entries[i]);
         debug_print("%s\n", "Producer: broadcast");
         if (pthread_cond_broadcast(&spmcq_datawaiter_cond) != 0) {
             proddata.fail = PRODUCER_BCAST;
             pthread_exit(&proddata);
         }
-        proddata.sum += xid;
-        xid++;
+        proddata.sum += (uintptr_t) entries[i].data;
     }
     debug_print("%s\n", "Producer: exit");
     pthread_exit((void *) &proddata);
@@ -138,16 +134,14 @@ static void
             }
         } else {
             /* entry != NULL */
-            debug_print("Consumer %d: dequeue %d (xid = %u)\n", id, ++deqs,
-                entry->xid);
-            pcdata->sum += entry->xid;
+            debug_print("Consumer %d: dequeue %d\n", id, ++deqs);
+            pcdata->sum += (uintptr_t) entry->data;
         }
     }
     debug_print("Consumer %d: drain queue, run = %d\n", id, run);
     while ((entry = SPMCQ_Deq()) != NULL) {
-        debug_print("Consumer %d: dequeue %d (xid = %u)\n", id, ++deqs,
-            entry->xid);
-        pcdata->sum += entry->xid;
+        debug_print("Consumer %d: dequeue %d\n", id, ++deqs);
+        pcdata->sum += (uintptr_t) entry->data;
     }
     debug_print("Consumer %d: exit\n", id);
     pthread_exit((void *) pcdata);
@@ -181,18 +175,15 @@ static char
 static const char
 *test_spmcq_enq_deq(void)
 {
-#define XID 1234567890
     dataentry entry1, *entry2;
 
     printf("... testing SPMCQ enqueue and dequeue\n");
 
-    entry1.xid = 1234567890;
     SPMCQ_Enq(&entry1);
 
     entry2 = SPMCQ_Deq();
     mu_assert("SPMCQ_Deq: returned NULL from non-empty queue", entry2 != NULL);
-    sprintf(errmsg, "SMPCQ_Deq: expected %d, got %d", XID, entry2->xid);
-    mu_assert(errmsg, XID == entry2->xid);
+    MASSERT(&entry1 == entry2);
     
     return NULL;
 }
@@ -267,8 +258,9 @@ static const char
         mu_assert(errmsg, con2_data->fail == SUCCESS);
     }
 
-    sprintf(errmsg, "Consumer/producer checksum mismatch: p = %u, c = %u",
-        prod_data->sum, con1_data->sum + con2_data->sum);
+    sprintf(errmsg, "Consumer/producer checksum mismatch: p = %" PRIuPTR
+            ", c = %" PRIuPTR,
+            prod_data->sum, con1_data->sum + con2_data->sum);
     mu_assert(errmsg, prod_data->sum == con1_data->sum + con2_data->sum);
     
     return NULL;

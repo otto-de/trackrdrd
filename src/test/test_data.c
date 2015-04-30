@@ -63,7 +63,6 @@ static char
         MAZ(entrytbl[i].hasdata);
         MAN(entrytbl[i].data);
         MAN(entrytbl[i].key);
-        MAZ(entrytbl[i].xid);
         MAZ(entrytbl[i].end);
         MAZ(entrytbl[i].keylen);
         MAZ(entrytbl[i].reqend_t.tv_sec);
