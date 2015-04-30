@@ -310,6 +310,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     int status = DISPATCH_RETURN_OK;
     dataentry *de = NULL;
     char reqend_str[REQEND_T_LEN];
+    int32_t vxid;
     (void) priv;
 
     if (all_wrk_abandoned())
@@ -344,7 +345,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
             assert(VSL_CLIENT(t->c->rec.ptr));
 
             if (de->end == 0) {
-                de->xid = t->vxid;
+                vxid = t->vxid;
                 snprintf(de->data, config.max_reclen, "XID=%u", t->vxid);
                 de->end = strlen(de->data);
                 if (de->end > len_hi)
@@ -423,7 +424,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 
     snprintf(reqend_str, REQEND_T_LEN, "%s=%u.%06lu", REQEND_T_VAR,
              (unsigned) de->reqend_t.tv_sec, de->reqend_t.tv_usec);
-    append(de, SLT_Timestamp, de->xid, reqend_str, REQEND_T_LEN - 1);
+    append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
     de->occupied = 1;
     MON_StatsUpdate(STATS_OCCUPANCY, 0);
     data_submit(de);

@@ -112,7 +112,6 @@ DATA_Reset(dataentry *entry)
     entry->keylen = 0;
     *entry->key = '\0';
     entry->hasdata = 0;
-    entry->xid = 0;
     entry->reqend_t.tv_sec = 0;
     entry->reqend_t.tv_usec = 0;
 }
@@ -158,8 +157,8 @@ DATA_Dump(void)
         if (!OCCUPIED(entry))
             continue;
         LOG_Log(LOG_INFO,
-                "Data entry %d: XID=%u data=[%.*s] key=[%.*s] reqend_t=%u.%06u",
-                i, entry->xid, entry->end, entry->data, entry->keylen,
-                entry->key, entry->reqend_t.tv_sec, entry->reqend_t.tv_usec);
+                "Data entry %d: data=[%.*s] key=[%.*s] reqend_t=%u.%06u",
+                i, entry->end, entry->data, entry->keylen, entry->key,
+                entry->reqend_t.tv_sec, entry->reqend_t.tv_usec);
     }
 }
