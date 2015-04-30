@@ -99,7 +99,7 @@ static unsigned long seen = 0, submitted = 0, len_overflows = 0, no_data = 0,
 
 static volatile sig_atomic_t flush = 0, term = 0;
 
-static struct sigaction terminate_action, dump_action;
+static struct sigaction terminate_action, dump_action, flush_action;
 
 /* Local freelist */
 static struct freehead_s reader_freelist = 
@@ -138,6 +138,14 @@ term_s(int sig)
             "will flush logs and terminate", sig, strsignal(sig));
     term = 1;
     flush = 1;
+}
+
+static void
+sigflush(int sig)
+{
+    flush = 1;
+    LOG_Log(LOG_NOTICE, "Received signal %d (%s), "
+            "flushing pending transactions", sig, strsignal(sig));
 }
 
 /*--------------------------------------------------------------------*/
@@ -486,6 +494,10 @@ CHILD_Main(int readconfig)
     terminate_action.sa_handler = term_s;
     AZ(sigemptyset(&terminate_action.sa_mask));
     terminate_action.sa_flags &= ~SA_RESTART;
+
+    flush_action.sa_handler = sigflush;
+    AZ(sigemptyset(&flush_action.sa_mask));
+    flush_action.sa_flags |= SA_RESTART;
 
 #define CHILD(SIG,disp) SIGDISP(SIG,disp)
 #define PARENT(SIG,disp) ((void) 0)
