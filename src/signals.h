@@ -44,7 +44,7 @@ CHILD(SIGTERM, terminate_action);
 CHILD(SIGINT, terminate_action);
 CHILD(SIGUSR1, dump_action);
 CHILD(SIGUSR2, ignore_action);
-CHILD(SIGHUP, ignore_action);
+CHILD(SIGHUP, flush_action);
 #ifndef DISABLE_STACKTRACE
 CHILD(SIGABRT, stacktrace_action);
 CHILD(SIGSEGV, stacktrace_action);
