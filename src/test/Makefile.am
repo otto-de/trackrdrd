@@ -19,6 +19,7 @@ test_parse_LDADD = \
 test_data_SOURCES = \
 	minunit.h \
 	test_data.c \
+	../data.h \
 	../trackrdrd.h
 
 test_data_LDADD = \
@@ -83,6 +84,7 @@ test_config_LDADD = \
 test_worker_SOURCES = \
 	minunit.h \
 	test_worker.c \
+	../data.h \
 	../trackrdrd.h
 
 test_worker_LDADD = \

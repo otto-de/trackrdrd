@@ -49,7 +49,7 @@ static unsigned	long	reconnects = 0;	/* Reconnects to MQ */
 static unsigned	long	restarts = 0;	/* Worker thread restarts */
 static unsigned		occ_hi = 0;	/* Occupancy high water mark */ 
 static unsigned		occ_hi_this = 0;/* Occupancy high water mark
-                                           this reporting interval*/
+                                           this reporting interval */
 
 static void
 log_output(void)
@@ -63,7 +63,7 @@ log_output(void)
 
     LOG_Log(LOG_INFO, "Data table: len=%u occ=%u occ_hi=%u occ_hi_this=%u "
             "global_free=%u",
-            dtbl.len, occ, occ_hi, occ_hi_this, dtbl.nfree);
+            config.maxdone, occ, occ_hi, occ_hi_this, global_nfree);
 
     /* Eliminate the dependency of trackrdrd.o for unit tests */
 #ifndef TEST_DRIVER

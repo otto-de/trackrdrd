@@ -36,6 +36,8 @@
 #include <errno.h>
 
 #include "trackrdrd.h"
+#include "data.h"
+
 #include "vas.h"
 #include "miniobj.h"
 
@@ -51,56 +53,50 @@
         VSTAILQ_INIT((head2));                                  \
 } while (0)
 
+static pthread_mutex_t freelist_lock;
+static char *buf;
+
 static void
 data_Cleanup(void)
 {
-    free(dtbl.entry);
-    free(dtbl.buf);
-    AZ(pthread_mutex_destroy(&dtbl.freelist_lock));
+    free(entrytbl);
+    free(buf);
+    AZ(pthread_mutex_destroy(&freelist_lock));
 }
 
 int
 DATA_Init(void)
 {
-    dataentry *entryptr;
-    char *bufptr;
-    
     unsigned bufsize = config.maxdata + config.maxkeylen;
     
     /*
      * we want enough space to accomodate all open and done records
      *
      */
-    entryptr = (dataentry *) calloc(config.maxdone, sizeof(dataentry));
-    if (entryptr == NULL)
+    entrytbl = (dataentry *) calloc(config.maxdone, sizeof(dataentry));
+    if (entrytbl == NULL)
         return(errno);
 
-    bufptr = (char *) calloc(config.maxdone, bufsize);
-    if (bufptr == NULL) {
-        free(entryptr);
+    buf = (char *) calloc(config.maxdone, bufsize);
+    if (buf == NULL) {
+        free(entrytbl);
         return(errno);
     }
 
-    memset(&dtbl, 0, sizeof(datatable));
-    dtbl.magic	= DATATABLE_MAGIC;
-    dtbl.len	= config.maxdone;
+    VSTAILQ_INIT(&freehead);
+    AZ(pthread_mutex_init(&freelist_lock, NULL));
 
-    VSTAILQ_INIT(&dtbl.freehead);
-    AZ(pthread_mutex_init(&dtbl.freelist_lock, NULL));
-
-    dtbl.entry	= entryptr;
-    dtbl.buf	= bufptr;
-    dtbl.nfree  = 0;
+    global_nfree  = 0;
 
     for (unsigned i = 0; i < config.maxdone; i++) {
-        dtbl.entry[i].magic = DATA_MAGIC;
-        dtbl.entry[i].data = &dtbl.buf[i * bufsize];
-        dtbl.entry[i].key = &dtbl.buf[(i * bufsize) + config.maxdata];
-        VSTAILQ_INSERT_TAIL(&dtbl.freehead, &dtbl.entry[i], freelist);
-        dtbl.nfree++;
+        entrytbl[i].magic = DATA_MAGIC;
+        entrytbl[i].data = &buf[i * bufsize];
+        entrytbl[i].key = &buf[(i * bufsize) + config.maxdata];
+        VSTAILQ_INSERT_TAIL(&freehead, &entrytbl[i], freelist);
+        global_nfree++;
     }
-    assert(dtbl.nfree == config.maxdone);
-    assert(VSTAILQ_FIRST(&dtbl.freehead));
+    assert(global_nfree == config.maxdone);
+    assert(VSTAILQ_FIRST(&freehead));
 
     atexit(data_Cleanup);
     return(0);
@@ -131,33 +127,33 @@ DATA_Take_Freelist(struct freehead_s *dst)
 {
     unsigned nfree;
 
-    AZ(pthread_mutex_lock(&dtbl.freelist_lock));
-    nfree = dtbl.nfree;
-    dtbl.nfree = 0;
-    VSTAILQ_PREPEND(dst, &dtbl.freehead);
-    AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
+    AZ(pthread_mutex_lock(&freelist_lock));
+    nfree = global_nfree;
+    global_nfree = 0;
+    VSTAILQ_PREPEND(dst, &freehead);
+    AZ(pthread_mutex_unlock(&freelist_lock));
     return nfree;
 }
 
 /*
- * return to dtbl.freehead
+ * return to freehead
  *
  * returned must be locked by caller, if required
  */
 void
 DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned)
 {
-    AZ(pthread_mutex_lock(&dtbl.freelist_lock));
-    VSTAILQ_PREPEND(&dtbl.freehead, returned);
-    dtbl.nfree += nreturned;
-    AZ(pthread_mutex_unlock(&dtbl.freelist_lock));
+    AZ(pthread_mutex_lock(&freelist_lock));
+    VSTAILQ_PREPEND(&freehead, returned);
+    global_nfree += nreturned;
+    AZ(pthread_mutex_unlock(&freelist_lock));
 }
 
 void
 DATA_Dump(void)
 {
-    for (int i = 0; i < dtbl.len; i++) {
-        dataentry *entry = &dtbl.entry[i];
+    for (int i = 0; i < config.maxdone; i++) {
+        dataentry *entry = &entrytbl[i];
 
         if (!OCCUPIED(entry))
             continue;
