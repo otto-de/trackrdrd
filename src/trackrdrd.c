@@ -62,9 +62,9 @@
 #include "vpf.h"
 #include "vtim.h"
 
-static volatile sig_atomic_t reload;
+static volatile sig_atomic_t term = 0, reload = 0;
 
-static struct sigaction restart_action;
+static struct sigaction terminate_action, restart_action;
 
 static const char *version = PACKAGE_STRING " revision " VCS_Version
     " branch " VCS_Branch;
@@ -74,8 +74,17 @@ static const char *version = PACKAGE_STRING " revision " VCS_Version
 static void
 restart(int sig)
 {
-    (void) sig;
+    LOG_Log(LOG_NOTICE, "Management process received signal %d (%s), "
+            "will restart child process with new config", sig, strsignal(sig));
     reload = 1;
+}
+
+static void
+term_s(int sig)
+{
+    LOG_Log(LOG_NOTICE, "Management process received signal %d (%s), "
+            "will terminate management and worker", sig, strsignal(sig));
+    term = 1;
 }
 
 /*--------------------------------------------------------------------*/
@@ -89,7 +98,7 @@ parent_shutdown(int status, pid_t child_pid)
     if (child_pid && kill(child_pid, SIGTERM) != 0) {
         LOG_Log(LOG_ERR, "Cannot kill child process %d: %s", child_pid,
             strerror(errno));
-        exit(EXIT_FAILURE);
+        status = EXIT_FAILURE;
     }
 
     /* Remove PID file if necessary */
@@ -139,8 +148,10 @@ parent_main(pid_t child_pid)
     AZ(sigemptyset(&restart_action.sa_mask));
     restart_action.sa_flags &= ~SA_RESTART;
 
-    term = 0;
-    reload = 0;
+    terminate_action.sa_handler = term_s;
+    AZ(sigemptyset(&terminate_action.sa_mask));
+    terminate_action.sa_flags &= ~SA_RESTART;
+
     /* install signal handlers */
 #define PARENT(SIG,disp) SIGDISP(SIG,disp)
 #define CHILD(SIG,disp) ((void) 0)
@@ -310,7 +321,7 @@ main(int argc, char * const *argv)
         LOG_SetLevel(LOG_DEBUG);
     LOG_Log(LOG_INFO, "initializing (%s)", version);
 
-    CONF_Dump();
+    CONF_Dump(LOG_DEBUG);
         
     if (!EMPTY(config.pid_file)
         && (pfh = VPF_Open(config.pid_file, 0644, NULL)) == NULL) {
@@ -330,10 +341,6 @@ main(int argc, char * const *argv)
 
     if (pfh != NULL)
         VPF_Write(pfh);
-
-    terminate_action.sa_handler = HNDL_Terminate;
-    AZ(sigemptyset(&terminate_action.sa_mask));
-    terminate_action.sa_flags &= ~SA_RESTART;
 
     stacktrace_action.sa_handler = HNDL_Abort;
 

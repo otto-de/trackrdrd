@@ -97,9 +97,9 @@ static unsigned long seen = 0, submitted = 0, len_overflows = 0, no_data = 0,
     ioerr = 0, reacquire = 0, truncated = 0, key_hi = 0, key_overflows = 0;
 // no_free_chunk = 0;
 
-static volatile sig_atomic_t flush = 0;
+static volatile sig_atomic_t flush = 0, term = 0;
 
-static struct sigaction dump_action;
+static struct sigaction terminate_action, dump_action;
 
 /* Local freelist */
 static struct freehead_s reader_freelist = 
@@ -125,10 +125,19 @@ RDR_Stats(void)
 static void
 dump(int sig)
 {
-    LOG_Log(LOG_NOTICE, "Received signal %d (%s), "
+    LOG_Log(LOG_NOTICE, "Child process received signal %d (%s), "
             "dumping config and data table", sig, strsignal(sig));
-    CONF_Dump();
+    CONF_Dump(LOG_INFO);
     DATA_Dump();
+}
+
+static void
+term_s(int sig)
+{
+    LOG_Log(LOG_NOTICE, "Child process received signal %d (%s), "
+            "will flush logs and terminate", sig, strsignal(sig));
+    term = 1;
+    flush = 1;
 }
 
 /*--------------------------------------------------------------------*/
@@ -445,7 +454,7 @@ CHILD_Main(int readconfig)
     LOG_Log(LOG_NOTICE, "Running as %s", pw->pw_name);
 
     if (debug)
-        CONF_Dump();
+        CONF_Dump(LOG_DEBUG);
 
     /* read messaging module */
     if (config.mq_module[0] == '\0') {
@@ -473,6 +482,10 @@ CHILD_Main(int readconfig)
     dump_action.sa_handler = dump;
     AZ(sigemptyset(&dump_action.sa_mask));
     dump_action.sa_flags |= SA_RESTART;
+
+    terminate_action.sa_handler = term_s;
+    AZ(sigemptyset(&terminate_action.sa_mask));
+    terminate_action.sa_flags &= ~SA_RESTART;
 
 #define CHILD(SIG,disp) SIGDISP(SIG,disp)
 #define PARENT(SIG,disp) ((void) 0)
@@ -648,20 +661,19 @@ CHILD_Main(int readconfig)
                 break;
             }
         }
-        if (flush) {
+        if (flush && !term) {
             LOG_Log0(LOG_NOTICE, "Flushing transactions");
             take_free();
             VSLQ_Flush(vslq, dispatch, NULL);
             flush = 0;
-            if (!term && EMPTY(config.varnish_bindump) &&
-                status != DISPATCH_CLOSED && status != DISPATCH_OVERRUN
-                && status != DISPATCH_IOERR)
+            if (EMPTY(config.varnish_bindump) && status != DISPATCH_CLOSED
+                && status != DISPATCH_OVERRUN && status != DISPATCH_IOERR)
                 continue;
             VSLQ_Delete(&vslq);
             AZ(vslq);
             /* cf. VUT_Main() in Varnish vut.c */
             LOG_Log0(LOG_NOTICE, "Attempting to reacquire the log");
-            while (!term && vslq == NULL) {
+            while (vslq == NULL) {
                 AN(vsm);
                 VTIM_sleep(0.1);
                 if (VSM_Open(vsm)) {

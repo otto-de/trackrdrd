@@ -242,31 +242,32 @@ CONF_ReadDefault(void)
     return 0;
 }
 
-#define confdump(str,val) \
-    LOG_Log(LOG_DEBUG, "config: " str, (val))
+#define confdump(level,str,val)                 \
+    LOG_Log((level), "config: " str, (val))
 
 void
-CONF_Dump(void)
+CONF_Dump(int level)
 {
-    confdump("pid.file = %s", config.pid_file);
-    confdump("varnish.name = %s", config.varnish_name);
-    confdump("log.file = %s",
-        strcmp(config.log_file,"-") == 0 ? "stdout" : config.log_file);
-    confdump("varnish.bindump = %s", config.varnish_bindump);
-    confdump("syslog.facility = %s", config.syslog_facility_name);
-    confdump("monitor.interval = %u", config.monitor_interval);
-    confdump("monitor.workers = %s", config.monitor_workers ? "true" : "false");
-    confdump("maxdone = %u", config.maxdone);
-    confdump("maxdata = %u", config.maxdata);
-    confdump("maxkeylen = %u", config.maxkeylen);
-    confdump("qlen.goal = %u", config.qlen_goal);
+    confdump(level, "pid.file = %s", config.pid_file);
+    confdump(level, "varnish.name = %s", config.varnish_name);
+    confdump(level, "log.file = %s",
+             strcmp(config.log_file,"-") == 0 ? "stdout" : config.log_file);
+    confdump(level, "varnish.bindump = %s", config.varnish_bindump);
+    confdump(level, "syslog.facility = %s", config.syslog_facility_name);
+    confdump(level, "monitor.interval = %u", config.monitor_interval);
+    confdump(level, "monitor.workers = %s",
+             config.monitor_workers ? "true" : "false");
+    confdump(level, "maxdone = %u", config.maxdone);
+    confdump(level, "maxdata = %u", config.maxdata);
+    confdump(level, "maxkeylen = %u", config.maxkeylen);
+    confdump(level, "qlen.goal = %u", config.qlen_goal);
 
-    confdump("mq.module = %s", config.mq_module);
-    confdump("mq.config_file = %s", config.mq_config_file);
-    confdump("nworkers = %u", config.nworkers);
-    confdump("restarts = %u", config.restarts);
-    confdump("restart.pause = %u", config.restart_pause);
-    confdump("idle.pause = %f", config.idle_pause);
-    confdump("thread.restarts = %u", config.thread_restarts);
-    confdump("user = %s", config.user_name);
+    confdump(level, "mq.module = %s", config.mq_module);
+    confdump(level, "mq.config_file = %s", config.mq_config_file);
+    confdump(level, "nworkers = %u", config.nworkers);
+    confdump(level, "restarts = %u", config.restarts);
+    confdump(level, "restart.pause = %u", config.restart_pause);
+    confdump(level, "idle.pause = %f", config.idle_pause);
+    confdump(level, "thread.restarts = %u", config.thread_restarts);
+    confdump(level, "user = %s", config.user_name);
 }
