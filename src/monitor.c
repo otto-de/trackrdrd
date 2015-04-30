@@ -63,7 +63,7 @@ log_output(void)
 
     LOG_Log(LOG_INFO, "Data table: len=%u occ=%u occ_hi=%u occ_hi_this=%u "
             "global_free=%u",
-            config.maxdone, occ, occ_hi, occ_hi_this, global_nfree);
+            config.max_records, occ, occ_hi, occ_hi_this, global_nfree);
 
     /* Eliminate the dependency of trackrdrd.o for unit tests */
 #ifndef TEST_DRIVER

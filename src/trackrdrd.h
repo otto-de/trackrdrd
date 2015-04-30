@@ -176,8 +176,8 @@ struct config {
     unsigned	monitor_interval;
     unsigned	monitor_workers;
 
-    unsigned	maxdone;	/* max number of records in *_DONE state */
-#define DEF_MAXDONE 1024
+    unsigned	max_records;	/* max number of buffered records */
+#define DEF_MAX_RECORDS 1024
     
     unsigned	maxdata;  	/* size of char data buffer */
 #define DEF_MAXDATA 1024

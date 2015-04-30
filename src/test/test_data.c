@@ -51,13 +51,13 @@ static char
 
     printf("... testing data table initialization\n");
     
-    config.maxdone = DEF_MAXDONE;
+    config.max_records = DEF_MAX_RECORDS;
     config.maxdata = DEF_MAXDATA;
     config.maxkeylen = DEF_MAXKEYLEN;
     err = DATA_Init();
     VMASSERT(err == 0, "DATA_Init: %s", strerror(err));
 
-    for (int i = 0; i < config.maxdone; i++) {
+    for (int i = 0; i < config.max_records; i++) {
         MCHECK_OBJ_NOTNULL(&entrytbl[i], DATA_MAGIC);
         MASSERT(!OCCUPIED(&entrytbl[i]));
         MAZ(entrytbl[i].hasdata);
@@ -80,7 +80,7 @@ static const char
     
     printf("... testing data write and read\n");
 
-    for (int i = 0; i < config.maxdone; i++) {
+    for (int i = 0; i < config.max_records; i++) {
         memset(entrytbl[i].data, 'd', DEF_MAXDATA);
         memset(entrytbl[i].key,  'k', DEF_MAXKEYLEN);
     }
@@ -88,7 +88,7 @@ static const char
     memset(data, 'd', DEF_MAXDATA);
     memset(key,  'k', DEF_MAXKEYLEN);
 
-    for (int i = 0; i < config.maxdone; i++) {
+    for (int i = 0; i < config.max_records; i++) {
         MASSERT(memcmp(entrytbl[i].data, data, DEF_MAXDATA) == 0);
         MASSERT(memcmp(entrytbl[i].key,  key,  DEF_MAXKEYLEN) == 0);
     }
@@ -103,7 +103,7 @@ static const char
 
     nfree = DATA_Take_Freelist(&local_freehead);
 
-    MASSERT(nfree == config.maxdone);
+    MASSERT(nfree == config.max_records);
 
     MASSERT0(!VSTAILQ_EMPTY(&local_freehead),
              "Local freelist empty after take");
@@ -127,7 +127,7 @@ static const char
     MASSERT0(VSTAILQ_EMPTY(&local_freehead),
              "Local freelist non-empty after return");
     
-    MASSERT(global_nfree == DEF_MAXDONE);
+    MASSERT(global_nfree == DEF_MAX_RECORDS);
 
     MASSERT0(!VSTAILQ_EMPTY(&freehead),
              "Global free list empty after take");

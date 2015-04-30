@@ -73,11 +73,11 @@ DATA_Init(void)
      * we want enough space to accomodate all open and done records
      *
      */
-    entrytbl = (dataentry *) calloc(config.maxdone, sizeof(dataentry));
+    entrytbl = (dataentry *) calloc(config.max_records, sizeof(dataentry));
     if (entrytbl == NULL)
         return(errno);
 
-    buf = (char *) calloc(config.maxdone, bufsize);
+    buf = (char *) calloc(config.max_records, bufsize);
     if (buf == NULL) {
         free(entrytbl);
         return(errno);
@@ -88,14 +88,14 @@ DATA_Init(void)
 
     global_nfree  = 0;
 
-    for (unsigned i = 0; i < config.maxdone; i++) {
+    for (unsigned i = 0; i < config.max_records; i++) {
         entrytbl[i].magic = DATA_MAGIC;
         entrytbl[i].data = &buf[i * bufsize];
         entrytbl[i].key = &buf[(i * bufsize) + config.maxdata];
         VSTAILQ_INSERT_TAIL(&freehead, &entrytbl[i], freelist);
         global_nfree++;
     }
-    assert(global_nfree == config.maxdone);
+    assert(global_nfree == config.max_records);
     assert(VSTAILQ_FIRST(&freehead));
 
     atexit(data_Cleanup);
@@ -152,7 +152,7 @@ DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned)
 void
 DATA_Dump(void)
 {
-    for (int i = 0; i < config.maxdone; i++) {
+    for (int i = 0; i < config.max_records; i++) {
         dataentry *entry = &entrytbl[i];
 
         if (!OCCUPIED(entry))

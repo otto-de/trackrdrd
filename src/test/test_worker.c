@@ -100,7 +100,7 @@ static char
 
     printf("... testing worker initialization\n");
 
-    config.maxdone = DEF_MAXDONE;
+    config.max_records = DEF_MAX_RECORDS;
     config.maxdata = DEF_MAXDATA;
     config.maxkeylen = DEF_MAXKEYLEN;
     config.nworkers = NWORKERS;
@@ -142,7 +142,7 @@ static const char
     VMASSERT(wrk_running == NWORKERS,
              "%d of %d worker threads running", wrk_running, NWORKERS);
 
-    for (int i = 0; i < config.maxdone; i++) {
+    for (int i = 0; i < config.max_records; i++) {
         entry = &entrytbl[i];
         MCHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         entry->xid = xid;
@@ -162,7 +162,7 @@ static const char
      * Verify DATA_Reset() by checking that all data entry fields are in
      * empty states after worker threads are shut down.
      */
-    for (int i = 0; i < config.maxdone; i++) {
+    for (int i = 0; i < config.max_records; i++) {
         entry = &entrytbl[i];
         MCHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         MASSERT(!OCCUPIED(entry));
