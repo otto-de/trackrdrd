@@ -90,6 +90,9 @@ void PRIV_Sandbox(void);
 
 /* worker.c */
 
+/* stats */
+unsigned abandoned;
+
 /**
  * Initializes resources for worker threads -- allocates memory,
  * initializes mutexes and condition variables.
@@ -108,6 +111,8 @@ void WRK_Shutdown(void);
 /* data.c */
 
 #define OCCUPIED(e) ((e)->occupied == 1)
+
+unsigned global_nfree;
 
 /* XXX: do we need xid, hasdata, reqend_t? all temp in dispatch? */
 struct dataentry_s {
@@ -129,27 +134,6 @@ struct dataentry_s {
 typedef struct dataentry_s dataentry;
 
 VSTAILQ_HEAD(freehead_s, dataentry_s);
-
-/* stats */
-unsigned abandoned;
-
-struct datatable_s {
-    unsigned			magic;
-#define DATATABLE_MAGIC 	0xd3ef3bd4
-    unsigned			len;
-
-    /* protected by freelist_lock */
-    struct freehead_s		freehead;
-    pthread_mutex_t		freelist_lock;
-    unsigned			nfree;
-
-    dataentry			*entry;
-    char			*buf;
-};
-
-typedef struct datatable_s datatable;
-
-datatable dtbl;
 
 int DATA_Init(void);
 void DATA_Reset(dataentry *entry);

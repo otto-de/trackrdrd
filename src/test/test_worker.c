@@ -36,6 +36,7 @@
 #include "minunit.h"
 
 #include "../trackrdrd.h"
+#include "../data.h"
 #include "../vtim.h"
 
 #define DEBUG 0
@@ -142,7 +143,7 @@ static const char
              "%d of %d worker threads running", wrk_running, NWORKERS);
 
     for (int i = 0; i < config.maxdone; i++) {
-        entry = &dtbl.entry[i];
+        entry = &entrytbl[i];
         MCHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         entry->xid = xid;
         sprintf(entry->data, "XID=%d&foo=bar&baz=quux&record=%d", xid, i+1);
@@ -162,7 +163,7 @@ static const char
      * empty states after worker threads are shut down.
      */
     for (int i = 0; i < config.maxdone; i++) {
-        entry = &dtbl.entry[i];
+        entry = &entrytbl[i];
         MCHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         MASSERT(!OCCUPIED(entry));
         MAZ(entry->end);

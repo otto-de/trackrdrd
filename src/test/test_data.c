@@ -34,6 +34,7 @@
 #include "minunit.h"
 
 #include "../trackrdrd.h"
+#include "../data.h"
 
 int tests_run = 0;
 
@@ -55,19 +56,18 @@ static char
     config.maxkeylen = DEF_MAXKEYLEN;
     err = DATA_Init();
     VMASSERT(err == 0, "DATA_Init: %s", strerror(err));
-    MASSERT(dtbl.len == DEF_MAXDONE);
 
-    for (int i = 0; i < dtbl.len; i++) {
-        MCHECK_OBJ_NOTNULL(&dtbl.entry[i], DATA_MAGIC);
-        MASSERT(!OCCUPIED(&dtbl.entry[i]));
-        MAZ(dtbl.entry[i].hasdata);
-        MAN(dtbl.entry[i].data);
-        MAN(dtbl.entry[i].key);
-        MAZ(dtbl.entry[i].xid);
-        MAZ(dtbl.entry[i].end);
-        MAZ(dtbl.entry[i].keylen);
-        MAZ(dtbl.entry[i].reqend_t.tv_sec);
-        MAZ(dtbl.entry[i].reqend_t.tv_usec);
+    for (int i = 0; i < config.maxdone; i++) {
+        MCHECK_OBJ_NOTNULL(&entrytbl[i], DATA_MAGIC);
+        MASSERT(!OCCUPIED(&entrytbl[i]));
+        MAZ(entrytbl[i].hasdata);
+        MAN(entrytbl[i].data);
+        MAN(entrytbl[i].key);
+        MAZ(entrytbl[i].xid);
+        MAZ(entrytbl[i].end);
+        MAZ(entrytbl[i].keylen);
+        MAZ(entrytbl[i].reqend_t.tv_sec);
+        MAZ(entrytbl[i].reqend_t.tv_usec);
     }
 
     return NULL;
@@ -80,17 +80,17 @@ static const char
     
     printf("... testing data write and read\n");
 
-    for (int i = 0; i < dtbl.len; i++) {
-        memset(dtbl.entry[i].data, 'd', DEF_MAXDATA);
-        memset(dtbl.entry[i].key,  'k', DEF_MAXKEYLEN);
+    for (int i = 0; i < config.maxdone; i++) {
+        memset(entrytbl[i].data, 'd', DEF_MAXDATA);
+        memset(entrytbl[i].key,  'k', DEF_MAXKEYLEN);
     }
 
     memset(data, 'd', DEF_MAXDATA);
     memset(key,  'k', DEF_MAXKEYLEN);
 
-    for (int i = 0; i < dtbl.len; i++) {
-        MASSERT(memcmp(dtbl.entry[i].data, data, DEF_MAXDATA) == 0);
-        MASSERT(memcmp(dtbl.entry[i].key,  key,  DEF_MAXKEYLEN) == 0);
+    for (int i = 0; i < config.maxdone; i++) {
+        MASSERT(memcmp(entrytbl[i].data, data, DEF_MAXDATA) == 0);
+        MASSERT(memcmp(entrytbl[i].key,  key,  DEF_MAXKEYLEN) == 0);
     }
 
     return NULL;
@@ -108,10 +108,10 @@ static const char
     MASSERT0(!VSTAILQ_EMPTY(&local_freehead),
              "Local freelist empty after take");
     
-    VMASSERT(dtbl.nfree == 0, "Global free count non-zero after take (%u)",
-             dtbl.nfree);
+    VMASSERT(global_nfree == 0, "Global free count non-zero after take (%u)",
+             global_nfree);
 
-    MASSERT0(VSTAILQ_EMPTY(&dtbl.freehead),
+    MASSERT0(VSTAILQ_EMPTY(&freehead),
              "Global free list non-empty after take");
 
     return NULL;
@@ -127,9 +127,9 @@ static const char
     MASSERT0(VSTAILQ_EMPTY(&local_freehead),
              "Local freelist non-empty after return");
     
-    MASSERT(dtbl.nfree == DEF_MAXDONE);
+    MASSERT(global_nfree == DEF_MAXDONE);
 
-    MASSERT0(!VSTAILQ_EMPTY(&dtbl.freehead),
+    MASSERT0(!VSTAILQ_EMPTY(&freehead),
              "Global free list empty after take");
 
     return NULL;

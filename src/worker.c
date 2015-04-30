@@ -188,7 +188,7 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
     VSTAILQ_INSERT_TAIL(&wrk->wrk_freelist, entry, freelist);
     wrk->wrk_nfree++;
 
-    if (dtbl.nfree == 0) {
+    if (global_nfree == 0) {
         DATA_Return_Freelist(&wrk->wrk_freelist, wrk->wrk_nfree);
         wrk->wrk_nfree = 0;
         assert(VSTAILQ_EMPTY(&wrk->wrk_freelist));
