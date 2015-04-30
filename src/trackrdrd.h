@@ -165,40 +165,6 @@ dataentry *SPMCQ_Deq(void);
 void SPMCQ_Drain(void);
 unsigned SPMCQ_NeedWorker(int running);
 
-#define spmcq_wait(what)						\
-    do {								\
-        AZ(pthread_mutex_lock(&spmcq_##what##waiter_lock));		\
-        spmcq_##what##waiter++;                                         \
-        AZ(pthread_cond_wait(&spmcq_##what##waiter_cond,		\
-                &spmcq_##what##waiter_lock));                           \
-        spmcq_##what##waiter--;                                         \
-        AZ(pthread_mutex_unlock(&spmcq_##what##waiter_lock));           \
-    } while (0)
-
-/* 
- * the first test is not synced, so we might enter the if body too late or
- * unnecessarily
- *
- * * too late: doesn't matter, will come back next time
- * * unnecessarily: we'll find out now
- */
-
-#define spmcq_signal(what)						\
-    do {								\
-        if (spmcq_##what##waiter) {					\
-            AZ(pthread_mutex_lock(&spmcq_##what##waiter_lock));         \
-            if (spmcq_##what##waiter)                                   \
-                AZ(pthread_cond_signal(&spmcq_##what##waiter_cond));    \
-            AZ(pthread_mutex_unlock(&spmcq_##what##waiter_lock));	\
-        }								\
-    } while (0)
-
-/* Producer waits for this condition when the spmc queue is full.
-   Consumers signal this condition after dequeue. */
-pthread_cond_t  spmcq_roomwaiter_cond;
-pthread_mutex_t spmcq_roomwaiter_lock;
-int		spmcq_roomwaiter;
-
 /* Consumers wait for this condition when the spmc queue is empty.
    Producer signals this condition after enqueue. */
 pthread_cond_t  spmcq_datawaiter_cond;
@@ -322,7 +288,3 @@ typedef enum { VCL_LOG_DATA, VCL_LOG_KEY } vcl_log_t;
 int Parse_VCL_Log(const char *ptr, int len, char **data, int *datalen,
                   vcl_log_t *type);
 int Parse_Timestamp(const char *ptr, int len, struct timeval *t);
-
-/* generic init attributes */
-pthread_mutexattr_t attr_lock;
-pthread_condattr_t  attr_cond;

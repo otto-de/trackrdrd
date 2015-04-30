@@ -150,6 +150,24 @@ sigflush(int sig)
 
 /*--------------------------------------------------------------------*/
 
+/* 
+ * the first test is not synced, so we might enter the if body too late or
+ * unnecessarily
+ *
+ * * too late: doesn't matter, will come back next time
+ * * unnecessarily: we'll find out now
+ */
+static inline void
+spmcq_signal(void)
+{
+    if (spmcq_datawaiter) {
+        AZ(pthread_mutex_lock(&spmcq_datawaiter_lock));
+        if (spmcq_datawaiter)
+            AZ(pthread_cond_signal(&spmcq_datawaiter_cond));
+        AZ(pthread_mutex_unlock(&spmcq_datawaiter_lock));
+    }
+}
+
 /* efficiently retrieve a single data entry */
 
 static inline dataentry
@@ -158,7 +176,7 @@ static inline dataentry
     dataentry *data;
 
     while (VSTAILQ_EMPTY(&reader_freelist)) {
-        spmcq_signal(data);
+        spmcq_signal();
         rdr_data_free = DATA_Take_Freelist(&reader_freelist);
         if (VSTAILQ_EMPTY(&reader_freelist)) {
             data_exhausted = 1;
@@ -200,19 +218,15 @@ data_submit(dataentry *de)
     SPMCQ_Enq(de);
     submitted++;
 
-    /* should we wake up another worker? */
-    wrk_running = WRK_Running();
-    if (SPMCQ_NeedWorker(wrk_running))
-        spmcq_signal(data);
-
-    /*
+    /* should we wake up another worker?
      * base case: wake up a worker if all are sleeping
      *
      * this is an un-synced access to spmcq_data_waiter, but
      * if we don't wake them up now, we will next time around
      */
-    if (wrk_running == spmcq_datawaiter)
-        spmcq_signal(data);
+    wrk_running = WRK_Running();
+    if (wrk_running == spmcq_datawaiter || SPMCQ_NeedWorker(wrk_running))
+        spmcq_signal();
 }
 
 static inline void

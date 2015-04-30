@@ -193,8 +193,6 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
         wrk->wrk_nfree = 0;
         assert(VSTAILQ_EMPTY(&wrk->wrk_freelist));
     }
-
-    spmcq_signal(room);
 }
 
 static void
@@ -264,7 +262,7 @@ static void
             spmcq_datawaiter++;
             wrk->state = WRK_WAITING;
             AZ(pthread_cond_wait(&spmcq_datawaiter_cond,
-                    &spmcq_datawaiter_lock));
+                                 &spmcq_datawaiter_lock));
             spmcq_datawaiter--;
             wrk->state = WRK_RUNNING;
         }
@@ -307,8 +305,6 @@ static void wrk_cleanup(void)
     free(thread_data);
     AZ(pthread_mutex_destroy(&spmcq_datawaiter_lock));
     AZ(pthread_cond_destroy(&spmcq_datawaiter_cond));
-    AZ(pthread_mutex_destroy(&spmcq_roomwaiter_lock));
-    AZ(pthread_cond_destroy(&spmcq_roomwaiter_cond));
     cleaned = 1;
 }
 
@@ -344,10 +340,6 @@ WRK_Init(void)
     spmcq_datawaiter = 0;
     AZ(pthread_mutex_init(&spmcq_datawaiter_lock, NULL));
     AZ(pthread_cond_init(&spmcq_datawaiter_cond, NULL));
-
-    spmcq_roomwaiter = 0;
-    AZ(pthread_mutex_init(&spmcq_roomwaiter_lock, NULL));
-    AZ(pthread_cond_init(&spmcq_roomwaiter_cond, NULL));
 
     atexit(wrk_cleanup);
     return 0;
