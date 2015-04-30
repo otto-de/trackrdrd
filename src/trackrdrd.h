@@ -260,6 +260,8 @@ struct config {
     char	user_name[BUFSIZ];
     uid_t	uid;
     gid_t	gid;
+
+#define DEF_IDLE_PAUSE 0.01
     double	idle_pause;
 } config;
 

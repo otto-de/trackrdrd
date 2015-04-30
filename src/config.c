@@ -179,6 +179,18 @@ CONF_Add(const char *lval, const char *rval)
         return(EINVAL);
     }
 
+    if (strcmp(lval, "idle.pause") == 0) {
+        char *p;
+        errno = 0;
+        double d = strtod(rval, &p);
+        if (errno == ERANGE)
+            return errno;
+        if (p[0] != '\0' || d < 0 || isnan(d) || !finite(d))
+            return EINVAL;
+        config.idle_pause = d;
+        return 0;
+    }
+
     return EINVAL;
 }
 
@@ -198,6 +210,7 @@ CONF_Init(void)
     config.maxdata = DEF_MAXDATA;
     config.maxkeylen = DEF_MAXKEYLEN;
     config.qlen_goal = DEF_QLEN_GOAL;
+    config.idle_pause = DEF_IDLE_PAUSE;
 
     config.mq_module[0] = '\0';
     config.mq_config_file[0] = '\0';
@@ -253,6 +266,7 @@ CONF_Dump(void)
     confdump("nworkers = %u", config.nworkers);
     confdump("restarts = %u", config.restarts);
     confdump("restart.pause = %u", config.restart_pause);
+    confdump("idle.pause = %f", config.idle_pause);
     confdump("thread.restarts = %u", config.thread_restarts);
     confdump("user = %s", config.user_name);
 }
