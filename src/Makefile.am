@@ -31,7 +31,7 @@ trackrdrd_LDADD = \
 trackrdrd_LDFLAGS = -ldl
 
 BUILT_SOURCES = usage.h vcs_version.h
-MAINTAINERCLEANFILES = usage.h vcs_version.h 
+DISTCLEANFILES = usage.h vcs_version.h 
 
 usage.h: $(top_srcdir)/synopsis.txt $(top_srcdir)/options.txt
 	( \

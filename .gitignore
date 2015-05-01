@@ -46,7 +46,6 @@ src/usage.h
 src/test/test_append
 src/test/test_config
 src/test/test_data
-src/test/test_hash
 src/test/test_mq
 src/test/test_parse
 src/test/test_spmcq
