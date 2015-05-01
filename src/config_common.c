@@ -33,6 +33,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <stdlib.h>
+
+#include "config.h"
 
 #include "config_common.h"
 
@@ -60,10 +63,24 @@ conf_ParseLine(char *ptr, char **lval, char **rval)
     return(0);
 }
 
+static int
+conf_get_line(char *line, FILE *in)
+{
+#ifdef HAVE_GETLINE
+    size_t n = BUFSIZ;
+    errno = 0;
+    return (getline(&line, &n, in));
+#else
+    if (fgets(line, BUFSIZ, in) == NULL)
+        return -1;
+    return 0;
+#endif
+}
+
 int
 CONF_ReadFile(const char *file, conf_add_f *conf_add) {
     FILE *in;
-    char line[BUFSIZ];
+    char *line;
     int linenum = 0;
 
     in = fopen(file, "r");
@@ -71,10 +88,13 @@ CONF_ReadFile(const char *file, conf_add_f *conf_add) {
         perror(file);
         return(-1);
     }
-    
-    while (fgets(line, BUFSIZ, in) != NULL) {
+
+    line = (char *) malloc(BUFSIZ);
+    if (line == NULL)
+        return ENOMEM;
+    while (conf_get_line(line, in) != -1) {
         char orig[BUFSIZ];
-        
+
         linenum++;
         char *comment = strchr(line, '#');
         if (comment != NULL)
@@ -92,7 +112,7 @@ CONF_ReadFile(const char *file, conf_add_f *conf_add) {
         ptr = line;
         while (isspace(*ptr) && *++ptr)
             ;
-        strcpy(orig, ptr);
+        strncpy(orig, ptr, BUFSIZ);
         char *lval, *rval;
         if (conf_ParseLine(ptr, &lval, &rval) != 0) {
             fprintf(stderr, "Cannot parse %s line %d: '%s'\n", file, linenum,
@@ -103,9 +123,21 @@ CONF_ReadFile(const char *file, conf_add_f *conf_add) {
         int ret;
         if ((ret = conf_add((const char *) lval, (const char *) rval)) != 0) {
             fprintf(stderr, "Error in %s line %d (%s): '%s'\n", file, linenum,
-                strerror(ret), orig);
+                    strerror(ret), orig);
             return(-1);
         }
     }
-    return(0);
+    int ret = 0;
+    if (ferror(in)) {
+        fprintf(stderr, "Error reading file %s (errno %d: %s)\n", file, errno,
+                strerror(errno));
+        ret = -1;
+    }
+    errno = 0;
+    if (fclose(in) != 0) {
+        fprintf(stderr, "Error closing file %s: %s)\n", file,  strerror(errno));
+        ret = -1;
+    }
+    free(line);
+    return(ret);
 }
