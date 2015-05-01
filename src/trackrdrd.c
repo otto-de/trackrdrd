@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012-2014 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2015 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2015 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -54,6 +54,7 @@
 #include <pwd.h>
 
 #include "vas.h"
+#include "vdef.h"
 
 #include "trackrdrd.h"
 #include "config_common.h"
@@ -276,7 +277,7 @@ main(int argc, char * const *argv)
         usage(EXIT_FAILURE);
 
     if (c_arg) {
-        strcpy(cli_config_filename, c_arg);
+        bprintf(cli_config_filename, "%s", c_arg);
         printf("Reading config from %s\n", c_arg);
         if (CONF_ReadFile(c_arg, CONF_Add) != 0)
             exit(EXIT_FAILURE);
@@ -304,13 +305,13 @@ main(int argc, char * const *argv)
     }
         
     if (P_arg)
-        strcpy(config.pid_file, P_arg);
+        bprintf(config.pid_file, "%s", P_arg);
     if (n_arg)
-        strcpy(config.varnish_name, n_arg);
+        bprintf(config.varnish_name, "%s", n_arg);
     if (l_arg)
-        strcpy(config.log_file, l_arg);
+        bprintf(config.log_file, "%s", l_arg);
     if (f_arg) {
-        strcpy(config.varnish_bindump, f_arg);
+        bprintf(config.varnish_bindump, "%s", f_arg);
     }
         
     if (LOG_Open(PACKAGE_NAME) != 0) {

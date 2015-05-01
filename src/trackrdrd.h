@@ -159,16 +159,25 @@ void CHILD_Main(int readconfig);
 #define EMPTY(s) (s[0] == '\0')
 
 #define DEFAULT_CONFIG "/etc/trackrdrd.conf"
-char cli_config_filename[BUFSIZ];
+char cli_config_filename[PATH_MAX + 1];
 
 struct config {
-    char	pid_file[BUFSIZ];
-    char	varnish_name[BUFSIZ];
-    char	vsmfile[PATH_MAX + 1];
-    char	log_file[BUFSIZ];
-    char	varnish_bindump[BUFSIZ];
+    char	pid_file[PATH_MAX];
+    char	varnish_name[PATH_MAX];
+    char	vsmfile[PATH_MAX];
+    char	log_file[PATH_MAX];
+    char	varnish_bindump[PATH_MAX];
+    char	mq_module[PATH_MAX];
+    char	mq_config_file[PATH_MAX];
+    char	user_name[LOGIN_NAME_MAX + 1];
+    char	syslog_facility_name[sizeof("LOCAL0")];
+
+#define DEF_IDLE_PAUSE 0.01
+    double	idle_pause;
+
+    uid_t	uid;
+    gid_t	gid;
     int		syslog_facility;
-    char	syslog_facility_name[BUFSIZ];
     unsigned	monitor_interval;
     unsigned	monitor_workers;
 
@@ -193,18 +202,10 @@ struct config {
     unsigned	qlen_goal;
 #define DEF_QLEN_GOAL 1024
 
-    char	mq_module[BUFSIZ];
-    char	mq_config_file[BUFSIZ];
     unsigned	nworkers;
     unsigned	restarts;
     unsigned	restart_pause;
     unsigned	thread_restarts;
-    char	user_name[BUFSIZ];
-    uid_t	uid;
-    gid_t	gid;
-
-#define DEF_IDLE_PAUSE 0.01
-    double	idle_pause;
 } config;
 
 void CONF_Init(void);

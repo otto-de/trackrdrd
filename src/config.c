@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012-2014 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2015 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2015 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -46,6 +46,7 @@
 #include "config_common.h"
 
 #include "vas.h"
+#include "vdef.h"
 
 #define DEFAULT_USER "nobody"
 
@@ -87,10 +88,12 @@ conf_getUnsignedInt(const char *rval, unsigned *i)
     return(0);
 }
 
-#define confString(name,fld)         \
-    if (strcmp(lval, (name)) == 0) { \
-        strcpy((config.fld), rval);  \
-        return(0);                   \
+#define confString(name,fld)                    \
+    if (strcmp(lval, (name)) == 0) {            \
+        if (strlen(rval) >= sizeof(config.fld)) \
+            return EINVAL;                      \
+        bprintf((config.fld), "%s", rval);      \
+        return(0);                              \
     }
 
 #define confUnsigned(name,fld)                   \
@@ -140,10 +143,12 @@ CONF_Add(const char *lval, const char *rval)
     }
 
     if (strcmp(lval, "syslog.facility") == 0) {
+        if (strlen(rval) + 1 > sizeof(config.syslog_facility_name))
+            return EINVAL;
         if ((ret = conf_getFacility(rval)) < 0)
             return EINVAL;
         config.syslog_facility = ret;
-        strcpy(config.syslog_facility_name, rval);
+        bprintf(config.syslog_facility_name, "%s", rval);
         char *p = &config.syslog_facility_name[0];
         do { *p = toupper(*p); } while (*++p);
         return(0);
@@ -155,7 +160,7 @@ CONF_Add(const char *lval, const char *rval)
         pw = getpwnam(rval);
         if (pw == NULL)
             return(EINVAL);
-        strcpy(config.user_name, pw->pw_name);
+        bprintf(config.user_name, "%s", pw->pw_name);
         config.uid = pw->pw_uid;
         config.gid = pw->pw_gid;
         return(0);
@@ -183,7 +188,7 @@ CONF_Add(const char *lval, const char *rval)
         char *p;
         errno = 0;
         double d = strtod(rval, &p);
-        if (errno == ERANGE)
+        if (errno)
             return errno;
         if (p[0] != '\0' || d < 0 || isnan(d) || !finite(d))
             return EINVAL;
@@ -223,7 +228,7 @@ CONF_Init(void)
     if (pw == NULL)
         pw = getpwuid(getuid());
     AN(pw);
-    strcpy(config.user_name, pw->pw_name);
+    bprintf(config.user_name, "%s", pw->pw_name);
     config.uid = pw->pw_uid;
     config.gid = pw->pw_gid;
 }
