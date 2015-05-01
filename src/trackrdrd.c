@@ -222,7 +222,7 @@ main(int argc, char * const *argv)
 {
     int c, d_flag = 0, D_flag = 0, err;
     const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
-        *y_arg = NULL, *c_arg = NULL, *u_arg = NULL;
+        *y_arg = NULL, *c_arg = NULL, *u_arg = NULL, *N_arg = NULL;
     pid_t child_pid;
 
     CONF_Init();
@@ -234,7 +234,7 @@ main(int argc, char * const *argv)
     }
     cli_config_filename[0] = '\0';
 
-    while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:D")) != -1) {
+    while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:DN:")) != -1) {
         switch (c) {
         case 'P':
             P_arg = optarg;
@@ -244,6 +244,9 @@ main(int argc, char * const *argv)
             exit(EXIT_SUCCESS);
         case 'n':
             n_arg = optarg;
+            break;
+        case 'N':
+            N_arg = optarg;
             break;
         case 'l':
             l_arg = optarg;
@@ -282,8 +285,10 @@ main(int argc, char * const *argv)
         if (CONF_ReadFile(c_arg, CONF_Add) != 0)
             exit(EXIT_FAILURE);
     }
-        
-    if (f_arg && n_arg)
+
+    if (n_arg && N_arg)
+        usage(EXIT_FAILURE);
+    if (f_arg && (n_arg || N_arg))
         usage(EXIT_FAILURE);
     if (l_arg && y_arg)
         usage(EXIT_FAILURE);
@@ -310,10 +315,11 @@ main(int argc, char * const *argv)
         bprintf(config.varnish_name, "%s", n_arg);
     if (l_arg)
         bprintf(config.log_file, "%s", l_arg);
-    if (f_arg) {
+    if (f_arg)
         bprintf(config.varnish_bindump, "%s", f_arg);
-    }
-        
+    if (N_arg)
+        bprintf(config.vsmfile, "%s", N_arg);
+
     if (LOG_Open(PACKAGE_NAME) != 0) {
         exit(EXIT_FAILURE);
     }

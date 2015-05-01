@@ -117,6 +117,7 @@ CONF_Add(const char *lval, const char *rval)
     
     confString("pid.file", pid_file);
     confString("varnish.name", varnish_name);
+    confString("varnish.file", vsmfile);
     confString("log.file", log_file);
     confString("varnish.bindump", varnish_bindump);
     confString("mq.module", mq_module);
@@ -206,6 +207,7 @@ CONF_Init(void)
 
     strcpy(config.pid_file, "/var/run/trackrdrd.pid");
     config.varnish_name[0] = '\0';
+    config.vsmfile[0] = '\0';
     config.log_file[0] = '\0';
     config.varnish_bindump[0] = '\0';
     config.syslog_facility = LOG_LOCAL0;
@@ -255,6 +257,7 @@ CONF_Dump(int level)
 {
     confdump(level, "pid.file = %s", config.pid_file);
     confdump(level, "varnish.name = %s", config.varnish_name);
+    confdump(level, "varnish.file = %s", config.vsmfile);
     confdump(level, "log.file = %s",
              strcmp(config.log_file,"-") == 0 ? "stdout" : config.log_file);
     confdump(level, "varnish.bindump = %s", config.varnish_bindump);
