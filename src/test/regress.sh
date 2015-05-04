@@ -12,22 +12,38 @@
 
 echo
 echo "TEST: $0"
-echo "... testing log output at debug level against a known checksum"
-CMD="../trackrdrd -D -f varnish.binlog -l - -d -c test.conf"
+echo '... testing messages & log output at debug level against known checksums'
+
+LOG=mq_log.log
+MSG=mq_test.log
+
+rm -f $LOG $MSG
+
+../trackrdrd -D -f varnish.binlog -l $LOG -d -c test.conf
+
+# Check ckums of the log with and without logs from the worker thread,
+# since these are written asynchronously.
 
 # the first sed removes the version/revision from the "initializing" line
 # the second sed removes the user under which the child process runs
 # "Not running as root" filtered so that the test is independent of
 # the user running it
-CKSUM=$( $CMD | sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(Running as\) \([a-zA-Z0-9]*\)$/\1/' | grep -v 'Not running as root' | cksum)
-
-if [ "$CKSUM" != '1821498238 249681' ]; then
+CKSUM=$( grep -v 'Worker 1' $LOG |  sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(Running as\) \([a-zA-Z0-9]*\)$/\1/' | grep -v 'Not running as root' | cksum)
+if [ "$CKSUM" != '3218424934 214113' ]; then
     echo "ERROR: Regression test incorrect log cksum: $CKSUM"
     exit 1
 fi
 
-CKSUM=$(cksum mq_test.log)
-if [ "$CKSUM" != '3675018591 29491 mq_test.log' ]; then
+# Now check the logs from the worker thread
+CKSUM=$( grep 'Worker 1' $LOG | cksum)
+if [ "$CKSUM" != '1219614274 35546' ]; then
+    echo "ERROR: Regression test incorrect output cksum: $CKSUM"
+    exit 1
+fi
+
+# Check the messages and keys
+CKSUM=$(cksum $MSG)
+if [ "$CKSUM" != "3675018591 29491 $MSG" ]; then
     echo "ERROR: Regression test incorrect output cksum: $CKSUM"
     exit 1
 fi
