@@ -59,6 +59,7 @@ src/mq/kafka/test/test_send
 src/test/stderr.txt
 src/test/testing.log
 src/test/mq_test.log
+src/test/mq_log.log
 src/test/trackrdrd.pid
 src/test/trackrdrd_001.conf.new
 src/test/trackrdrd_002.conf.new
