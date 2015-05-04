@@ -79,15 +79,16 @@ case $target in
 esac
 
 # optionally choose the MQ plugins to build, by default all
+KAFKA_LIBS=""
 AC_ARG_ENABLE([kafka], [AS_HELP_STRING([--enable-kafka],
                        [build the Kafka MQ plugin @<:@default=yes@:>@])],
                        [], [enable_kafka=yes])
 AM_CONDITIONAL([KAFKA_OPT], [test "$enable_kafka" = yes])
 AS_IF([test "x$enable_kafka" != xno],
       [
-      AC_CHECK_LIB([zookeeper_mt], [zookeeper_init], [],
+      AC_CHECK_LIB([zookeeper_mt], [zookeeper_init], [true],
                    AC_MSG_ERROR([libzookeeper_mt is required]))
-      AC_CHECK_LIB([rdkafka], [rd_kafka_new], [],
+      AC_CHECK_LIB([rdkafka], [rd_kafka_new], [true],
                    AC_MSG_ERROR([librdkafka is required]))
       ], [])
 
