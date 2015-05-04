@@ -7,7 +7,7 @@ check_PROGRAMS = test_parse test_data test_append test_mq	\
 	test_spmcq test_config test_worker
 
 CLEANFILES = testing.log stderr.txt trackrdrd.pid trackrdrd_*.conf.new
-DISTCLEANFILES = mq_test.log
+DISTCLEANFILES = mq_test.log mq_log.log
 
 test_parse_SOURCES = \
 	minunit.h \
