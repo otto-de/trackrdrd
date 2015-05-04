@@ -158,16 +158,19 @@ DEVELOPER_CLANG_CFLAGS="-Wmissing-variable-declarations -Wno-string-plus-int"
 
 # --enable-stack-protector
 AC_ARG_ENABLE(stack-protector,
-       AS_HELP_STRING([--enable-stack-protector],[enable stack protector (default is YES)]),
+       AS_HELP_STRING([--enable-stack-protector],
+                      [enable stack protector (default is YES)]),
        [],
        [enable_stack_protector=yes])
 
-if test "x$enable_stack_protector" != "xno"; then
-	AX_CHECK_COMPILE_FLAG([-fstack-protector],
-		AX_CHECK_LINK_FLAG([-fstack-protector],
-			[DEVELOPER_CFLAGS="${DEVELOPER_CFLAGS} -fstack-protector"], [], []),
-		[], [])
-fi
+AS_IF([test "x$enable_stack_protector" != xno],
+      [
+      AX_CHECK_COMPILE_FLAG([-fstack-protector],
+                            AX_CHECK_LINK_FLAG([-fstack-protector],
+	             [DEVELOPER_CFLAGS="${DEVELOPER_CFLAGS} -fstack-protector"],
+                                               [], [])
+		            [], [])
+      ], [])
 
 # --enable-developer-warnings
 # cf. Varnish configure.ac, which checks compile flags more carefully
