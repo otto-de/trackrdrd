@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2012-2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2012-2014 Otto Gmbh & Co KG
+ * Copyright (c) 2012-2015 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2012-2015 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -112,29 +112,42 @@ void WRK_Shutdown(void);
 
 #define OCCUPIED(e) ((e)->occupied == 1)
 
-unsigned global_nfree;
+unsigned global_nfree_rec, global_nfree_chunk;
+
+typedef struct chunk_t {
+    unsigned magic;
+#define CHUNK_MAGIC 0x224a86ed
+    char *data;
+    VSTAILQ_ENTRY(chunk_t) freelist;
+    VSTAILQ_ENTRY(chunk_t) chunklist;
+    unsigned char occupied;
+} chunk_t;
+
+typedef VSTAILQ_HEAD(chunkhead_s, chunk_t) chunkhead_t;
 
 struct dataentry_s {
     unsigned 			magic;
 #define DATA_MAGIC 0xb41cb1e1
+    chunkhead_t			chunks;
     VSTAILQ_ENTRY(dataentry_s)	freelist;
     VSTAILQ_ENTRY(dataentry_s)	spmcq;
-
-    char			*data;
     char			*key;
-
-    unsigned			end;	/* End of string index in data */
+    chunk_t			*curchunk;
+    unsigned			curchunkidx;
     unsigned			keylen;
-    char			occupied;
+    unsigned			end;	/* End of string index in data */
+    unsigned char		occupied;
 };
 typedef struct dataentry_s dataentry;
 
-VSTAILQ_HEAD(freehead_s, dataentry_s);
+VSTAILQ_HEAD(rechead_s, dataentry_s);
 
 int DATA_Init(void);
-void DATA_Reset(dataentry *entry);
-unsigned DATA_Take_Freelist(struct freehead_s *dst);
-void DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned);
+unsigned DATA_Reset(dataentry *entry, chunkhead_t * const freechunk);
+unsigned DATA_Take_Freerec(struct rechead_s *dst);
+void DATA_Return_Freerec(struct rechead_s *returned, unsigned nreturned);
+unsigned DATA_Take_Freechunk(struct chunkhead_s *dst);
+void DATA_Return_Freechunk(struct chunkhead_s *returned, unsigned nreturned);
 void DATA_Dump(void);
 
 /* spmcq.c */
@@ -154,6 +167,7 @@ int		spmcq_datawaiter;
 /* child.c */
 void RDR_Stats(void);
 void CHILD_Main(int readconfig);
+int RDR_Exhausted(void);
 
 /* config.c */
 #define EMPTY(s) (s[0] == '\0')
@@ -206,6 +220,8 @@ struct config {
     unsigned	restarts;
     unsigned	restart_pause;
     unsigned	thread_restarts;
+    unsigned	chunk_size;
+#define DEF_CHUNK_SIZE 64
 } config;
 
 void CONF_Init(void);
@@ -259,7 +275,7 @@ void *MON_StatusThread(void *arg);
 void MON_Output(void);
 void MON_StatusShutdown(pthread_t monitor);
 void MON_StatsInit(void);
-void MON_StatsUpdate(stats_update_t update, unsigned n);
+void MON_StatsUpdate(stats_update_t update, unsigned nchunks, unsigned nbytes);
 
 /* parse.c */
 

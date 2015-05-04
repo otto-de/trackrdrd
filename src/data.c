@@ -40,6 +40,7 @@
 
 #include "vas.h"
 #include "miniobj.h"
+#include "vsb.h"
 
 /* Preprend head2 before head1, result in head1, head2 empty afterward */
 #define	VSTAILQ_PREPEND(head1, head2) do {                      \
@@ -53,108 +54,181 @@
         VSTAILQ_INIT((head2));                                  \
 } while (0)
 
-static pthread_mutex_t freelist_lock;
-static char *buf;
+static pthread_mutex_t freerec_lock, freechunk_lock;
+static char *buf, *keybuf;
 
 static void
 data_Cleanup(void)
 {
+    free(chunktbl);
     free(entrytbl);
+    free(keybuf);
     free(buf);
-    AZ(pthread_mutex_destroy(&freelist_lock));
+    AZ(pthread_mutex_destroy(&freerec_lock));
+    AZ(pthread_mutex_destroy(&freechunk_lock));
 }
 
 int
 DATA_Init(void)
 {
-    unsigned bufsize = config.max_reclen + config.maxkeylen;
-    
-    /*
-     * we want enough space to accomodate all open and done records
-     *
-     */
+    unsigned chunks_per_rec
+        = (config.max_reclen + config.chunk_size - 1) / config.chunk_size;
+    unsigned nchunks = chunks_per_rec * config.max_records;
+
     entrytbl = (dataentry *) calloc(config.max_records, sizeof(dataentry));
     if (entrytbl == NULL)
         return(errno);
 
-    buf = (char *) calloc(config.max_records, bufsize);
-    if (buf == NULL) {
+    chunktbl = (chunk_t *) calloc(nchunks, sizeof(chunk_t));
+    if (chunktbl == NULL) {
         free(entrytbl);
         return(errno);
     }
 
-    VSTAILQ_INIT(&freehead);
-    AZ(pthread_mutex_init(&freelist_lock, NULL));
+    buf = (char *) calloc(nchunks, config.chunk_size);
+    if (buf == NULL) {
+        free(entrytbl);
+        free(chunktbl);
+        return(errno);
+    }
 
-    global_nfree  = 0;
+    keybuf = (char *) calloc(config.max_records, config.maxkeylen);
+    if (keybuf == NULL) {
+        free(entrytbl);
+        free(chunktbl);
+        free(buf);
+        return(errno);
+    }
+
+    VSTAILQ_INIT(&freechunkhead);
+    VSTAILQ_INIT(&freerechead);
+    AZ(pthread_mutex_init(&freerec_lock, NULL));
+    AZ(pthread_mutex_init(&freechunk_lock, NULL));
+
+    global_nfree_rec = config.max_records;
+    global_nfree_chunk = nchunks;
+
+    for (int i = 0; i < nchunks; i++) {
+        chunktbl[i].magic = CHUNK_MAGIC;
+        chunktbl[i].data = &buf[i * config.chunk_size];
+        VSTAILQ_INSERT_TAIL(&freechunkhead, &chunktbl[i], freelist);
+    }
 
     for (unsigned i = 0; i < config.max_records; i++) {
         entrytbl[i].magic = DATA_MAGIC;
-        entrytbl[i].data = &buf[i * bufsize];
-        entrytbl[i].key = &buf[(i * bufsize) + config.max_reclen];
-        VSTAILQ_INSERT_TAIL(&freehead, &entrytbl[i], freelist);
-        global_nfree++;
+        entrytbl[i].key = &keybuf[(i * config.maxkeylen)];
+        VSTAILQ_INIT(&entrytbl[i].chunks);
+        VSTAILQ_INSERT_TAIL(&freerechead, &entrytbl[i], freelist);
     }
-    assert(global_nfree == config.max_records);
-    assert(VSTAILQ_FIRST(&freehead));
 
     atexit(data_Cleanup);
     return(0);
 }
 
-void
-DATA_Reset(dataentry *entry)
+unsigned
+DATA_Reset(dataentry *entry, chunkhead_t * const freechunk)
 {
+    chunk_t *chunk;
+    unsigned nchunk = 0;
+
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     entry->occupied = 0;
     entry->end = 0;
-    *entry->data = '\0';
     entry->keylen = 0;
     *entry->key = '\0';
+    entry->curchunk = NULL;
+    entry->curchunkidx = 0;
+
+    while ((chunk = VSTAILQ_FIRST(&entry->chunks)) != NULL) {
+        CHECK_OBJ(chunk, CHUNK_MAGIC);
+        chunk->occupied = 0;
+        *chunk->data = '\0';
+        VSTAILQ_REMOVE_HEAD(&entry->chunks, chunklist);
+        VSTAILQ_INSERT_HEAD(freechunk, chunk, freelist);
+        nchunk++;
+    }
+    assert(VSTAILQ_EMPTY(&entry->chunks));
+    return nchunk;
 }
 
 /* 
- * take all free entries from the datatable for lockless
- * allocation
+ * prepend a global freelist to the reader's freelist for access with rare
+ * locking
  */
-
-unsigned
-DATA_Take_Freelist(struct freehead_s *dst)
-{
-    unsigned nfree;
-
-    AZ(pthread_mutex_lock(&freelist_lock));
-    nfree = global_nfree;
-    global_nfree = 0;
-    VSTAILQ_PREPEND(dst, &freehead);
-    AZ(pthread_mutex_unlock(&freelist_lock));
-    return nfree;
+#define DATA_Take_Free(type)                            \
+unsigned                                                \
+DATA_Take_Free##type(struct type##head_s *dst)          \
+{                                                       \
+    unsigned nfree;                                     \
+                                                        \
+    AZ(pthread_mutex_lock(&free##type##_lock));         \
+    VSTAILQ_PREPEND(dst, &free##type##head);            \
+    nfree = global_nfree_##type;                        \
+    global_nfree_##type = 0;                            \
+    AZ(pthread_mutex_unlock(&free##type##_lock));       \
+    return nfree;                                       \
 }
+
+DATA_Take_Free(rec)
+DATA_Take_Free(chunk)
 
 /*
- * return to freehead
- *
+ * return to global freelist
  * returned must be locked by caller, if required
  */
-void
-DATA_Return_Freelist(struct freehead_s *returned, unsigned nreturned)
-{
-    AZ(pthread_mutex_lock(&freelist_lock));
-    VSTAILQ_PREPEND(&freehead, returned);
-    global_nfree += nreturned;
-    AZ(pthread_mutex_unlock(&freelist_lock));
+#define DATA_Return_Free(type)                                          \
+void                                                                    \
+DATA_Return_Free##type(struct type##head_s *returned, unsigned nreturned) \
+{                                                                       \
+    AZ(pthread_mutex_lock(&free##type##_lock));                         \
+    VSTAILQ_PREPEND(&free##type##head, returned);                       \
+    global_nfree_##type += nreturned;                                   \
+    AZ(pthread_mutex_unlock(&free##type##_lock));                       \
 }
+
+DATA_Return_Free(rec)
+DATA_Return_Free(chunk)
 
 void
 DATA_Dump(void)
 {
+    struct vsb *data = VSB_new_auto();
+
     for (int i = 0; i < config.max_records; i++) {
         dataentry *entry = &entrytbl[i];
 
+        if (entry == NULL)
+            continue;
+        if (entry->magic != DATA_MAGIC) {
+            LOG_Log(LOG_ERR, "Invalid data entry at index %d, magic = 0x%08x, "
+                    "expected 0x%08x", i, entry->magic, DATA_MAGIC);
+        }
         if (!OCCUPIED(entry))
             continue;
+
+        VSB_clear(data);
+        if (entry->end) {
+            int n = entry->end;
+            chunk_t *chunk = VSTAILQ_FIRST(&entry->chunks);
+            while (n > 0 && chunk != NULL) {
+                if (chunk->magic != CHUNK_MAGIC) {
+                    LOG_Log(LOG_ERR,
+                            "Invalid chunk at index %d, magic = 0x%08x, "
+                            "expected 0x%08x",
+                            i, chunk->magic, CHUNK_MAGIC);
+                    continue;
+                }
+                int cp = n;
+                if (cp > config.chunk_size)
+                    cp = config.chunk_size;
+                VSB_bcat(data, chunk->data, cp);
+                n -= cp;
+                chunk = VSTAILQ_NEXT(chunk, chunklist);
+            }
+        }
+        VSB_finish(data);
         LOG_Log(LOG_INFO,
                 "Data entry %d: data=[%.*s] key=[%.*s]",
-                i, entry->end, entry->data, entry->keylen, entry->key);
+                i, entry->end, VSB_data(data), entry->keylen, entry->key);
     }
 }

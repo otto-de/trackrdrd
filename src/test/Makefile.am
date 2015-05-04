@@ -27,7 +27,8 @@ test_data_SOURCES = \
 
 test_data_LDADD = \
 	../data.$(OBJEXT) \
-	../assert.$(OBJEXT)
+	../assert.$(OBJEXT) \
+	@VARNISH_LIBS@ -L${VARNISH_PKG_LIB}/varnish -lvarnish
 
 test_append_SOURCES = \
 	../child.c \
@@ -46,7 +47,7 @@ test_append_LDADD = \
 	../config_common.$(OBJEXT) \
 	../sandbox.$(OBJEXT) \
 	../vtim.$(OBJEXT) \
-	@VARNISH_LIBS@
+	@VARNISH_LIBS@ -L${VARNISH_PKG_LIB}/varnish -lvarnish
 
 test_append_CFLAGS = -DTEST_DRIVER
 
@@ -97,4 +98,5 @@ test_worker_LDADD = \
 	../spmcq.$(OBJEXT) \
 	../data.$(OBJEXT) \
 	../assert.$(OBJEXT) \
-	../vtim.$(OBJEXT)
+	../vtim.$(OBJEXT) \
+	-L${VARNISH_PKG_LIB}/varnish -lvarnish

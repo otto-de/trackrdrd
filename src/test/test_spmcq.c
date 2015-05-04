@@ -87,7 +87,7 @@ static void
             proddata.fail = PRODUCER_BCAST;
             pthread_exit(&proddata);
         }
-        proddata.sum += (uintptr_t) entries[i].data;
+        proddata.sum += (uintptr_t) &entries[i].chunks;
     }
     debug_print("%s\n", "Producer: exit");
     pthread_exit((void *) &proddata);
@@ -135,13 +135,13 @@ static void
         } else {
             /* entry != NULL */
             debug_print("Consumer %d: dequeue %d\n", id, ++deqs);
-            pcdata->sum += (uintptr_t) entry->data;
+            pcdata->sum += (uintptr_t) &entry->chunks;
         }
     }
     debug_print("Consumer %d: drain queue, run = %d\n", id, run);
     while ((entry = SPMCQ_Deq()) != NULL) {
         debug_print("Consumer %d: dequeue %d\n", id, ++deqs);
-        pcdata->sum += (uintptr_t) entry->data;
+        pcdata->sum += (uintptr_t) &entry->chunks;
     }
     debug_print("Consumer %d: exit\n", id);
     pthread_exit((void *) pcdata);

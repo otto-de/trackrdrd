@@ -90,34 +90,43 @@ const char *version = PACKAGE_TARNAME "-" PACKAGE_VERSION " revision " \
     VCS_Version " branch " VCS_Branch;
 
 static unsigned len_hi = 0, debug = 0, data_exhausted = 0;
-    // chunk_exhausted = 0;
 
 static unsigned long seen = 0, submitted = 0, len_overflows = 0, no_data = 0,
     no_free_data = 0, vcl_log_err = 0, vsl_errs = 0, closed = 0, overrun = 0,
-    ioerr = 0, reacquire = 0, truncated = 0, key_hi = 0, key_overflows = 0;
-// no_free_chunk = 0;
+    ioerr = 0, reacquire = 0, truncated = 0, key_hi = 0, key_overflows = 0,
+    no_free_chunk = 0;
 
 static volatile sig_atomic_t flush = 0, term = 0;
 
 static struct sigaction terminate_action, dump_action, flush_action;
 
-/* Local freelist */
-static struct freehead_s reader_freelist = 
-    VSTAILQ_HEAD_INITIALIZER(reader_freelist);
-static unsigned rdr_data_free = 0;
+/* Local freelists */
+static struct rechead_s reader_freerec = 
+    VSTAILQ_HEAD_INITIALIZER(reader_freerec);
+static chunkhead_t reader_freechunk = 
+    VSTAILQ_HEAD_INITIALIZER(reader_freechunk);
+static unsigned rdr_rec_free = 0, rdr_chunk_free = 0;
 
 /*--------------------------------------------------------------------*/
 
 void
 RDR_Stats(void)
 {
-    LOG_Log(LOG_INFO, "Reader: seen=%lu submitted=%lu nodata=%lu free=%u "
-            "no_free_rec=%lu len_hi=%u key_hi=%lu len_overflows=%lu "
-            "truncated=%lu key_overflows=%lu vcl_log_err=%lu vsl_err=%lu "
-            "closed=%lu overrun=%lu ioerr=%lu reacquire=%lu",
-            seen, submitted, no_data, rdr_data_free, no_free_data, len_hi,
-            key_hi, len_overflows, truncated, key_overflows, vcl_log_err,
-            vsl_errs, closed, overrun, ioerr, reacquire);
+    LOG_Log(LOG_INFO, "Reader: seen=%lu submitted=%lu nodata=%lu free_rec=%u "
+            "free_chunk=%u no_free_rec=%lu no_free_chunk=%lu len_hi=%u "
+            "key_hi=%lu len_overflows=%lu truncated=%lu key_overflows=%lu "
+            "vcl_log_err=%lu vsl_err=%lu closed=%lu overrun=%lu ioerr=%lu "
+            "reacquire=%lu",
+            seen, submitted, no_data, rdr_rec_free, rdr_chunk_free,
+            no_free_data, no_free_chunk, len_hi, key_hi, len_overflows,
+            truncated, key_overflows, vcl_log_err, vsl_errs, closed, overrun,
+            ioerr, reacquire);
+}
+
+int
+RDR_Exhausted(void)
+{
+    return data_exhausted;
 }
 
 /*--------------------------------------------------------------------*/
@@ -175,22 +184,45 @@ static inline dataentry
 {
     dataentry *data;
 
-    while (VSTAILQ_EMPTY(&reader_freelist)) {
+    while (VSTAILQ_EMPTY(&reader_freerec)) {
         spmcq_signal();
-        rdr_data_free = DATA_Take_Freelist(&reader_freelist);
-        if (VSTAILQ_EMPTY(&reader_freelist)) {
+        rdr_rec_free = DATA_Take_Freerec(&reader_freerec);
+        if (VSTAILQ_EMPTY(&reader_freerec)) {
             data_exhausted = 1;
             return NULL;
         }
         if (debug)
             LOG_Log(LOG_DEBUG, "Reader: took %u free data entries",
-                    rdr_data_free);
+                    rdr_rec_free);
     }
     data_exhausted = 0;
-    data = VSTAILQ_FIRST(&reader_freelist);
-    VSTAILQ_REMOVE_HEAD(&reader_freelist, freelist);
-    rdr_data_free--;
+    data = VSTAILQ_FIRST(&reader_freerec);
+    VSTAILQ_REMOVE_HEAD(&reader_freerec, freelist);
+    rdr_rec_free--;
     return (data);
+}
+
+static inline chunk_t
+*take_chunk(void)
+{
+    chunk_t *chunk;
+
+    while (VSTAILQ_EMPTY(&reader_freechunk)) {
+        spmcq_signal();
+        rdr_chunk_free = DATA_Take_Freechunk(&reader_freechunk);
+        if (VSTAILQ_EMPTY(&reader_freechunk)) {
+            data_exhausted = 1;
+            return NULL;
+        }
+        if (debug)
+            LOG_Log(LOG_DEBUG, "Reader: took %u free chunks",
+                    rdr_chunk_free);
+    }
+    data_exhausted = 0;
+    chunk = VSTAILQ_FIRST(&reader_freechunk);
+    VSTAILQ_REMOVE_HEAD(&reader_freechunk, freelist);
+    rdr_chunk_free--;
+    return (chunk);
 }
 
 /* return to our own local cache */
@@ -200,7 +232,8 @@ data_free(dataentry *de)
 {
     AN(de);
     assert(!OCCUPIED(de));
-    VSTAILQ_INSERT_HEAD(&reader_freelist, de, freelist);
+    rdr_chunk_free += DATA_Reset(de, &reader_freechunk);
+    VSTAILQ_INSERT_HEAD(&reader_freerec, de, freelist);
 }
 
 static inline void
@@ -210,9 +243,27 @@ data_submit(dataentry *de)
 
     CHECK_OBJ_NOTNULL(de, DATA_MAGIC);
     assert(OCCUPIED(de));
-    AZ(memchr(de->data, '\0', de->end));
-    if (debug)
-        LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", de->end, de->data);
+    if (debug) {
+        chunk_t *chunk;
+        char *p, *data = (char *) malloc(de->end);
+        int n = de->end;
+        p = data;
+        chunk = VSTAILQ_FIRST(&de->chunks);
+        while (n > 0) {
+            CHECK_OBJ_NOTNULL(chunk, CHUNK_MAGIC);
+            assert(OCCUPIED(chunk));
+            int cp = n;
+            if (cp > config.chunk_size)
+                cp = config.chunk_size;
+            memcpy(p, chunk->data, cp);
+            chunk = VSTAILQ_NEXT(chunk, chunklist);
+            n -= cp;
+            p += cp;
+        }
+        assert(p == data + de->end);
+        LOG_Log(LOG_DEBUG, "submit: data=[%.*s]", de->end, data);
+        free(data);
+    }
 
     SPMCQ_Enq(de);
     submitted++;
@@ -231,7 +282,8 @@ data_submit(dataentry *de)
 static inline void
 take_free(void)
 {
-    rdr_data_free += DATA_Take_Freelist(&reader_freelist);
+    rdr_rec_free += DATA_Take_Freerec(&reader_freerec);
+    rdr_chunk_free += DATA_Take_Freechunk(&reader_freechunk);
 }
 
 /*--------------------------------------------------------------------*/
@@ -250,11 +302,35 @@ all_wrk_abandoned(void)
 
 /*--------------------------------------------------------------------*/
 
-static void
+static chunk_t *
+get_chunk(dataentry *entry)
+{
+    chunk_t *chunk;
+
+    CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+
+    chunk = take_chunk();
+    if (chunk == NULL) {
+        no_free_chunk++;
+        return NULL;
+    }
+    CHECK_OBJ(chunk, CHUNK_MAGIC);
+    assert(!OCCUPIED(chunk));
+    entry->curchunk = chunk;
+    entry->curchunkidx = 0;
+    VSTAILQ_INSERT_TAIL(&entry->chunks, chunk, chunklist);
+    chunk->occupied = 1;
+    return chunk;
+}
+
+static unsigned
 append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
        int datalen)
 {
-    char *null;
+    chunk_t *chunk;
+    char *null, *p;
+    unsigned chunks_added = 0;
+    int n;
 
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     /* Data overflow */
@@ -263,7 +339,7 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
             "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
             datalen, data);
         len_overflows++;
-        return;
+        return -1;
     }
     /* Null chars in the payload means that the data was truncated in the
        log, due to exceeding shm_reclen. */
@@ -273,14 +349,41 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
                 VSL_tags[tag], xid, datalen, data);
         truncated++;
     }
-        
-    entry->data[entry->end] = '&';
+
+    assert(entry->curchunkidx <= config.chunk_size);
+    if (entry->curchunkidx == config.chunk_size) {
+        chunk = get_chunk(entry);
+        if (chunk == NULL)
+            return -1;
+        chunks_added++;
+    }
+    entry->curchunk->data[entry->curchunkidx] = '&';
+    entry->curchunkidx++;
     entry->end++;
-    memcpy(&entry->data[entry->end], data, datalen);
+
+    p = data;
+    n = datalen;
+    while (n > 0) {
+        assert(entry->curchunkidx <= config.chunk_size);
+        if (entry->curchunkidx == config.chunk_size) {
+            chunk = get_chunk(entry);
+            if (chunk == NULL)
+                return -1;
+            chunks_added++;
+        }
+        int cp = n;
+        if (cp + entry->curchunkidx > config.chunk_size)
+            cp = config.chunk_size - entry->curchunkidx;
+        memcpy(&entry->curchunk->data[entry->curchunkidx], p, cp);
+        entry->curchunkidx += cp;
+        p += cp;
+        n -= cp;
+    }
+    assert(p == data + datalen);
     entry->end += datalen;
     if (entry->end > len_hi)
         len_hi = entry->end;
-    return;
+    return chunks_added;
 }
 
 static inline void
@@ -306,11 +409,12 @@ addkey(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *key,
 static int
 dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 {
-    int status = DISPATCH_RETURN_OK, hasdata = 0;
+    int status = DISPATCH_RETURN_OK, hasdata = 0, chunks = 0;
     dataentry *de = NULL;
     char reqend_str[REQEND_T_LEN];
     int32_t vxid;
     struct timeval latest_t = { 0 };
+    unsigned chunks_added = 0;
     (void) priv;
 
     if (all_wrk_abandoned())
@@ -342,11 +446,27 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
             assert(VSL_CLIENT(t->c->rec.ptr));
 
             if (de->end == 0) {
+                chunk_t *chunk;
+
+                chunk = get_chunk(de);
+                if (chunk == NULL) {
+                    if (debug)
+                        LOG_Log(LOG_DEBUG, "Free chunks exhausted, "
+                                "DATA DISCARDED: [Tx %d]", t->vxid);
+                    data_free(de);
+                    return status;
+                }
                 vxid = t->vxid;
-                snprintf(de->data, config.max_reclen, "XID=%u", t->vxid);
-                de->end = strlen(de->data);
+                de->curchunk = chunk;
+                /* XXX: minimum chunk size */
+                snprintf(de->curchunk->data, config.chunk_size, "XID=%u",
+                         t->vxid);
+                de->curchunkidx = strlen(de->curchunk->data);
+                de->end = de->curchunkidx;
+                de->occupied = 1;
                 if (de->end > len_hi)
                     len_hi = de->end;
+                chunks_added++;
             }
 
             len = VSL_LEN(t->c->rec.ptr) - 1;
@@ -382,7 +502,15 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
                             datalen, data);
 
                 if (data_type == VCL_LOG_DATA) {
-                    append(de, tag, xid, data, datalen);
+                    chunks = append(de, tag, xid, data, datalen);
+                    if (chunks < 0) {
+                        if (debug)
+                            LOG_Log(LOG_DEBUG, "Chunks exhausted, DATA "
+                                    "DISCARDED: %.*s", datalen, data);
+                        data_free(de);
+                        return status;
+                    }
+                    chunks_added += chunks;
                     hasdata = 1;
                 }
                 else
@@ -422,9 +550,16 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 
     snprintf(reqend_str, REQEND_T_LEN, "%s=%u.%06lu", REQEND_T_VAR,
              (unsigned) latest_t.tv_sec, latest_t.tv_usec);
-    append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
+    chunks = append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
+    if (chunks < 0) {
+        if (debug)
+            LOG_Log(LOG_DEBUG, "Chunks exhausted, DATA DISCARDED: Tx %u", vxid);
+        data_free(de);
+        return status;
+    }
+    chunks_added += chunks;
     de->occupied = 1;
-    MON_StatsUpdate(STATS_OCCUPANCY, 0);
+    MON_StatsUpdate(STATS_OCCUPANCY, chunks_added, 0);
     data_submit(de);
         
     if (term)
@@ -751,26 +886,91 @@ int tests_run = 0;
 static char
 *test_append(void)
 {
-    dataentry *entry;
-    char data_with_null[8];
+    dataentry entry;
+    chunk_t chunk, *c;
+    char data[DEF_MAX_RECLEN - 1], result[DEF_MAX_RECLEN];
 
-    printf("... testing data append (expect an ERR)\n");
+    printf("... testing data append\n");
 
     config.max_reclen = DEF_MAX_RECLEN;
-    entry = calloc(1, sizeof(dataentry));
-    AN(entry);
-    entry->data = calloc(1, config.max_reclen);
-    AN(entry->data);
-    entry->magic = DATA_MAGIC;
+    config.chunk_size = DEF_CHUNK_SIZE;
+    config.max_records = DEF_MAX_RECORDS;
+    MAZ(DATA_Init());
+
+    entry.magic = DATA_MAGIC;
+    VSTAILQ_INIT(&entry.chunks);
+    chunk.magic = CHUNK_MAGIC;
+    chunk.data = (char *) calloc(1, config.max_reclen);
+    VSTAILQ_INSERT_TAIL(&entry.chunks, &chunk, chunklist);
+    entry.curchunk = &chunk;
+    entry.curchunkidx = 0;
+    entry.end = 0;
+    entry.occupied = 1;
+    chunk.occupied = 1;
+    truncated = len_overflows = len_hi = 0;
+    strcpy(config.log_file, "-");
+    AZ(LOG_Open("test_append"));
+
+    for (int i = 0; i < DEF_MAX_RECLEN - 1; i++)
+        data[i] = (i % 10) + '0';
+
+    append(&entry, SLT_VCL_Log, 12345678, data, DEF_MAX_RECLEN - 1);
+
+    MASSERT(entry.end == DEF_MAX_RECLEN);
+    MASSERT(len_hi == DEF_MAX_RECLEN);
+    MAZ(truncated);
+    MAZ(len_overflows);
+
+    int idx = 0;
+    int n = entry.end;
+    c = VSTAILQ_FIRST(&entry.chunks);
+    while (n > 0) {
+        CHECK_OBJ_NOTNULL(c, CHUNK_MAGIC);
+        int cp = n;
+        if (cp > config.chunk_size)
+            cp = config.chunk_size;
+        memcpy(&result[idx], c->data, cp);
+        n -= cp;
+        idx += cp;
+        c = VSTAILQ_NEXT(c, chunklist);
+    }
+    MASSERT(result[0] == '&');
+    MASSERT(memcmp(&result[1], data, DEF_MAX_RECLEN - 1) == 0);
+
+    return NULL;
+}
+
+static char
+*test_truncated(void)
+{
+    dataentry entry;
+    chunk_t chunk;
+    char data_with_null[8];
+
+    printf("... testing data append with truncated data (expect an ERR)\n");
+
+    config.max_reclen = DEF_MAX_RECLEN;
+    config.chunk_size = DEF_CHUNK_SIZE;
+    entry.magic = DATA_MAGIC;
+    VSTAILQ_INIT(&entry.chunks);
+    chunk.magic = CHUNK_MAGIC;
+    chunk.data = (char *) calloc(1, config.max_reclen);
+    VSTAILQ_INSERT_TAIL(&entry.chunks, &chunk, chunklist);
+    entry.curchunk = &chunk;
+    entry.curchunkidx = 0;
+    entry.end = 0;
+    entry.occupied = 1;
+    chunk.occupied = 1;
     truncated = len_hi = 0;
     strcpy(config.log_file, "-");
     AZ(LOG_Open("test_append"));
 
     memcpy(data_with_null, "foo\0bar", 8);
-    append(entry, SLT_VCL_Log, 12345678, data_with_null, 7);
+    append(&entry, SLT_VCL_Log, 12345678, data_with_null, 7);
 
-    MASSERT(memcmp(entry->data, "&foo\0\0", 6) == 0);
-    MASSERT(entry->end == 4);
+    MASSERT(memcmp(chunk.data, "&foo\0\0", 6) == 0);
+    MASSERT(entry.end == 4);
+    MASSERT(entry.curchunkidx == 4);
     MASSERT(truncated == 1);
     MASSERT(len_hi == 4);
 
@@ -781,6 +981,7 @@ static const char
 *all_tests(void)
 {
     mu_run_test(test_append);
+    mu_run_test(test_truncated);
     return NULL;
 }
 

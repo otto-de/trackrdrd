@@ -54,10 +54,19 @@ static void *mqh;
 /* Called from worker.c, but we don't want to pull in all of monitor.c's
    dependecies. */
 void
-MON_StatsUpdate(stats_update_t update, unsigned n)
+MON_StatsUpdate(stats_update_t update, unsigned nchunks, unsigned nbytes)
 {
     (void) update;
-    (void) n;
+    (void) nchunks;
+    (void) nbytes;
+}
+
+/* Called from worker.c, but we don't want to pull in all of child.c's
+   dependecies. */
+int
+RDR_Exhausted(void)
+{
+    return 0;
 }
 
 static void
@@ -104,6 +113,7 @@ static char
     config.max_reclen = DEF_MAX_RECLEN;
     config.maxkeylen = DEF_MAXKEYLEN;
     config.nworkers = NWORKERS;
+    config.chunk_size = DEF_CHUNK_SIZE;
     strcpy(config.mq_config_file, MQ_CONFIG);
 
     error = mqf.global_init(config.nworkers, config.mq_config_file);
@@ -126,6 +136,7 @@ static const char
 *test_worker_run(void)
 {
     dataentry *entry;
+    chunk_t *chunk;
 
     printf("... testing run of %d workers\n", NWORKERS);
 
@@ -142,8 +153,14 @@ static const char
     for (int i = 0; i < config.max_records; i++) {
         entry = &entrytbl[i];
         MCHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-        sprintf(entry->data, "foo=bar&baz=quux&record=%d", i+1);
-        entry->end = strlen(entry->data);
+        chunk = &chunktbl[i];
+        MCHECK_OBJ_NOTNULL(chunk, CHUNK_MAGIC);
+
+        chunk->data = (char *) malloc(sizeof("foo=bar&baz=quux&record=9999"));
+        sprintf(chunk->data, "foo=bar&baz=quux&record=%d", i+1);
+        chunk->occupied = 1;
+        VSTAILQ_INSERT_TAIL(&entry->chunks, chunk, chunklist);
+        entry->end = strlen(chunk->data);
         entry->occupied = 1;
         SPMCQ_Enq(entry);
     }
@@ -163,9 +180,11 @@ static const char
         MCHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
         MASSERT(!OCCUPIED(entry));
         MAZ(entry->end);
-        MAZ(*entry->data);
         MAZ(entry->keylen);
         MAZ(*entry->key);
+        MAZ(entry->curchunk);
+        MAZ(entry->curchunkidx);
+        MASSERT(VSTAILQ_EMPTY(&entry->chunks));
     }
 
     return NULL;
