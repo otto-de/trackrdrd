@@ -42,6 +42,7 @@ static int run;
 
 static pthread_mutex_t	mutex;
 static unsigned		occ = 0;
+static unsigned		occ_chunk = 0;
 static unsigned	long	sent = 0;	/* Sent successfully to MQ */
 static unsigned	long	bytes = 0;	/* Total bytes successfully sent */
 static unsigned	long	failed = 0;	/* MQ send fails */
@@ -50,6 +51,8 @@ static unsigned	long	restarts = 0;	/* Worker thread restarts */
 static unsigned		occ_hi = 0;	/* Occupancy high water mark */ 
 static unsigned		occ_hi_this = 0;/* Occupancy high water mark
                                            this reporting interval */
+static unsigned		occ_chunk_hi = 0;
+static unsigned		occ_chunk_hi_this = 0;
 
 static void
 log_output(void)
@@ -61,9 +64,12 @@ log_output(void)
     if (wrk_running > wrk_running_hi)
         wrk_running_hi = wrk_running;
 
-    LOG_Log(LOG_INFO, "Data table: len=%u occ=%u occ_hi=%u occ_hi_this=%u "
-            "global_free=%u",
-            config.max_records, occ, occ_hi, occ_hi_this, global_nfree);
+    LOG_Log(LOG_INFO, "Data table: len=%u occ_rec=%u occ_rec_hi=%u "
+            "occ_rec_hi_this=%u occ_chunk=%u occ_chunk_hi=%u "
+            "occ_chunk_hi_this=%u global_free_rec=%u global_free_chunk=%u",
+            config.max_records, occ, occ_hi, occ_hi_this, occ_chunk,
+            occ_chunk_hi, occ_chunk_hi_this, global_nfree_rec,
+            global_nfree_chunk);
 
     /* Eliminate the dependency of trackrdrd.o for unit tests */
 #ifndef TEST_DRIVER
@@ -82,6 +88,7 @@ log_output(void)
 
     /* locking would be overkill */
     occ_hi_this = 0;
+    occ_chunk_hi_this = 0;
 
     if (config.monitor_workers)
         WRK_Stats();
@@ -154,20 +161,22 @@ MON_StatsInit(void)
 }
 
 void
-MON_StatsUpdate(stats_update_t update, unsigned n)
+MON_StatsUpdate(stats_update_t update, unsigned nchunks, unsigned nbytes)
 {
     AZ(pthread_mutex_lock(&mutex));
     switch(update) {
         
     case STATS_SENT:
         sent++;
-        bytes += n;
+        bytes += nbytes;
         occ--;
+        occ_chunk -= nchunks;
         break;
         
     case STATS_FAILED:
         failed++;
         occ--;
+        occ_chunk -= nchunks;
         break;
         
     case STATS_RECONNECT:
@@ -176,10 +185,15 @@ MON_StatsUpdate(stats_update_t update, unsigned n)
 
     case STATS_OCCUPANCY:
         occ++;
+        occ_chunk += nchunks;
         if (occ > occ_hi)
             occ_hi = occ;
         if (occ > occ_hi_this)
             occ_hi_this = occ;
+        if (occ_chunk > occ_chunk_hi)
+            occ_chunk_hi = occ_chunk;
+        if (occ_chunk > occ_chunk_hi_this)
+            occ_chunk_hi_this = occ_chunk;
         break;
 
     case STATS_RESTART:

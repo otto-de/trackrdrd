@@ -125,6 +125,7 @@ CONF_Add(const char *lval, const char *rval)
 
     confUnsigned("max.reclen", max_reclen);
     confUnsigned("maxkeylen", maxkeylen);
+    confUnsigned("chunk.size", chunk_size);
     confUnsigned("qlen.goal", qlen_goal);
     confUnsigned("nworkers", nworkers);
     confUnsigned("restarts", restarts);
@@ -215,6 +216,7 @@ CONF_Init(void)
     config.monitor_workers = false;
     config.max_records = DEF_MAX_RECORDS;
     config.max_reclen = DEF_MAX_RECLEN;
+    config.chunk_size = DEF_CHUNK_SIZE;
     config.maxkeylen = DEF_MAXKEYLEN;
     config.qlen_goal = DEF_QLEN_GOAL;
     config.idle_pause = DEF_IDLE_PAUSE;
@@ -267,6 +269,7 @@ CONF_Dump(int level)
              config.monitor_workers ? "true" : "false");
     confdump(level, "max.records = %u", config.max_records);
     confdump(level, "max.reclen = %u", config.max_reclen);
+    confdump(level, "chunk.size = %u", config.chunk_size);
     confdump(level, "maxkeylen = %u", config.maxkeylen);
     confdump(level, "qlen.goal = %u", config.qlen_goal);
 

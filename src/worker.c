@@ -39,6 +39,7 @@
 #include "trackrdrd.h"
 #include "vas.h"
 #include "miniobj.h"
+#include "vsb.h"
 
 #define VERSION_LEN 64
 #define CLIENT_ID_LEN 80
@@ -72,10 +73,13 @@ struct worker_data_s {
     unsigned id;
     unsigned status;  /* exit status */
     wrk_state_e state;
+    struct vsb *sb;
 
-    /* per-worker freelist - return space in chunks */
-    struct freehead_s	wrk_freelist;
-    unsigned		wrk_nfree;
+    /* per-worker freelists */
+    struct rechead_s	freerec;
+    unsigned		nfree_rec;
+    chunkhead_t		freechunk;
+    unsigned		nfree_chunk;
 
     /* stats */
     unsigned long deqs;
@@ -95,10 +99,12 @@ typedef struct {
     worker_data_t *wrk_data;
 } thread_data_t;
     
-static unsigned run, cleaned = 0;
+static unsigned run, cleaned = 0, rec_thresh, chunk_thresh;
 static thread_data_t *thread_data;
 
 static pthread_mutex_t running_lock;
+
+static char empty[1] = "";
 
 static void
 wrk_log_connection(void *mq_worker, unsigned id)
@@ -120,26 +126,77 @@ wrk_log_connection(void *mq_worker, unsigned id)
             clientID);
 }
 
+static char *
+wrk_get_data(dataentry *entry, worker_data_t *wrk) {
+    CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
+    assert(OCCUPIED(entry));
+
+    if (entry->end == 0)
+        return empty;
+
+    chunk_t *chunk = VSTAILQ_FIRST(&entry->chunks);
+    CHECK_OBJ_NOTNULL(chunk, CHUNK_MAGIC);
+    assert(OCCUPIED(chunk));
+    if (entry->end <= config.chunk_size)
+        return chunk->data;
+
+    VSB_clear(wrk->sb);
+    int n = entry->end;
+    while (n > 0) {
+        CHECK_OBJ_NOTNULL(chunk, CHUNK_MAGIC);
+        int cp = n;
+        if (cp > config.chunk_size)
+            cp = config.chunk_size;
+        VSB_bcat(wrk->sb, chunk->data, cp);
+        n -= cp;
+        chunk = VSTAILQ_NEXT(chunk, chunklist);
+    }
+    assert(VSB_len(wrk->sb) == entry->end);
+    VSB_finish(wrk->sb);
+    return VSB_data(wrk->sb);
+}
+
+static inline void
+wrk_return_freelist(worker_data_t *wrk)
+{
+    if (wrk->nfree_rec > 0) {
+        DATA_Return_Freerec(&wrk->freerec, wrk->nfree_rec);
+        LOG_Log(LOG_DEBUG, "Worker %d: returned %u records to free list",
+                wrk->id, wrk->nfree_rec);
+        wrk->nfree_rec = 0;
+        assert(VSTAILQ_EMPTY(&wrk->freerec));
+    }
+    if (wrk->nfree_chunk > 0) {
+        DATA_Return_Freechunk(&wrk->freechunk, wrk->nfree_chunk);
+        LOG_Log(LOG_DEBUG, "Worker %d: returned %u chunks to free list",
+                wrk->id, wrk->nfree_chunk);
+        wrk->nfree_chunk = 0;
+        assert(VSTAILQ_EMPTY(&wrk->freechunk));
+    }
+}
+
 static inline void
 wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
 {
+    char *data;
     const char *err;
     int errnum;
+    stats_update_t stat = STATS_FAILED;
+    unsigned bytes = 0;
     
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     assert(OCCUPIED(entry));
     AN(mq_worker);
 
-    AZ(memchr(entry->data, '\0', entry->end));
-    errnum = mqf.send(*mq_worker, entry->data, entry->end,
+    data = wrk_get_data(entry, wrk);
+    AZ(memchr(data, '\0', entry->end));
+    errnum = mqf.send(*mq_worker, data, entry->end,
                       entry->key, entry->keylen, &err);
     if (errnum != 0) {
         LOG_Log(LOG_WARNING, "Worker %d: Failed to send data: %s",
                 wrk->id, err);
-        if (errnum > 0) {
+        if (errnum > 0)
             wrk->recoverables++;
-            MON_StatsUpdate(STATS_FAILED, 0);
-        }
         else {
             /* Non-recoverable error */
             LOG_Log(LOG_INFO, "Worker %d: Reconnecting", wrk->id);
@@ -149,29 +206,25 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
                 LOG_Log(LOG_ALERT, "Worker %d: Reconnect failed (%s)", wrk->id,
                         err);
                 LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]", wrk->id,
-                        entry->end, entry->data);
-                MON_StatsUpdate(STATS_FAILED, 0);
+                        entry->end, data);
             }
             else {
                 wrk->reconnects++;
                 wrk_log_connection(*mq_worker, wrk->id);
-                MON_StatsUpdate(STATS_RECONNECT, 0);
-                errnum = mqf.send(*mq_worker, entry->data, entry->end,
+                MON_StatsUpdate(STATS_RECONNECT, 0, 0);
+                errnum = mqf.send(*mq_worker, data, entry->end,
                                   entry->key, entry->keylen, &err);
                 if (errnum != 0) {
                     LOG_Log(LOG_WARNING, "Worker %d: Failed to send data "
                             "after reconnect: %s", wrk->id, err);
-                    if (errnum > 0) {
+                    if (errnum > 0)
                         wrk->recoverables++;
-                        MON_StatsUpdate(STATS_FAILED, 0);
-                    }
                     else {
                         /* Fail after reconnect, give up */
                         wrk->fails++;
                         wrk->status = EXIT_FAILURE;
                         LOG_Log(LOG_ERR, "Worker %d: Data DISCARDED [%.*s]",
-                                wrk->id, entry->end, entry->data);
-                        MON_StatsUpdate(STATS_FAILED, 0);
+                                wrk->id, entry->end, data);
                     }
                 }
             }
@@ -180,19 +233,20 @@ wrk_send(void **mq_worker, dataentry *entry, worker_data_t *wrk)
     if (errnum == 0) {
         wrk->sends++;
         wrk->bytes += entry->end;
-        MON_StatsUpdate(STATS_SENT, entry->end);
+        stat = STATS_SENT;
+        bytes = entry->end;
         LOG_Log(LOG_DEBUG, "Worker %d: Successfully sent data [%.*s]", wrk->id,
-                entry->end, entry->data);
+                entry->end, data);
     }
-    DATA_Reset(entry);
-    VSTAILQ_INSERT_TAIL(&wrk->wrk_freelist, entry, freelist);
-    wrk->wrk_nfree++;
+    unsigned chunks = DATA_Reset(entry, &wrk->freechunk);
+    MON_StatsUpdate(stat, chunks, bytes);
+    VSTAILQ_INSERT_HEAD(&wrk->freerec, entry, freelist);
+    wrk->nfree_rec++;
+    wrk->nfree_chunk += chunks;
 
-    if (global_nfree == 0) {
-        DATA_Return_Freelist(&wrk->wrk_freelist, wrk->wrk_nfree);
-        wrk->wrk_nfree = 0;
-        assert(VSTAILQ_EMPTY(&wrk->wrk_freelist));
-    }
+    if (RDR_Exhausted() || wrk->nfree_rec > rec_thresh
+        || wrk->nfree_chunk > chunk_thresh)
+        wrk_return_freelist(wrk);
 }
 
 static void
@@ -220,8 +274,10 @@ static void
     }
 
     wrk_log_connection(mq_worker, wrk->id);
-    VSTAILQ_INIT(&wrk->wrk_freelist);
-    wrk->wrk_nfree = 0;
+    VSTAILQ_INIT(&wrk->freerec);
+    wrk->nfree_rec = 0;
+    VSTAILQ_INIT(&wrk->freechunk);
+    wrk->nfree_chunk = 0;
 
     wrk->state = WRK_RUNNING;
     AZ(pthread_mutex_lock(&running_lock));
@@ -240,10 +296,7 @@ static void
         }
 
         /* return space before sleeping */
-        if (wrk->wrk_nfree > 0) {
-            DATA_Return_Freelist(&wrk->wrk_freelist, wrk->wrk_nfree);
-            wrk->wrk_nfree = 0;
-        }
+        wrk_return_freelist(wrk);
 
         /*
          * Queue is empty, wait until data are available, or quit is
@@ -331,6 +384,9 @@ WRK_Init(void)
         
         worker_data_t *wrk = thread_data[i].wrk_data;
         wrk->magic = WORKER_DATA_MAGIC;
+        wrk->sb = (struct vsb *) malloc(sizeof(struct vsb));
+        AN(wrk->sb);
+        AN(VSB_new(wrk->sb, NULL, config.max_reclen + 1, VSB_FIXEDLEN));
         wrk->id = i + 1;
         wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
             = wrk->restarts = wrk->recoverables = wrk->bytes = 0;
@@ -340,6 +396,10 @@ WRK_Init(void)
     spmcq_datawaiter = 0;
     AZ(pthread_mutex_init(&spmcq_datawaiter_lock, NULL));
     AZ(pthread_cond_init(&spmcq_datawaiter_cond, NULL));
+
+    rec_thresh = (config.max_records >> 1) / config.nworkers;
+    chunk_thresh = rec_thresh *
+        ((config.max_reclen + config.chunk_size - 1) / config.chunk_size);
 
     atexit(wrk_cleanup);
     return 0;
@@ -378,7 +438,7 @@ WRK_Restart(void)
             wrk->deqs = wrk->waits = wrk->sends = wrk->fails = wrk->reconnects
                 = 0;
             wrk->restarts++;
-            MON_StatsUpdate(STATS_RESTART, 0);
+            MON_StatsUpdate(STATS_RESTART, 0, 0);
             wrk->state = WRK_NOTSTARTED;
             if (pthread_create(&thread_data[i].worker, NULL, wrk_main, wrk)
                 != 0) {
@@ -405,10 +465,11 @@ WRK_Stats(void)
         wrk = thread_data[i].wrk_data;
         LOG_Log(LOG_INFO,
                 "Worker %d (%s): seen=%lu waits=%lu sent=%lu bytes=%lu "
-                "reconnects=%lu restarts=%lu failed_recoverable=%lu failed=%lu",
+                "free_rec=%u free_chunk=%u reconnects=%lu restarts=%lu "
+                "failed_recoverable=%lu failed=%lu",
                 wrk->id, statename[wrk->state], wrk->deqs, wrk->waits,
-                wrk->sends, wrk->bytes, wrk->reconnects, wrk->restarts,
-                wrk->recoverables, wrk->fails);
+                wrk->sends, wrk->bytes, wrk->nfree_rec, wrk->nfree_chunk,
+                wrk->reconnects, wrk->restarts, wrk->recoverables, wrk->fails);
     }
 }
 

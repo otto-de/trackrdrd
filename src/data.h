@@ -30,8 +30,10 @@
  *
  */
 
-/* Head of the global free list */
-struct freehead_s freehead;
+/* Heads of the global free lists */
+struct rechead_s freerechead;
+chunkhead_t freechunkhead;
 
-/* Table of data entries */
+/* Tables of records and chunks */
 dataentry *entrytbl;
+chunk_t *chunktbl;
