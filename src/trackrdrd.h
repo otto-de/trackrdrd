@@ -188,6 +188,7 @@ struct config {
 
 #define DEF_IDLE_PAUSE 0.01
     double	idle_pause;
+    double	tx_timeout;
 
     uid_t	uid;
     gid_t	gid;
@@ -222,6 +223,8 @@ struct config {
     unsigned	thread_restarts;
     unsigned	chunk_size;
 #define DEF_CHUNK_SIZE 64
+
+    unsigned	tx_limit;
 } config;
 
 void CONF_Init(void);
