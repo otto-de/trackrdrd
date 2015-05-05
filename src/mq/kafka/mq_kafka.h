@@ -77,7 +77,7 @@ void MQ_LOG_SetLevel(int level);
 void MQ_LOG_Close(void);
 
 /* monitor.c */
-int MQ_MON_Init(unsigned interval);
+int MQ_MON_Init(void);
 void MQ_MON_Fini(void);
 
 /* zookeeper.c */
