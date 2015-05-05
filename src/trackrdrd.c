@@ -222,7 +222,8 @@ main(int argc, char * const *argv)
 {
     int c, d_flag = 0, D_flag = 0, err;
     const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
-        *y_arg = NULL, *c_arg = NULL, *u_arg = NULL, *N_arg = NULL;
+        *y_arg = NULL, *c_arg = NULL, *u_arg = NULL, *N_arg = NULL,
+        *L_arg = NULL, *T_arg = NULL;
     pid_t child_pid;
 
     CONF_Init();
@@ -234,7 +235,7 @@ main(int argc, char * const *argv)
     }
     cli_config_filename[0] = '\0';
 
-    while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:DN:")) != -1) {
+    while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:DN:L:T:")) != -1) {
         switch (c) {
         case 'P':
             P_arg = optarg;
@@ -268,6 +269,12 @@ main(int argc, char * const *argv)
             break;
         case 'u':
             u_arg = optarg;
+            break;
+        case 'L':
+            L_arg = optarg;
+            break;
+        case 'T':
+            T_arg = optarg;
             break;
         case 'h':
             usage(EXIT_SUCCESS);
@@ -319,6 +326,15 @@ main(int argc, char * const *argv)
         bprintf(config.varnish_bindump, "%s", f_arg);
     if (N_arg)
         bprintf(config.vsmfile, "%s", N_arg);
+
+    if (L_arg && ((err = CONF_Add("tx.limit", L_arg)) != 0)) {
+        fprintf(stderr, "-L: %s\n", strerror(err));
+        usage(EXIT_FAILURE);
+    }
+    if (T_arg && ((err = CONF_Add("tx.timeout", T_arg)) != 0)) {
+        fprintf(stderr, "-T: %s\n", strerror(err));
+        usage(EXIT_FAILURE);
+    }
 
     if (LOG_Open(PACKAGE_NAME) != 0) {
         exit(EXIT_FAILURE);

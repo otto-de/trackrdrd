@@ -106,6 +106,19 @@ conf_getUnsignedInt(const char *rval, unsigned *i)
         return(0);                               \
     }
 
+#define confNonNegativeDouble(name,fld)                         \
+    if (strcmp(lval, (name)) == 0) {                            \
+        char *p;                                                \
+        errno = 0;                                              \
+        double d = strtod(rval, &p);                            \
+        if (errno)                                              \
+            return errno;                                       \
+        if (p[0] != '\0' || d < 0 || isnan(d) || !finite(d))    \
+            return EINVAL;                                      \
+        config.fld = d;                                         \
+        return 0;                                               \
+    }
+
 int
 CONF_Add(const char *lval, const char *rval)
 {
@@ -132,6 +145,10 @@ CONF_Add(const char *lval, const char *rval)
     confUnsigned("restart.pause", restart_pause);
     confUnsigned("thread.restarts", thread_restarts);
     confUnsigned("monitor.interval", monitor_interval);
+    confUnsigned("tx.limit", tx_limit);
+
+    confNonNegativeDouble("idle.pause", idle_pause);
+    confNonNegativeDouble("tx.timeout", tx_timeout);
 
     if (strcmp(lval, "max.records") == 0) {
         unsigned int i;
@@ -186,18 +203,6 @@ CONF_Add(const char *lval, const char *rval)
         return(EINVAL);
     }
 
-    if (strcmp(lval, "idle.pause") == 0) {
-        char *p;
-        errno = 0;
-        double d = strtod(rval, &p);
-        if (errno)
-            return errno;
-        if (p[0] != '\0' || d < 0 || isnan(d) || !finite(d))
-            return EINVAL;
-        config.idle_pause = d;
-        return 0;
-    }
-
     return EINVAL;
 }
 
@@ -235,6 +240,9 @@ CONF_Init(void)
     bprintf(config.user_name, "%s", pw->pw_name);
     config.uid = pw->pw_uid;
     config.gid = pw->pw_gid;
+
+    config.tx_limit = 0;
+    config.tx_timeout = -1.;
 }
 
 /* XXX: stdout is /dev/null in child process */
@@ -281,4 +289,6 @@ CONF_Dump(int level)
     confdump(level, "idle.pause = %f", config.idle_pause);
     confdump(level, "thread.restarts = %u", config.thread_restarts);
     confdump(level, "user = %s", config.user_name);
+    confdump(level, "tx.limit = %u", config.tx_limit);
+    confdump(level, "tx.timeout = %f", config.tx_timeout);
 }

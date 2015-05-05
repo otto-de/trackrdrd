@@ -53,6 +53,7 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <dlfcn.h>
+#include <float.h>
 
 #include "trackrdrd.h"
 #include "config_common.h"
@@ -62,6 +63,7 @@
 #include "vapi/vsl.h"
 #include "miniobj.h"
 #include "vas.h"
+#include "vdef.h"
 
 #define QUERY "VCL_log ~ \"^track \""
 #define I_TAG "VSL"
@@ -659,6 +661,18 @@ CHILD_Main(int readconfig)
     }
 
     vsl = VSL_New();
+
+    if (config.tx_limit > 0) {
+        char L[sizeof("4294967296") + 1];
+        bprintf(L, "%u", config.tx_limit);
+        assert(VSL_Arg(vsl, 'L', L) > 0);
+    }
+    if (config.tx_timeout >= 0) {
+        char T[DBL_MAX_10_EXP - DBL_MIN_10_EXP + 2];
+        bprintf(T, "%f", config.tx_timeout);
+        assert(VSL_Arg(vsl, 'T', T) > 0);
+    }
+
     if (EMPTY(config.varnish_bindump)) {
         vsm = VSM_New();
         AN(vsm);
