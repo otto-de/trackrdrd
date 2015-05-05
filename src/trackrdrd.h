@@ -222,7 +222,8 @@ struct config {
     unsigned	restart_pause;
     unsigned	thread_restarts;
     unsigned	chunk_size;
-#define DEF_CHUNK_SIZE 64
+#define DEF_CHUNK_SIZE 256
+#define MIN_CHUNK_SIZE 64
 
     unsigned	tx_limit;
 } config;

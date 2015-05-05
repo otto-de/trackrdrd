@@ -29,7 +29,7 @@ rm -f $LOG $MSG
 # "Not running as root" filtered so that the test is independent of
 # the user running it
 CKSUM=$( grep -v 'Worker 1' $LOG |  sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(Running as\) \([a-zA-Z0-9]*\)$/\1/' | grep -v 'Not running as root' | cksum)
-if [ "$CKSUM" != '625760318 214345' ]; then
+if [ "$CKSUM" != '3927549947 214347' ]; then
     echo "ERROR: Regression test incorrect reader log cksum: $CKSUM"
     exit 1
 fi
