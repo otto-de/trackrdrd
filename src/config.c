@@ -138,7 +138,6 @@ CONF_Add(const char *lval, const char *rval)
 
     confUnsigned("max.reclen", max_reclen);
     confUnsigned("maxkeylen", maxkeylen);
-    confUnsigned("chunk.size", chunk_size);
     confUnsigned("qlen.goal", qlen_goal);
     confUnsigned("nworkers", nworkers);
     confUnsigned("restarts", restarts);
@@ -149,6 +148,17 @@ CONF_Add(const char *lval, const char *rval)
 
     confNonNegativeDouble("idle.pause", idle_pause);
     confNonNegativeDouble("tx.timeout", tx_timeout);
+
+    if (strcmp(lval, "chunk.size") == 0) {
+        unsigned int i;
+        int err = conf_getUnsignedInt(rval, &i);
+        if (err != 0)
+            return err;
+        if (i < MIN_CHUNK_SIZE)
+            return EINVAL;
+        config.chunk_size = i;
+        return(0);
+    }
 
     if (strcmp(lval, "max.records") == 0) {
         unsigned int i;
