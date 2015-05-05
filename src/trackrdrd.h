@@ -37,6 +37,7 @@
 #include <signal.h>
 #include <stdint.h>
 #include <limits.h>
+#include <stddef.h>
 
 #include "vapi/vsl.h"
 #include "vqueue.h"
@@ -47,8 +48,8 @@ typedef const char *init_connections_f(void);
 typedef const char *worker_init_f(void **priv, int wrk_num);
 typedef int send_f(void *priv, const char *data, unsigned len,
                     const char *key, unsigned keylen, const char **error);
-typedef const char *version_f(void *priv, char *version);
-typedef const char *client_id_f(void *priv, char *clientID);
+typedef const char *version_f(void *priv, char *version, size_t len);
+typedef const char *client_id_f(void *priv, char *clientID, size_t len);
 typedef const char *reconnect_f(void **priv);
 typedef const char *worker_shutdown_f(void **priv, int wrk_num);
 typedef const char *global_shutdown_f(void);

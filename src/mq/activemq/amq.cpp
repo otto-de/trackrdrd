@@ -154,20 +154,20 @@ AMQ_Send(AMQ_Worker *worker, const char *data, unsigned len)
 }
 
 const char *
-AMQ_Version(AMQ_Worker *worker, char *version)
+AMQ_Version(AMQ_Worker *worker, char *version, size_t len)
 {
     try {
-        strcpy(version, worker->getVersion().c_str());
+            strncpy(version, worker->getVersion().c_str(), len);
         return NULL;
     }
     CATCHALL
 }
 
 const char *
-AMQ_ClientID(AMQ_Worker *worker, char *clientID)
+AMQ_ClientID(AMQ_Worker *worker, char *clientID, size_t len)
 {
     try {
-        strcpy(clientID, worker->getClientID().c_str());
+            strncpy(clientID, worker->getClientID().c_str(), len);
         return NULL;
     }
     CATCHALL

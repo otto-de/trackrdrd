@@ -1,6 +1,6 @@
 INCLUDES = -I$(top_srcdir)/include
 
-CURRENT = 1
+CURRENT = 5
 REVISION = 0
 AGE = 0
 

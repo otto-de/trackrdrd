@@ -174,19 +174,19 @@ MQ_Reconnect(void **priv)
 }
 
 const char *
-MQ_Version(void *priv, char *version)
+MQ_Version(void *priv, char *version, size_t len)
 {
     (void) priv;
-    strcpy(version, _version);
+    strncpy(version, _version, len);
     return NULL;
 }
 
 const char *
-MQ_ClientID(void *priv, char *clientID)
+MQ_ClientID(void *priv, char *clientID, size_t len)
 {
     wrk_t *wrk;
     CAST_OBJ_NOTNULL(wrk, priv, FILE_WRK_MAGIC);
-    sprintf(clientID, "worker %d", wrk->n);
+    snprintf(clientID, len, "worker %d", wrk->n);
     return NULL;
 }
 

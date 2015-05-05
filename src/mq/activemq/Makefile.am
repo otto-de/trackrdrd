@@ -19,7 +19,7 @@ libtrackrdr_activemq_la_LIBADD = \
 	@APR_LIBS@ \
 	@APU_LIBS@
 
-libtrackrdr_activemq_la_LDFLAGS = -version-info 4:0:0
+libtrackrdr_activemq_la_LDFLAGS = -version-info 5:0:0
 
 if HAVE_RST2MAN
 dist_man_MANS = libtrackrdr-activemq.3

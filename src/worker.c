@@ -41,7 +41,7 @@
 #include "miniobj.h"
 #include "vsb.h"
 
-#define VERSION_LEN 64
+#define VERSION_LEN 80
 #define CLIENT_ID_LEN 80
 
 static int running = 0, exited = 0;
@@ -112,12 +112,12 @@ wrk_log_connection(void *mq_worker, unsigned id)
     const char *err;
     char version[VERSION_LEN], clientID[CLIENT_ID_LEN];
 
-    err = mqf.version(mq_worker, version);
+    err = mqf.version(mq_worker, version, VERSION_LEN);
     if (err != NULL) {
         LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ version", id, err);
         version[0] = '\0';
     }
-    err = mqf.client_id(mq_worker, clientID);
+    err = mqf.client_id(mq_worker, clientID, CLIENT_ID_LEN);
     if (err != NULL) {
         LOG_Log(LOG_ERR, "Worker %d: Failed to get MQ client ID", id, err);
         clientID[0] = '\0';

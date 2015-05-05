@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2014 UPLEX Nils Goroll Systemoptimierung
- * Copyright (c) 2014 Otto Gmbh & Co KG
+ * Copyright (c) 2014-2015 UPLEX Nils Goroll Systemoptimierung
+ * Copyright (c) 2014-2015 Otto Gmbh & Co KG
  * All rights reserved
  * Use only with permission
  *
@@ -29,12 +29,14 @@
  *
  */
 
+#include <stddef.h>
+
 /**
  * \file mq.h
  * \brief MQ messaging interface for trackrdrd
  * \details MQ -- the messaging interface for the Varnish log tracking
  * reader
- * \version 4
+ * \version 5
  *
  * This header defines the interface to a messaging system, such as
  * ActiveMQ or Kafka, used by the tracking reader. It is responsible for
@@ -188,9 +190,10 @@ int MQ_Send(void *priv, const char *data, unsigned len,
  * @param version pointer to the version string. The implementation is
  * expected to place the starting address of a null-terminated string in
  * this location.
+ * @param len maximum length of the version string
  * @return `NULL` on success, an error message on failure
  */
-const char *MQ_Version(void *priv, char *version);
+const char *MQ_Version(void *priv, char *version, size_t len);
 
 /**
  * Return an ID string for the client connection.
@@ -204,9 +207,10 @@ const char *MQ_Version(void *priv, char *version);
  * @param clientID pointer to the client ID string. The implementation is
  * expected to place the starting address of a null-terminated string in
  * this location.
+ * @param len maximum length of the ID string
  * @return `NULL` on success, an error message on failure
  */
-const char *MQ_ClientID(void *priv, char *clientID);
+const char *MQ_ClientID(void *priv, char *clientID, size_t len);
 
 /**
  * Re-initialize a connection to the messaging system after a send

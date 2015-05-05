@@ -361,19 +361,19 @@ MQ_Reconnect(void **priv)
 }
 
 const char *
-MQ_Version(void *priv, char *version)
+MQ_Version(void *priv, char *version, size_t len)
 {
     (void) priv;
-    strcpy(version, _version);
+    strncpy(version, _version, len);
     return NULL;
 }
 
 const char *
-MQ_ClientID(void *priv, char *clientID)
+MQ_ClientID(void *priv, char *clientID, size_t len)
 {
     kafka_wrk_t *wrk;
     CAST_OBJ_NOTNULL(wrk, priv, KAFKA_WRK_MAGIC);
-    strcpy(clientID, rd_kafka_name(wrk->kafka));
+    strncpy(clientID, rd_kafka_name(wrk->kafka), len);
     return NULL;
 }
 
