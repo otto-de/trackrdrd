@@ -30,14 +30,16 @@ rm -f $LOG $MSG
 # the user running it
 CKSUM=$( grep -v 'Worker 1' $LOG |  sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(Running as\) \([a-zA-Z0-9]*\)$/\1/' | grep -v 'Not running as root' | cksum)
 if [ "$CKSUM" != '2709219299 214213' ]; then
-    echo "ERROR: Regression test incorrect log cksum: $CKSUM"
+    echo "ERROR: Regression test incorrect reader log cksum: $CKSUM"
     exit 1
 fi
 
 # Now check the logs from the worker thread
-CKSUM=$( grep 'Worker 1' $LOG | cksum)
-if [ "$CKSUM" != '1419634713 52909' ]; then
-    echo "ERROR: Regression test incorrect output cksum: $CKSUM"
+# Filter the 'returned to free list' messages, since these may be different
+# in different runs.
+CKSUM=$( grep 'Worker 1' $LOG | egrep -v 'returned [0-9]+ [^ ]+ to free list' | cksum)
+if [ "$CKSUM" != '1219614274 35546' ]; then
+    echo "ERROR: Regression test incorrect worker log cksum: $CKSUM"
     exit 1
 fi
 
