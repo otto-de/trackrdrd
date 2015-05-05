@@ -37,8 +37,9 @@ fi
 # Now check the logs from the worker thread
 # Filter the 'returned to free list' messages, since these may be different
 # in different runs.
-CKSUM=$( grep 'Worker 1' $LOG | egrep -v 'returned [0-9]+ [^ ]+ to free list' | cksum)
-if [ "$CKSUM" != '1219614274 35546' ]; then
+# Also filter the version/revision from the "connected" line.
+CKSUM=$( grep 'Worker 1' $LOG | egrep -v 'returned [0-9]+ [^ ]+ to free list' | sed -e 's/\(connected\) \(.*\)/\1/' | cksum)
+if [ "$CKSUM" != '4004155691 35506' ]; then
     echo "ERROR: Regression test incorrect worker log cksum: $CKSUM"
     exit 1
 fi

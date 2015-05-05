@@ -183,15 +183,15 @@ MQ_Reconnect(void **priv)
 }
 
 const char *
-MQ_Version(void *priv, char *version)
+MQ_Version(void *priv, char *version, size_t len)
 {
-    return AMQ_Version((AMQ_Worker *) priv, version);
+    return AMQ_Version((AMQ_Worker *) priv, version, len);
 }
 
 const char *
-MQ_ClientID(void *priv, char *clientID)
+MQ_ClientID(void *priv, char *clientID, size_t len)
 {
-    return AMQ_ClientID((AMQ_Worker *) priv, clientID);
+    return AMQ_ClientID((AMQ_Worker *) priv, clientID, len);
 }
 
 const char *

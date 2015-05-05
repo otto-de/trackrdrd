@@ -130,7 +130,7 @@ static const char
     printf("... testing version info\n");
 
     MASSERT0(worker != NULL, "MQ_Version: worker is NULL before call");
-    err = mqf.version(worker, version);
+    err = mqf.version(worker, version, BUFSIZ);
     VMASSERT(err == NULL, "MQ_Version: %s", err);
     MASSERT0(version[0] != '\0', "MQ_Version: version is empty");
 
@@ -146,7 +146,7 @@ static const char
     printf("... testing client ID info\n");
 
     MASSERT0(worker != NULL, "MQ_ClientID: worker is NULL before call");
-    err = mqf.client_id(worker, clientID);
+    err = mqf.client_id(worker, clientID, BUFSIZ);
     VMASSERT(err == NULL, "MQ_ClientID: %s", err);
     MASSERT0(clientID[0] != '\0', "MQ_ClientID: client ID is empty");
 

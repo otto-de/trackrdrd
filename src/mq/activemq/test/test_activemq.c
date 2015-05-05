@@ -98,7 +98,7 @@ static const char
     printf("... testing ActiveMQ version info\n");
 
     MASSERT0(worker != NULL, "MQ_Version: worker is NULL before call");
-    err = MQ_Version(worker, version);
+    err = MQ_Version(worker, version, BUFSIZ);
     VMASSERT(err == NULL, "MQ_Version: %s", err);
     MASSERT0(version[0] != '\0', "MQ_Version: version is empty");
 
@@ -114,7 +114,7 @@ static const char
     printf("... testing ActiveMQ client ID info\n");
 
     MASSERT0(worker != NULL, "MQ_ClientID: worker is NULL before call");
-    err = MQ_ClientID(worker, clientID);
+    err = MQ_ClientID(worker, clientID, BUFSIZ);
     VMASSERT(err == NULL, "MQ_ClientID: %s", err);
     MASSERT0(clientID[0] != '\0', "MQ_ClientID: client ID is empty");
 
