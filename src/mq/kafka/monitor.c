@@ -75,13 +75,13 @@ static void
 *monitor_thread(void *arg)
 {
     struct timespec t;
-    unsigned interval = *((unsigned *) arg);
+    (void) arg;
 
-    AN(interval);
+    AN(stats_interval);
 
     /* Convert ms -> struct timespec */
-    t.tv_sec = (time_t) interval / 1e3;
-    t.tv_nsec = (interval % (unsigned) 1e3) * 1e6;
+    t.tv_sec = (time_t) stats_interval / 1e3;
+    t.tv_nsec = (stats_interval % (unsigned) 1e3) * 1e6;
     MQ_LOG_Log(LOG_INFO,
                "libtrackrdr-kafka monitor thread running every %u.%03lu secs",
                t.tv_sec, t.tv_nsec / (unsigned long) 1e6);
@@ -118,11 +118,11 @@ static void
 }
 
 int
-MQ_MON_Init(unsigned interval)
+MQ_MON_Init(void)
 {
-    if (interval == 0)
+    if (stats_interval == 0)
         return 0;
-    return pthread_create(&monitor, NULL, monitor_thread, (void *) &interval);
+    return pthread_create(&monitor, NULL, monitor_thread, NULL);
 }
 
 void

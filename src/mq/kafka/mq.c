@@ -161,7 +161,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     }
 
     if (stats_interval != 0) {
-        int err = MQ_MON_Init(stats_interval);
+        int err = MQ_MON_Init();
         if (err != 0) {
             snprintf(errmsg, LINE_MAX, "Cannot start monitoring thread: %s",
                      strerror(err));
