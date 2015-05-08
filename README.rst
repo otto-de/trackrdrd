@@ -9,50 +9,49 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2015-04-27
-:Version: 3.0
+:Date:   2015-05-08
+:Version: 4.0
 :Manual section: 3
-
-**IMPORTANT NOTE: A new version of the Tracking Reader that is
-compatible with Varnish version 4 is currently under development in
-the master branch, but it WILL NOT WORK in its present form, and this
-documentation has not been updated.**
-
-Use branch 3.0 for a version that is compatible with Varnish 3.0.x.
-
-Check back here again if you're looking for a version that runs with
-Varnish 4. When this message goes away, and the documentation is
-updated, you can give it a try.
 
 SYNOPSIS
 ========
 
-  trackrdrd [[-n varnish_name] | [-f varnishlog_bindump]]
-            [-c config_file] [-u user] [-P pid_file]
-            [[-l log_file] | [-y syslog_facility]]
-            [-D] [-d] [-V] [-h]
+
+|  trackrdrd [[-n varnish_name] | [-f varnish_binlog] | [-N vsm_file]]
+|            [-c config_file] [-u user] [-P pid_file]
+|            [[-l log_file] | [-y syslog_facility]]
+|            [-L tx_limit] [-T tx_timeout]
+|            [-D] [-d] [-V] [-h]
 
 DESCRIPTION
 ===========
 
 The ``trackrdrd`` demon reads from the shared memory log of a running
-instance of Varnish, aggregates data for a request that are relevant
-to tracking, and forwards the data to a messaging system (such as
-ActiveMQ or Kafka).
+instance of Varnish, aggregates data logged in a specific format for
+requests and ESI subrequests, and forwards the data to a messaging
+system, such as ActiveMQ or Kafka.
 
 ``trackrdrd`` reads data from ``VCL_Log`` entries that are displayed
-in this format by the ``varnishlog`` tool::
+in this format by the ``varnishlog`` tool for client request
+transactions::
 
-  <FD> VCL_Log      c track <XID> <DATA>
+  VCL_Log        track <XID> <DATA>
 
-* ``FD``: file descriptor of a client connection
 * ``XID``: XID (request identifier) assigned by Varnish
 * ``DATA``: data to be logged
+
+The ``VCL_Log`` entries may also specify a sharding key for the
+message brokers, in this format::
+
+  VCL_Log        track <XID> key <KEY>
+
+* ``KEY``: the sharding key
 
 ``VCL_Log`` entries result from use of the ``log()`` function provided
 by the standard vmod ``std`` distributed with Varnish. The ``log()``
 call must include the prefix ``track``, the XID and the data to be
-logged. These log entries can be created with VCL code such as::
+logged, or a sharding key. These log entries can be created with VCL
+code such as::
 
   import std;
 
@@ -60,61 +59,85 @@ logged. These log entries can be created with VCL code such as::
       /* ... */
       std.log("track " + req.xid + " url=" + req.url);
       std.log("track " + req.xid + " http_Host=" + req.http.Host);
+      std.log("track " + req.xid + " key " + req.http.X-Key);
       /* ... */
   }
 
-Thus the data to be logged can be any information available in VCL.
+Thus the data to be logged can be any information available in VCL. In
+this example, the data to be forwarded includes the URL and the
+``Host`` header, and the sharding key was obtained from a request
+header ``X-Key``.
 
-``trackrdrd`` collects all data logged for each XID, and combines
-their data fields with the ampersand (``&``) character. Note that (in
-Varnish 3) the same XID is assigned to a request and all requests that
-it includes via ESI; so ``trackrdrd`` combines all logged data for a
-request and its ESI includes.
+``trackrdrd`` collects all of the data logged for a request and its
+ESI subrequests, combining their data fields with the ampersand
+character (``&``). The data record is then buffered and ready to be
+forwarded to the messaging system, using the sharding key if required
+by the system. ``trackrdrd`` comprises a reader thread, which reads
+from the shared memory log and buffers data, and one or more worker
+threads, which read from the buffers and send data to message brokers.
 
-When the request processing for an XID is complete (i.e. when
-``trackrdrd`` reads ``ReqEnd`` for that XID), the data record is
-complete and ready to be forwarded to the messaging
-system. ``trackrdrd`` comprises a reader thread, which reads from the
-shared memory log, and one or more worker threads, which send records
-to one or more message brokers.
+In addition to the data obtained from the ``VCL_Log`` payloads,
+``trackrdrd`` prepends a field ``XID=<xid>`` to the data, where
+``<xid>`` is the VXID of the parent request (that includes any other
+ESI subrequests). It also appends a field ``req_endt=<t>`` containing
+the epoch time at which request processing ended, obtained from the
+``Timestamp`` entry with the prefix ``Resp:`` (see vsl(3)). When there
+is more than one such ``Timestamp`` entry in a group of requests (for
+example in the logs of the ESI subrequests), the latest time is used.
 
-In addition to the data logged for an XID, ``trackrdrd`` prepends a
-field ``XID=<xid>`` to the data, and appends a field ``req_endt=<t>``
-containg the epoch time at which request processing ended (from the
-``ReqEnd`` entry).
-
-The interface to the messaging system is implemented in a messaging
+The interface to the messaging system is implemented by a messaging
 plugin -- a shared object that provides definitions for the functions
 declared in the MQ interface in ``include/mq.h``. See ``mq.h`` for
 documentation of the interface.
 
 The source distribution for ``trackrdrd`` includes implementations of
-the MQ interface for Kafka and ActiveMQ; see libtrackrdr-activemq(3)
-and libtrackrdr-kafka(3) for details.
+the MQ interface for Kafka, ActiveMQ and for file output (the latter
+for testing and debugging); see libtrackrdr-kafka(3),
+libtrackrdr-activemq(3) and libtrackrdr-file(3) for details.
 
 EXAMPLE
 =======
 
-The VCL example shown above may result in log entries such as these::
+The data read by the tracking reader from the Varnish log corresponds
+to the data displayed with this ``varnishlog`` command::
 
-   29 ReqEnd       c 881964201 1363144515.280081511 1363144515.284164190 0.052356958 0.003843069 0.000239611
-   29 VCL_Log      c track 881964202 url=/index.html
-   29 VCL_Log      c track 881964202 http_Host=foo.bar.org
-   29 ReqEnd       c 881964202 1363144515.433386803 1363144515.436567307 0.149222612 0.000135660 0.003044844
+  $ varnishlog -c -I 'VCL_log:^track ' -I Timestamp:^Resp: -g request \\
+    -q 'VCL_log ~ "^track "' -i VSL
 
-In this case, ``trackrdrd`` send this data to a message broker::
+Thus the VCL example shown above may result in log entries such as::
 
-  XID=881964202&url=/index.html&http_Host=foo.bar.org&req_endt=1363144515.436567307
+  *   << Request  >> 591570    
+  -   VCL_Log        track 591570 url=/index.html
+  -   VCL_Log        track 591570 http_Host=foo.bar.org
+  -   VCL_Log        track 591570 key 12345678
+  -   Timestamp      Resp: 1430835449.167329 0.000681 0.000352
+
+In this case, ``trackrdrd`` sends this data to message brokers, with
+the sharding key ``12345678``::
+
+  XID=591570&url=/index.html&http_Host=foo.bar.org&req_endt=1430835449.167329
+
+A ``VSL`` record is synthesized by the Varnish logging API if there
+was an error reading from the log; when this happens, ``trackrdrd``
+logs the error message or warning in the ``VSL`` payload (by default
+using syslog(3)).
 
 OPTIONS
 =======
 
-    -n varnish_logfile
+    -n varnish_name
         Same as the -n option for varnishd and other Varnish binaries;
-        i.e. the 'varnish name' indicating the path of the mmap'd file
-        used by varnishd for the shared memory log. By default, the
-        host name is assumed (as with varnishd). Also set by the
-        config parameter 'varnish.name'. The -n and -f options are
+        i.e. the 'varnish name' indicating the directory containing
+        the mmap'd file used by varnishd for the shared memory log. By
+        default, the host name is assumed (as with varnishd). Also set
+        by the config parameter 'varnish.name'. The -n, -N and -f
+        options are mutually exclusive.
+
+    -N vsm_file
+        Same as the -N option for Varnish binaries; i.e. the full path
+        of a mmap'd VSM file, usually named ``_.vsm``. The default is
+        ``-n hostname`` as explained above. Also set by the config
+        parameter 'varnish.file'. The -n. -N and -f options are
         mutually exclusive.
 
     -c config_file
@@ -154,13 +177,31 @@ OPTIONS
         debugging). By default, trackrdrd runs as a demon with a
         management (parent) process and worker (child) process.
 
-    -f varnishlog_bindump
-        A binary dump of the Varnish SHM log produced by 'varnishlog
-        -w'. If this option is specified, trackrdrd reads from the
-        dump instead of a live SHM log (useful for debugging and
-        replaying traffic). The options -f and -n are mutually
-        exclusive; -n is the default. Also set by the config parameter
-        'varnish.bindump'.
+    -f varnish_binlog
+        A binary dump of the Varnish SHM log produced by
+        'varnishlog -B -w'. If this option is specified, trackrdrd
+        reads from the dump instead of a live SHM log (useful for
+        debugging and replaying traffic). The options -f and -n are
+        mutually exclusive; -n is the default. Also set by the config
+        parameter 'varnish.bindump'.
+
+    -L limit
+        Sets the upper limit of incomplete transactions kept by the
+        Varnish logging API before the oldest transaction is force
+        completed. An error message is logged when this happens. This
+        setting keeps an upper bound on the memory usage of running
+        queries. Defaults to 1000 transactions. The same as the -L
+        option for standard Varnish logging tools such as
+        varnishlog(3).
+
+    -T seconds
+        Sets the transaction timeout in seconds for the Varnish
+        logging API. This defines the maximum number of seconds
+        elapsed between the beginning and end of the log
+        transaction. If the timeout expires, the error message from
+        the API is logged, and the transaction is force
+        completed. Defaults to 120 seconds. The same as the -T option
+        for standard Varnish logging tools such as varnishlog(3).
 
     -d
        Sets the log level to LOG_DEBUG. The default log level is
@@ -175,10 +216,30 @@ OPTIONS
 BUILD/INSTALL
 =============
 
-The build requires a source directory for Varnish 3.0.x in which sources
-have been compiled. It also requires the unique XID patch available at::
+Requirements
+------------
 
-	https://code.uplex.de/uplex-varnish/unique-xids
+Since version 4.0, the tracking reader is compatible with Varnish
+4.0.x (and has been tested with Varnish 4.0.3). ``trackrdrd`` is built
+against an existing Varnish installation on the same host, which in
+the standard case can be found with usual settings for the ``PATH``
+environment variable in the ``configure`` step described below.
+
+The build requires the following tools/packages:
+
+* git
+* autoconf
+* automake
+* autoheader
+* pkg-config
+* python-docutils (for rst2man)
+
+The messaging plugin for Kafka (``libtrackrdr-kafka``) requires
+libraries for Kafka (``librdkafka``) and the multi-threaded libary for
+Zookeeper (``libzookeeper_mt``)::
+
+        https://github.com/edenhill/librdkafka
+        http://zookeeper.apache.org/
 
 To build the messaging plugin for ActiveMQ (``libtrackrdr-activemq``)
 it is neccessary to link with the CMS or ActiveMQ-CPP library
@@ -186,24 +247,13 @@ it is neccessary to link with the CMS or ActiveMQ-CPP library
 
         http://activemq.apache.org/cms/
 
-The messaging plugin for Kafka (``libtrackrdr-kafka``) requires the
-rdkafka library (``librdkafka``)::
+The messaging plugins for Kafka and ActiveMQ are optional, and you can
+choose to disable the builds of either or both of them in the
+``configure`` step, as explained below. Requirements do not need to be
+met for plugins that are not built.
 
-        https://github.com/edenhill/librdkafka
-
-Building Varnish
-----------------
-
-The Varnish build requires the following tools/packages:
-
-* git
-* autoconf
-* automake
-* pkg-config
-* pcre-devel (so that Varnish can link to the runtime libs)
-* python-docutils (for rst2man)
-
-Check out the repository and apply the unique-xids patch.
+Building and installing trackrdrd
+---------------------------------
 
 The tracking reader and the Varnish instances against which it built
 and run must be built for the same architecture; in particular, they
@@ -213,54 +263,17 @@ machine (with the same architecture on which they will run), then they
 will likely match by default. When in doubt, set compile-time flags
 such as ``CFLAGS=-m64`` for ``gcc``.
 
-The following sequence builds Varnish as needed for the ``trackrdrd``
-build::
-
-	$ ./autogen.sh
-	$ CFLAGS=-m64 ./configure
-	$ make
-
-Building and installing packaged MQ implementations
----------------------------------------------------
-
-The ``trackrdrd`` distribution includes implementations of the MQ
-interface for Kafka and ActiveMQ message brokers. For details of the
-builds and their dependencies, see libtrackrdr-kafka(3) and
-libtrackrdr-activemq(3) (``README.rst`` in ``src/mq/kafka`` and
-``src/mq/activemq``).
-
-The global make targets for ``trackrdrd`` also build the MQ
-implementations, unless their builds are disabled in the ``configure``
-step as explained below. If they are enabled, then it is necessary to
-configure the build for them as well, for example by setting
-``CXXFLAGS`` to compile C++ sources.
-
-Building and installing trackrdrd
----------------------------------
-
-Requirements for ``trackrdrd`` are the same as for Varnish, in
-addition to the Varnish build itself. (``pcre-devel`` is not strictly
-necessary for ``trackrdrd``, but since you are building ``trackrdrd``
-on the same platform as the Varnish build, all requirements are
-fulfilled.)
-
-The steps to build ``trackrdrd`` are very similar to those for
-building Varnish. The only difference is in the ``configure``
-step:
-
-* The path to the Varnish source directory must be given in the
-  variable ``VARNISHSRC``.
-* For ActiveMQ, the flag ``CXXFLAGS`` should be set similarly to
-  ``CFLAGS``, because C++ code is also compiled. Settings for
-  ``CXXFLAGS`` can be obtained from ``pkg-config --cflags apr-1``.
+For ActiveMQ, the flag ``CXXFLAGS`` should be set similarly to
+``CFLAGS``, because C++ code is also compiled (unless you choose to
+disable the ActiveMQ plugin). Settings for ``CXXFLAGS`` can be
+obtained from ``pkg-config --cflags apr-1``.
 
 At minimum, run these steps::
 
 	$ git clone $TRACKRDRD_GIT_URL
 	$ cd trackrdrd
 	$ ./autogen.sh
-	$ CXXFLAGS=-m64 CFLAGS=-m64 ./configure \\
-          VARNISHSRC=/path/to/compiled/varnish-cache
+	$ CXXFLAGS=-m64 CFLAGS=-m64 ./configure
 	$ make
 
 For self-tests after the build, run::
@@ -283,55 +296,68 @@ be shown with::
 
 To disable the build of the Kafka or ActiveMQ MQ implementations,
 specify the options ``--disable-kafka`` or ``disable-activemq`` for
-``configure``. Both are enabled by default.
+``configure``. Both are enabled by default. A file output plugin,
+suitable for testing and debugging, is always built.
 
 To specify a non-standard installation prefix, add the ``--prefix``
 option::
 
 	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
-          VARNISHSRC=/path/to/varnish_build \\
-	  --prefix=/path/to/trackrdrd_install
+          --prefix=/path/to/trackrdrd_install
 
-If Varnish is installed at a non-standard location, it is necessary to
-set runtime paths to the Varnish libraries with the option
-``LDFLAGS=-Wl,-rpath=$LIB_PATHS``::
+If the Varnish installation against which ``trackrdrd`` is *built* has
+a non-standard location, set these env variables before running
+``configure``:
+
+* PREFIX=/path/to/varnish/install/prefix
+* export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
+* export ACLOCAL_PATH=$PREFIX/share/aclocal
+* export PATH=$PREFIX/bin:$PREFIX/sbin:$PATH
+
+``PKG_CONFIG_PATH`` might also have to include pkg-config directories
+for other requirements, such as the ActiveMQ C++ libraries, if they
+have been installed into non-default locations.
+
+If the Varnish installation against which ``trackrdrd`` is *run* has a
+non-standard location, it is necessary to specify runtime paths to the
+Varnish libraries by setting ``LDFLAGS=-Wl,-rpath=$LIB_PATHS`` for the
+configure step::
 
         $ export VARNISH_PREFIX=/path/to/varnish_install
 	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
-          VARNISHSRC=/path/to/varnish_build \\
-	  --prefix=/path/to/trackrdrd_install \\
           LDFLAGS=-Wl,-rpath=$VARNISH_PREFIX/lib/varnish:$VARNISH_PREFIX/lib
 
-Developers can add a number of options as an aid to compiling and debugging::
+Developers can add a number of options as an aid to compiling and
+debugging::
 
 	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
-          VARNISHSRC=/path/to/varnish_build \\
-          --enable-debugging-symbols --enable-werror \\
-          --enable-developer-warnings --enable-extra-developer-warnings \\
-          --enable-diagnostics
+          --enable-debugging-symbols --enable-developer-warnings
 
 ``--enable-debugging-symbols`` ensures that symbols and source code
 file names are saved in the executable, and thus are available in core
 dumps, in stack traces on assertion failures, for debuggers and so
-forth. It is advisable to turn this switch on for production builds
-(not just for developer builds), so that runtime errors can more
-easily be debugged.
+forth.
 
-``--enable-werror`` activates the ``-Werror`` option for compilers,
-which causes compiles to fail on any warning. ``trackrdrd`` should
-*always* build successfully with this option.
+``--enable-developer-warnings`` activates stricter compiler switches
+for errors and warnings, such as ``-Werror`` to cause compiles to fail
+on any warning. ``trackrdrd`` should *always* build successfully with
+this option.
 
-``--enable-developer-warnings``, ``--enable-extra-developer-warnings``
-and ``--enable-diagnostics`` turn on additional compiler switches for
-errors and warnings. ``trackrdrd`` builds should succeed with these as
-well.
+Building and installing packaged MQ implementations
+---------------------------------------------------
 
-It may be necessary to set ``PKG_CONFIG_PATH`` to point to the
-appropriate pkg-config directories, if any of the needed requirements
-(such as the ActiveMQ C++ library) have been installed into
-non-default locations, as in this example::
+The ``trackrdrd`` distribution includes implementations of the MQ
+interface for Kafka and ActiveMQ message brokers, as well as the file
+output plugin. For details of the builds and their dependencies, see
+libtrackrdr-kafka(3), libtrackrdr-activemq(3) and libtrackrdr-file(3)
+(``README.rst`` in ``src/mq/kafka``, ``src/mq/activemq`` and
+``src/mq/file``).
 
-	$ PKG_CONFIG_PATH=/usr/local/lib/pkgconfig ./configure #...
+The global make targets for ``trackrdrd`` also build the MQ
+implementations, unless their builds are disabled in the ``configure``
+step as explained above. If they are enabled, then it is necessary to
+configure the build for them as well, for example by setting
+``CXXFLAGS`` to compile C++ sources.
 
 STARTUP AND SHUTDOWN
 ====================
@@ -353,16 +379,67 @@ that send data to message brokers.
 To stop ``trackrdrd``, send the ``TERM`` signal to the management
 process (e.g. with ``kill(1)``); the management process in turn shuts
 down the worker process. Other responses to signals are detailed below
-in SIGNALS_. If the worker process stops without being directed by the
-management process, then the management process starts another one, up
-to the limit defined by the config parameter ``restarts``.
+in SIGNALS_. If the worker process stops without being directed to do
+so by the management process, then the management process starts
+another one, up to the limit defined by the config parameter
+``restarts``.
 
-After being instructed to terminate, the child process continues
-reading data from the Varnish log for open records (request records
-for which ``ReqEnd`` has not yet been read), and sends all pending
-messages to the message broker, but does not open any new records on
-reading ``ReqStart``. It stops when all open records are complete and
-have been sent to message brokers.
+After being instructed to terminate, the child process requests the
+Varnish logging API to flush open log transactions (transactions that
+have not yet been read to the ``End`` tag), and sends all pending
+messages to the message broker, but does not open any new
+transactions. It stops when all pending data have been sent to message
+brokers.
+
+DATA BUFFERS
+============
+
+The tracking reader reads and writes data asynchronously -- a reader
+thread reads from the Varnish log and saves messages ready for sending
+in buffers, while worker threads read from the buffer and send
+messages to brokers.
+
+Objects in the buffer are *records* and *chunks*. A record comprises a
+complete message ready to be sent to brokers, made up of one or more
+chunks, which store the message payload in fixed-size blocks.
+
+The maximal length of a message payload is set by the config parameter
+``max.reclen`` (payloads longer than the maximum are truncated), and
+the ``chunk.size`` sets the fixed length of data blocks. The best
+choice for these parameters depends on the distribution of message
+lengths.  If the majority of messages are shorter than the maximum,
+then less memory is wasted by setting a smaller chunk size. Ideally,
+most messages should fit into the chunk size, and if nearly all
+messages require the maximum length, then ``chunk.size`` can be set
+equal to ``max.reclen``.
+
+The choice constitutes a time-space tradeoff -- if the chunk size is
+too large, then space is wasted; it if is too small, then the tracking
+reader spends too much time iterating over and copying chunks.
+
+The ``max.records`` parameter sets the maximum number of records that
+can be stored in the buffers; the tracking reader computes the number
+of chunks necessary for that many records. ``max.records`` should be
+large enough for the buffering necessary during load spikes, and when
+the delivery of messages to the brokers is slow.  ``max.records`` and
+``chunk.size`` together determine the memory footprint of the tracking
+reader.
+
+Free entries in the buffers for records and chunks are structured in
+free lists. The reader and worker threads each have local free lists,
+and exchange data via global free lists. That is, the reader thread
+takes free entries from its local free lists, and gets new entries
+from the global lists when the local lists are exhausted. Worker
+threads return free data to their local free lists, and return free
+lists to the global free lists periodically.
+
+If the reader thread cannot obtain free data from the buffers --
+meaning that the buffers are full and the worker threads have not yet
+returned free data -- then the reader discards the transaction that is
+currently being read from the Varnish log. No data are buffered from
+the transaction, leading to a loss of data. To avoid that, configure
+the throughput of message sends and the size of the data buffers so
+that free space is available as needed.
 
 CONFIGURATION
 =============
@@ -400,45 +477,44 @@ command-line options, as shown below.
 ==================== ========== ========================================================================================= =======
 Parameter            CLI Option Description                                                                               Default
 ==================== ========== ========================================================================================= =======
-``varnish.name``     ``-n``     Like the ``-n`` option for Varnish, this is the path to the file that is mmap'd to the    default for Varnish (the host name)
-                                shared memory segment for the Varnish log. This parameter and ``varnish.bindump`` are
-                                mutually exclusive.
+``varnish.name``     ``-n``     Like the ``-n`` option for Varnish, this is the directory containing the file that is     default for Varnish (the host name)
+                                mmap'd to the shared memory segment for the Varnish log. This parameter, ``varnish.file``
+                                and ``varnish.bindump`` are mutually exclusive.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``varnish.file``     ``-N``     Like the ``-N`` option for Varnish, this is the full path to the mmap'd shared memory     default for Varnish (the host name)
+                                file. This parameter, ``varnish.name`` and ``varnish.bindump`` are mutually exclusive.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``mq.module``                   Name of the shared object implementing the MQ interface. May be an absolute path, or the  None, this parameter is required.
-                                name of a library that the dynamic linker finds according to the rules described in
+                                SO name of a library that the dynamic linker finds according to the rules described in
                                 ld.so(8).
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``mq.config_file``              Path of a configuration file used by the MQ implementation                                None, this parameter is optional.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``nworkers``                    Number of worker threads used to send messages to the message broker(s).                  1
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``maxopen.scale``               log\ :sub:`2`\(max number of concurrent requests in Varnish). For example, if             10 (= 1024 concurrent requests)
-                                ``maxopen.scale`` = 10, then ``trackrdrd`` can support up to 1024 concurrent requests.
-                                More precisely, this number describes the maximum number of request XIDs for which
-                                ``ReqStart`` has been read, but not yet ``ReqEnd``. It should specify at least the next
-                                power of two larger than (``thread_pools`` * ``thread_pool_max``) in the Varnish
-                                configuration.
+``max.records``                 The maximum number of buffered records waiting to be sent to message brokers.             1024
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``maxdone``                     The maximum number of finished records waiting to be sent to message brokers. That is,    1024
-                                the largest number of request XIDs for which ``ReqEnd`` has been read, but the data have
-                                not yet been sent to a message queue.
--------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``maxdata``                     The maximum length of a data record in characters. Should be at least as large the        1024
+``max.reclen``                  The maximum length of a data record in characters. Should be at least as large the        1024
                                 Varnish parameter ``shm_reclen``.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``hash.max_probes``             The maximum number of insert or find probes used for the hash table of XIDs. Hash lookups 10
-                                fail if a hit is not found after this many probes.
+``chunk.size``                  The size of fixed data blocks to store message data, as described above. This value may   256
+                                not be smaller than 64.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``hash.ttl``                    Maximum time to live in seconds for an unfinished record. If ``ReqEnd`` is not read for   120
-                                a request XID within this time, then ``trackrdrd`` no longer waits for it, and schedules
-                                the data read thus far to be sent to a message broker. This should be a bit longer than
-                                the sum of all timeouts configured for a Varnish request.
+``maxkeylen``                   The maximum length of a sharding key. Keys longer than this limit are discarded, with an  128
+                                error message in the log.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``hash.mlt``                    Minimum lifetime of an open record in seconds. That is, after ``ReqStart`` has been read  5
-                                for a request XID, then ``trackrdrd`` will not evacuate it if space is needed in its hash
-                                table before this interval has elapsed.
+``idle.pause``                  When the reader thread encounters the end of the Varnish log, i.e. no new transactions    0.01 seconds
+                                have been added to the log since the last read, then the thread pauses for this length
+                                of time in seconds. If the pause is too short, then the reader thread may waste CPU
+                                time in a busy-wait loop. If too long, the reader may fall too far behind in the log
+                                read, running a risk of log overruns.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``qlen.goal``                   A goal length for the internal queue from the reader thread to the worker thread.         ``maxdone``/2
+``tx.limit``         ``-L``     The upper limit for incomplete transactions to be aggregated by the Varnish logging API,  default for the logging API (1000 transactions)
+                                as explained above.
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``tx.timeout``       ``-T``     The transaction timeout in seconds for the logging API, as explained above.               default for the logging API (120 seconds)
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``qlen.goal``                   A goal length for the internal queue from the reader thread to the worker threads.        ``max.records``/2
                                 ``trackrdrd`` uses this value to determine whether a new worker thread should be started
                                 to support increasing load.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
@@ -469,10 +545,10 @@ Parameter            CLI Option Description                                     
 ``syslog.facility``  ``-y``     See ``syslog(3)``; legal values are ``user`` or ``local0`` through ``local7``. This       ``local0``
                                 parameter and ``log.file`` are mutually exclusive. 
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``varnish.bindump``  ``-f``     A binary dump of the Varnish shared memory log obtained from ``varnishlog -w``. If a
+``varnish.bindump``  ``-f``     A binary dump of the Varnish shared memory log obtained from ``varnishlog -B -w``. If a
                                 value is specified, ``trackrdrd`` reads from that file instead of a live Varnish log
-                                (useful for testing, debugging and replaying traffic). This parameter and
-                                ``varnish.name`` are mutually exclusive. 
+                                (useful for testing, debugging and replaying traffic). This parameter ```varnish.name``
+                                and ``varnish.file`` are mutually exclusive. 
 ==================== ========== ========================================================================================= =======
 
 LOGGING AND MONITORING
@@ -487,104 +563,122 @@ to the log (as configured with the parameter
 ``info`` log level, with additional formatting of the log lines,
 depending on how syslog is configured)::
 
- Hash table: len=8192 seen=375862067 drop_reqstart=0 drop_vcl_log=0 drop_reqend=14 expired=50 evacuated=0 open=29 load=0.35 collisions=1526027 insert_probes=1534686 find_probes=45907 fail=0 occ_hi=530 occ_hi_this=85
- Data table: len=18192 nodata=280295531 submitted=95566507 wait_room=0 data_hi=6217 data_overflows=0 done=9 open=29 load=0.21 sent=95566498 reconnects=0 failed=0 restarts=0 abandoned=0 occ_hi=944 occ_hi_this=111
+ Data table: len=1000 occ_rec=0 occ_rec_hi=8 occ_rec_hi_this=2 occ_chunk=0 occ_chunk_hi=8 occ_chunk_hi_this=2 global_free_rec=0 global_free_chunk=0
+ Reader: seen=1896 submitted=1896 nodata=0 free_rec=1000 free_chunk=8000 no_free_rec=0 no_free_chunk=0 len_hi=728 key_hi=39 len_overflows=0 truncated=0 key_overflows=0 vcl_log_err=0 vsl_err=0 closed=0 overrun=0 ioerr=0 reacquire=0
+ Workers: active=20 running=0 waiting=20 exited=0 abandoned=0 reconnects=0 restarts=0 sent=1896 failed=0 bytes=1050591
 
 If monitoring of worker threads is switched on, then monitoring logs
 such as this are emitted for each thread::
 
- Worker 1 (waiting): seen=576414 waits=86682 sent=576414 reconnects=0 restarts=0 failed=0
+ Worker 1 (waiting): seen=105 waits=85 sent=105 bytes=57664 free_rec=0 free_chunk=0 reconnects=0 restarts=0 failed_recoverable=0 failed=0
 
-The line prefixed by ``Hash table`` describes the hash table for open
-records -- records for request XIDs for which ``ReqStart`` has been
-read, but not yet ``ReqEnd``. The fields ``open``, ``load`` and
-``occ_hi_this`` are gauges (expressing a current state), and
-``occ_hi`` is monotonic increasing; all other fields are cumulative
-counters:
+The line prefixed by ``Data table`` describes the state of the data
+buffers -- completed messages waiting to be forwarded by worker
+threads.  The field ``len`` is constant; ``occ_rec_hi`` and
+``occ_chunk_hi`` are monotone increasing.  All other fields are
+gauges, expressing a current level that may rise or fall:
 
-================= =============================================================
-Field             Description
-================= =============================================================
-``len``           Size of the hash table (2\ :sup:``maxopen.scale``\)
------------------ -------------------------------------------------------------
-``seen``          Number of request records read (``ReqStart`` seen)
------------------ -------------------------------------------------------------
-``drop_reqstart`` Number of records that could not be inserted into internal
-                  tables (no data from ``ReqStart`` inserted, nor any other
-                  data for that XID)
------------------ -------------------------------------------------------------
-``drop_vcl_log``  How often data from ``VCL_log`` could not be inserted
-                  (usually because the XID could not be found)
------------------ -------------------------------------------------------------
-``drop_reqend``   How often data from ``ReqStart`` could not be inserted
-                  (usually because the XID could not be found)
------------------ -------------------------------------------------------------
-``expired``       Number of records for which ``hash.ttl`` expired (data sent
-                  to message broker without waiting for ``ReqEnd``)
------------------ -------------------------------------------------------------
-``evacuated``     Number of records removed to recover space in the hash table
-                  (``hash.mlt`` expired, data possibly incomplete)
------------------ -------------------------------------------------------------
-``open``          Current number of open records in the table
------------------ -------------------------------------------------------------
-``load``          Current open records as percent (``open``/``len`` * 100)
------------------ -------------------------------------------------------------
-``collisions``    Number of hash collisions
------------------ -------------------------------------------------------------
-``insert_probes`` Number of hash insert probes
------------------ -------------------------------------------------------------
-``find_probes``   Number of hash find probes
------------------ -------------------------------------------------------------
-``fail``          Number of failed hash operations (insert or find)
------------------ -------------------------------------------------------------
-``occ_hi``        Occupancy high watermark -- highest number of open records
-                  since startup
------------------ -------------------------------------------------------------
-``occ_hi_this``   Occupancy high watermark in the current monitoring interval
-================= =============================================================
+===================== ===================================================
+Field                 Description
+===================== ===================================================
+``len``               Max number of records in the data table
+--------------------- ---------------------------------------------------
+``occ_rec``           Number of records currently buffered
+--------------------- ---------------------------------------------------
+``occ_rec_hi``        Occupancy high watermark for records -- highest
+                      number of buffered records since startup
+--------------------- ---------------------------------------------------
+``occ_rec_hi_this``   Occupancy high watermark for records in the current
+                      monitoring interval
+--------------------- ---------------------------------------------------
+``occ_chunk``         Number of chunks currently buffered
+--------------------- ---------------------------------------------------
+``occ_chunk_hi``      Occupancy high watermark for chunks since startup
+--------------------- ---------------------------------------------------
+``occ_chunk_hi_this`` Occupancy high watermark for chunks in the current
+                      monitoring interval
+--------------------- ---------------------------------------------------
+``global_free_rec``   Current length of the global free record list
+--------------------- ---------------------------------------------------
+``global_free_chunk`` Current length of the global free record list
+===================== ===================================================
 
-The line prefixed by ``Data table`` describes the table of request
-records, including records in the open and done states -- for "done"
-records, ``ReqEnd`` has been read for the XID and the record is
-complete, but it has not yet been sent to a message broker. The fields
-``open``, ``done``, ``load`` and ``occ_hi_this`` are gauges, and
-``occ_hi`` is monotonic increasing; the rest are cumulative counters:
+The line prefixed by ``Reader`` describes the state of the reader
+thread.  The fields ``free_rec`` and ``free_chunk`` are gauges, and
+``len_hi`` and ``key_hi`` are monotone increasing; the rest are
+cumulative counters:
 
 ================== ============================================================
 Field              Description
 ================== ============================================================
-``len``            Size of the data table
-                   (``maxdone`` + 2\ :sup:``maxopen.scale``\)
------------------- ------------------------------------------------------------
-``nodata``         Number of request records that contained no data (nothing to
-                   track in a ``VCL_log`` entry). These records are discarded
-                   without sending a message to a message broker.
+``seen``           Number of log transactions read since startup, natching the
+                   filters for the tracking reader as shown above
 ------------------ ------------------------------------------------------------
 ``submitted``      Number of records passed from the reader thread to worker
-                   threads to be sent to a message broker
+                   threads, to be sent to message brokers
 ------------------ ------------------------------------------------------------
-``wait_room``      How often the reader thread had to wait for space in the
-                   data table
+``no_data``        Number of log transactions read with no data payloads in the
+                   ``VCL_Log`` entries
 ------------------ ------------------------------------------------------------
-``data_hi``        Data high watermark -- longest record since startup (in
-                   bytes)
+``free_rec``       Number of records in the reader thread's local free list
 ------------------ ------------------------------------------------------------
-``data_overflows`` How often the accumulated length of a record exceeded
-                   ``maxdata``
+``free_chunk``     Number of chunks in the reader thread's local free list
 ------------------ ------------------------------------------------------------
-``data_truncated`` How often data from the Varnish log was truncated due to
+``no_free_rec``    How often data was discarded because no free records were
+                   available
+------------------ ------------------------------------------------------------
+``no_free_chunk``  How often data was discarded because no free chunks were
+                   available
+------------------ ------------------------------------------------------------
+``len_hi``         Length high watermark -- longest complete message formed
+                   since startup
+------------------ ------------------------------------------------------------
+``key_hi``         Key length high watermark -- longest sharding key since
+                   startup
+------------------ ------------------------------------------------------------
+``len_overflows``  How often the length of a message exceeded ``max.reclen``
+------------------ ------------------------------------------------------------
+``truncated``      How often data from the Varnish log was truncated due to
                    the presence of a null byte. This can happen if the data was
                    already truncated in the log, due to exceeding
                    ``shm_reclen``.
 ------------------ ------------------------------------------------------------
-``done``           Current number of records in state "done"
+``key_overflows``  How often the length of a sharding key exceeded
+                   ``maxkeylen``
 ------------------ ------------------------------------------------------------
-``open``           Current number of open records in the table
+``vcl_log_err``    How often a ``VCL_Log`` entry beginning with ``track`` could
+                   not be parsed
 ------------------ ------------------------------------------------------------
-``load``           Current number records in the table as percent
-                   (100 * (``open`` + ``done``)/``len``)
+``vsl_err``        Number of errors/warnings signaled by the Varnish logging
+                   API with a ``VSL`` entry in the log transaction
 ------------------ ------------------------------------------------------------
-``sent``           Number of records successfully sent to a message broker
+``closed``         Number of times the Varnish log was closed or abandoned
+------------------ ------------------------------------------------------------
+``overrun``        Number of times log reads were overrun
+------------------ ------------------------------------------------------------
+``ioerr``          Number of times log reads failed due to I/O errors
+------------------ ------------------------------------------------------------
+``reacquire``      Number of times the Varnish log was re-acquired
+================== ============================================================
+
+The line prefixed by ``Workers`` gives an overview of the worker
+threads.  The field ``active`` is constant, and ``running`` and
+``waiting`` are gauges; the rest are cumulative counters:
+
+================== ============================================================
+Field              Description
+================== ============================================================
+``active``         Number of worker threads created, equal to the config param
+                   ``nworkers``
+------------------ ------------------------------------------------------------
+``running``        Number of worker threads currently in the running state
+------------------ ------------------------------------------------------------
+``waiting``        Number of threads currently in the waiting state
+------------------ ------------------------------------------------------------
+``exited``         Number of threads currently in the exited state
+------------------ ------------------------------------------------------------
+``abandoned``      Number of worker threads that have been abandoned due to
+                   reaching the restart limit (``thread.restarts``)
 ------------------ ------------------------------------------------------------
 ``reconnects``     How often worker threads reconnected to a message broker
                    after an unsuccessful send
@@ -592,15 +686,13 @@ Field              Description
 ``restarts``       How often worker threads were restarted after a message
                    send, reconnect and resend all failed
 ------------------ ------------------------------------------------------------
-``abandoned``      Number of worker threads that have been abandoned due to
-                   reaching the restart limit (``thread.restarts``)
+``sent``           Total number of messages successfully sent to a message
+                   broker
 ------------------ ------------------------------------------------------------
-``failed``         Number of failed sends (failure after reconnect)
+``failed``         Number of failed sends (failure after reconnect, or after
+                   non-recoverable failures of the message plugin)
 ------------------ ------------------------------------------------------------
-``occ_hi``         Occupancy high watermark -- highest number of records (open
-                   and done) since startup
------------------- ------------------------------------------------------------
-``occ_hi_this``    Occupancy high watermark in the current monitoring interval
+``bytes``          Total number of bytes in successfully sent messages
 ================== ============================================================
 
 If worker threads are monitored, then the running state if logged for
@@ -615,65 +707,48 @@ each worker thread, one of:
 * ``exited``
 
 In normal operation, the state should be either ``running``, when the
-thread is actively reading finished data records and sending them to
-message brokers, or ``waiting``, when the threads has exhausted all
-pending records, or has not yet been awakened to handle more records.
+thread is actively reading data buffers and sending them to message
+brokers, or ``waiting``, when the threads have exhausted all pending
+records, or has not yet been awakened to handle more records.
 
-The remaining fields in a log line for a worker thread are cumulative
-counters:
+The fields ``free_rec`` and ``free_chunks`` are gauges, and all other
+fields in a log line for a worker thread are cumulative counters:
 
-================== ============================================================
-Field              Description
-================== ============================================================
-``len``            Size of the data table
-                   (``maxdone`` + 2\ :sup:``maxopen.scale``\)
------------------- ------------------------------------------------------------
-``nodata``         Number of request records that contained no data (nothing to
-                   track in a ``VCL_log`` entry). These records are discarded
-                   without sending a message to a message broker.
------------------- ------------------------------------------------------------
-``submitted``      Number of records passed from the reader thread to worker
-                   threads to be sent to a message broker
------------------- ------------------------------------------------------------
-``wait_room``      How often the reader thread had to wait for space in the
-                   data table
------------------- ------------------------------------------------------------
-``data_hi``        Data high watermark -- longest record since startup (in
-                   bytes)
------------------- ------------------------------------------------------------
-``data_overflows`` How often the accumulated length of a record exceeded
-                   ``maxdata``
------------------- ------------------------------------------------------------
-``data_truncated`` How often data from the Varnish log was truncated due to
-                   the presence of a null byte. This can happen if the data was
-                   already truncated in the log, due to exceeding
-                   ``shm_reclen``.
------------------- ------------------------------------------------------------
-``done``           Current number of records in state "done"
------------------- ------------------------------------------------------------
-``open``           Current number of open records in the table
------------------- ------------------------------------------------------------
-``load``           Current number records in the table as percent
-                   (100 * (``open`` + ``done``)/``len``)
------------------- ------------------------------------------------------------
-``sent``           Number of records successfully sent to a message broker
------------------- ------------------------------------------------------------
-``reconnects``     How often worker threads reconnected to a message broker
-                   after an unsuccessful send
------------------- ------------------------------------------------------------
-``restarts``       How often worker threads were restarted after a message
-                   send, reconnect and resend all failed
------------------- ------------------------------------------------------------
-``abandoned``      Number of worker threads that have been abandoned due to
-                   reaching the restart limit (``thread.restarts``)
------------------- ------------------------------------------------------------
-``failed``         Number of failed sends (failure after reconnect)
------------------- ------------------------------------------------------------
-``occ_hi``         Occupancy high watermark -- highest number of records (open
-                   and done) since startup
------------------- ------------------------------------------------------------
-``occ_hi_this``    Occupancy high watermark in the current monitoring interval
-================== ============================================================
+====================== ========================================================
+Field                  Description
+====================== ========================================================
+``seen``               Number of messages read by the worker thread from the
+                       internal queue (which is filled by the reader thread)
+---------------------- --------------------------------------------------------
+``waits``              How often the worker thread was in the waiting state (no
+                       new messages on the queue)
+---------------------- --------------------------------------------------------
+``sent``               Number of messages successfully sent by the worker
+                       thread
+---------------------- --------------------------------------------------------
+``bytes``              Total number of bytes in messages successfully sent by
+                       the worker
+---------------------- --------------------------------------------------------
+``free_rec``           Number of records currently in the worker's local free
+                       list
+---------------------- --------------------------------------------------------
+``free_chunk``         Number of chunks currently in the worker's local free
+                       list
+---------------------- --------------------------------------------------------
+``reconnects``         How often this worker reconnected to a message broker
+                       after an unsuccessful send
+---------------------- --------------------------------------------------------
+``restarts``           How often this worker was restarted after a message
+                       send, reconnect and resend all failed, or after
+                       non-recoverable message failures
+---------------------- --------------------------------------------------------
+``failed_recoverable`` How often this worker had recoverable message failures
+                       (failures that do not corrupt the state of the message
+                       plugin and do not require thread restart)
+---------------------- --------------------------------------------------------
+``failed``             Number of non-recoverable message failures, requiring a
+                       thread restart
+====================== ========================================================
 
 SIGNALS
 =======
@@ -688,8 +763,8 @@ TERM   Shutdown   Shutdown
 ------ ---------- ------------
 INT    Shutdown   Shutdown
 ------ ---------- ------------
-HUP    Graceful   Ignore
-       restart
+HUP    Graceful   Flush
+       restart    transactions
 ------ ---------- ------------
 USR1   Graceful   Dump data
        restart    table to log
@@ -710,16 +785,23 @@ Shutdown proceeds as described above in `STARTUP AND SHUTDOWN`_.
 
 When signaled for graceful restart, the management process stops the
 running worker process and starts another one. This has the effect
-that the first process finishes reading data for open requests, and
-the second one begins reading data for new requests, so that few or no
-records are lost. The new process reads the same config files as the
-original worker process, and retains any command-line configuration,
-unless these values are overridden by config files. This allows for
-configuration changes "on-the-fly".
+that the first process finishes reading data for open log
+transactions, and the second one begins reading data for new requests,
+so that as few records as possible are lost. The new process reads the
+same config files as the original worker process, and retains any
+command-line configuration, unless these values are overridden by
+config files. This allows for configuration changes "on-the-fly".
 
 On receiving signal ``USR1``, the worker process writes the contents
-of all records in the "open" or "done" states to the log (syslog, or
-log file specified by config), for troubleshooting or debugging.
+of all buffered data as well as the current configuration to the log
+(syslog, or log file specified by config), for troubleshooting or
+debugging.
+
+On receivng the ``HUP`` signal, the worker process requests the
+Varnish log API to flush all transactions that it is currently
+aggregating, even if they are not yet complete (to the ``End`` tag).
+These are consumed by the reader thread and processed normally
+(although data may be missing).
 
 Where "abort with stacktrace" is specified above, a process write a
 stack trace to the log (syslog or otherwise) before aborting
@@ -741,6 +823,8 @@ SEE ALSO
 ========
 
 * ``varnishd(1)``
+* ``libtrackrdr-file(3)``
+* ``libtrackrdr-kafka(3)``
 * ``libtrackrdr-activemq(3)``
 * ``ld.so(8)``
 * ``syslog(3)``

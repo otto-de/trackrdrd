@@ -216,7 +216,7 @@ struct config {
      * running
      */
     unsigned	qlen_goal;
-#define DEF_QLEN_GOAL 1024
+#define DEF_QLEN_GOAL 512
 
     unsigned	nworkers;
     unsigned	restarts;

@@ -1,9 +1,16 @@
-    -n varnish_logfile
+    -n varnish_name
         Same as the -n option for varnishd and other Varnish binaries;
-        i.e. the 'varnish name' indicating the path of the mmap'd file
-        used by varnishd for the shared memory log. By default, the
-        host name is assumed (as with varnishd). Also set by the
-        config parameter 'varnish.name'. The -n and -f options are
+        i.e. the 'varnish name' indicating the directory containing
+        the mmap'd file used by varnishd for the shared memory log. By
+        default, the host name is assumed (as with varnishd). Also set
+        by the config parameter 'varnish.name'. The -n, -N and -f
+        options are mutually exclusive.
+
+    -N vsm_file
+        Same as the -N option for Varnish binaries; i.e. the full path
+        of a mmap'd VSM file, usually named ``_.vsm``. The default is
+        ``-n hostname`` as explained above. Also set by the config
+        parameter 'varnish.file'. The -n. -N and -f options are
         mutually exclusive.
 
     -c config_file
@@ -45,11 +52,29 @@
 
     -f varnishlog_bindump
         A binary dump of the Varnish SHM log produced by 'varnishlog
-        -w'. If this option is specified, trackrdrd reads from the
+        -B -w'. If this option is specified, trackrdrd reads from the
         dump instead of a live SHM log (useful for debugging and
-        replaying traffic). The options -f and -n are mutually
+        replaying traffic). The options -f, -n and -N are mutually
         exclusive; -n is the default. Also set by the config parameter
         'varnish.bindump'.
+
+    -L limit
+        Sets the upper limit of incomplete transactions kept by the
+        Varnish logging API before the oldest transaction is force
+        completed. An error message is logged when this happens. This
+        setting keeps an upper bound on the memory usage of running
+        queries. Defaults to 1000 transactions. The same as the -L
+        option for standard Varnish logging tools such as
+        varnishlog(3).
+
+    -T seconds
+        Sets the transaction timeout in seconds for the Varnish
+        logging API. This defines the maximum number of seconds
+        elapsed between the beginning and end of the log
+        transaction. If the timeout expires, the error message from
+        the API is logged, and the transaction is force
+        completed. Defaults to 120 seconds. The same as the -T option
+        for standard Varnish logging tools such as varnishlog(3).
 
     -d
        Sets the log level to LOG_DEBUG. The default log level is
