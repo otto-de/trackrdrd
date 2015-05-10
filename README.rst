@@ -181,9 +181,9 @@ OPTIONS
         A binary dump of the Varnish SHM log produced by
         'varnishlog -B -w'. If this option is specified, trackrdrd
         reads from the dump instead of a live SHM log (useful for
-        debugging and replaying traffic). The options -f and -n are
-        mutually exclusive; -n is the default. Also set by the config
-        parameter 'varnish.bindump'.
+        debugging and replaying traffic). The options -f, -n and -N
+        are mutually exclusive; -n is the default. Also set by the
+        config parameter 'varnish.bindump'.
 
     -L limit
         Sets the upper limit of incomplete transactions kept by the
