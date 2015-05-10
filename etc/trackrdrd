@@ -10,9 +10,9 @@
 # Default-Stop:      0 1 2 6
 # Short-Description: Varnish log tracking reader demon
 # Description:       This is the Varnish log tracking reader demon,
-#	which reads data intended for tracking from the Varnish
-#	shared memory log, collects all data for each XID, and
-#	sends each data record to an ActiveMQ message broker.
+#	which reads data in a specific format from the Varnish
+#	shared memory log, aggregates data for requests and ESI
+#       subrequest, and sends each data record to message brokers.
 ### END INIT INFO
 
 PIDFILE=/var/run/trackrdrd.pid
@@ -23,11 +23,6 @@ TRACKRDRD_BIN=/path/to/trackrdrd/bin/trackrdrd
 #CONFIG=/path/to/trackrdrd/etc/run.conf
 #CMD="${TRACKRDRD_BIN} -c ${CONFIG}"
 CMD="${TRACKRDRD_BIN}"
-
-# Child process stops after receiving a request
-CURL=/usr/bin/curl
-VARNISH_PORT=81
-URL=http://localhost:${VARNISH_PORT}/ts-rcv?testSession=true
 
 START_RETRIES=10
 
@@ -72,7 +67,6 @@ function stop_trackrdrd {
         logger "trackrdrd stop FAILED (killproc returned $?)"
         exit 1
     fi
-    ${CURL} ${URL} >/dev/null 2&>1
     echo "done."
 }
 
@@ -121,7 +115,6 @@ case "$1" in
             exit 1
         fi
         kill -USR1 $(cat ${PIDFILE})
-        ${CURL} ${URL} >/dev/null 2&>1
         getstatus_trackrdrd
         exit 0
         ;;
