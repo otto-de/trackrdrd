@@ -64,6 +64,9 @@ AC_SUBST(VARNISH_LIBVARNISH_LIB, "-L$ac_varnish_libdir/varnish")
 AC_HEADER_STDC
 AC_CHECK_HEADERS([execinfo.h])
 
+# Check for library functions
+AC_CHECK_FUNCS([getline])
+
 ## From Varnish configure.ac
 # white lie - we don't actually test it
 AC_MSG_CHECKING([whether daemon() works])
@@ -79,7 +82,6 @@ case $target in
 esac
 
 # optionally choose the MQ plugins to build, by default all
-KAFKA_LIBS=""
 AC_ARG_ENABLE([kafka], [AS_HELP_STRING([--enable-kafka],
                        [build the Kafka MQ plugin @<:@default=yes@:>@])],
                        [], [enable_kafka=yes])
