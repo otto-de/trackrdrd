@@ -576,7 +576,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 void
 CHILD_Main(int readconfig)
 {
-    int errnum, status;
+    int errnum, status = DISPATCH_CONTINUE;
     const char *errmsg;
     pthread_t monitor;
     struct passwd *pw;
