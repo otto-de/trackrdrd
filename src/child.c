@@ -232,7 +232,6 @@ static inline void
 data_free(dataentry *de)
 {
     AN(de);
-    assert(!OCCUPIED(de));
     rdr_chunk_free += DATA_Reset(de, &reader_freechunk);
     VSTAILQ_INSERT_HEAD(&reader_freerec, de, freelist);
 }
