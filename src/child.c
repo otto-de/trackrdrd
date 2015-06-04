@@ -433,6 +433,9 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
         if (debug)
             LOG_Log(LOG_DEBUG, "Reader read tx: [%u]", t->vxid);
 
+        if (t->type != VSL_t_req)
+            continue;
+
         while ((status = VSL_Next(t->c)) > 0) {
             int len, err;
             const char *payload;
@@ -442,7 +445,6 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
             if (!VSL_Match(vsl, t->c))
                 continue;
 
-            assert(t->type == VSL_t_req);
             assert(VSL_CLIENT(t->c->rec.ptr));
 
             if (de->end == 0) {
@@ -714,7 +716,6 @@ CHILD_Main(int readconfig)
     }
 
     /* Log filters */
-    assert(VSL_Arg(vsl, 'c', NULL) > 0);
     assert(VSL_Arg(vsl, 'i', I_TAG) > 0);
     assert(VSL_Arg(vsl, 'I', I_FILTER_VCL_LOG) > 0);
     assert(VSL_Arg(vsl, 'I', I_FILTER_TS) > 0);
