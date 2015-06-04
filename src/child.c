@@ -65,7 +65,6 @@
 #include "vas.h"
 #include "vdef.h"
 
-#define QUERY "VCL_log ~ \"^track \""
 #define I_TAG "VSL"
 #define I_FILTER_VCL_LOG "VCL_log:^track "
 #define I_FILTER_TS "Timestamp:^Resp"
@@ -700,7 +699,7 @@ CHILD_Main(int readconfig)
         LOG_Log(LOG_CRIT, "Cannot open log: %s\n", VSL_Error(vsl));
         exit(EXIT_FAILURE);
     }
-    vslq = VSLQ_New(vsl, &cursor, VSL_g_request, QUERY);
+    vslq = VSLQ_New(vsl, &cursor, VSL_g_request, NULL);
     if (vslq == NULL) {
         LOG_Log(LOG_CRIT, "Cannot init log query: %s\n", VSL_Error(vsl));
         exit(EXIT_FAILURE);
@@ -861,7 +860,7 @@ CHILD_Main(int readconfig)
                     VSM_Close(vsm);
                     continue;
                 }
-                vslq = VSLQ_New(vsl, &cursor, VSL_g_request, QUERY);
+                vslq = VSLQ_New(vsl, &cursor, VSL_g_request, NULL);
                 AZ(cursor);
             }
             if (vslq != NULL) {
