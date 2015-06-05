@@ -716,6 +716,7 @@ CHILD_Main(int readconfig)
     }
 
     /* Log filters */
+    assert(VSL_Arg(vsl, 'c', NULL) > 0);
     assert(VSL_Arg(vsl, 'i', I_TAG) > 0);
     assert(VSL_Arg(vsl, 'I', I_FILTER_VCL_LOG) > 0);
     assert(VSL_Arg(vsl, 'I', I_FILTER_TS) > 0);
