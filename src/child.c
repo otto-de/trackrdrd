@@ -442,6 +442,17 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
             unsigned xid;
             enum VSL_tag_e tag;
 
+            /* Quick filter for the tags of interest */
+            switch(VSL_TAG(t->c->rec.ptr)) {
+            case SLT_VCL_Log:
+            case SLT_Timestamp:
+            case SLT_VSL:
+                break;
+            default:
+                continue;
+            }
+
+            /* Now filter for regexen, etc. */
             if (!VSL_Match(vsl, t->c))
                 continue;
 
