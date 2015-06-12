@@ -97,7 +97,7 @@ static unsigned len_hi = 0, debug = 0, data_exhausted = 0;
 static unsigned long seen = 0, submitted = 0, len_overflows = 0, no_data = 0,
     no_free_data = 0, vcl_log_err = 0, vsl_errs = 0, closed = 0, overrun = 0,
     ioerr = 0, reacquire = 0, truncated = 0, key_hi = 0, key_overflows = 0,
-    no_free_chunk = 0, eol = 0;
+    no_free_chunk = 0, eol = 0, no_timestamp = 0;
 
 static double idle_pause = MAX_IDLE_PAUSE;
 
@@ -118,15 +118,14 @@ void
 RDR_Stats(void)
 {
     LOG_Log(LOG_INFO, "Reader: seen=%lu submitted=%lu nodata=%lu eol=%lu "
-            "idle_pause=%.09f "
-            "free_rec=%u free_chunk=%u no_free_rec=%lu no_free_chunk=%lu "
-            "len_hi=%u key_hi=%lu len_overflows=%lu truncated=%lu "
-            "key_overflows=%lu vcl_log_err=%lu vsl_err=%lu closed=%lu "
-            "overrun=%lu ioerr=%lu reacquire=%lu",
+            "idle_pause=%.09f free_rec=%u free_chunk=%u no_free_rec=%lu "
+            "no_free_chunk=%lu len_hi=%u key_hi=%lu len_overflows=%lu "
+            "truncated=%lu key_overflows=%lu vcl_log_err=%lu no_timestamp=%lu "
+            "vsl_err=%lu closed=%lu overrun=%lu ioerr=%lu reacquire=%lu",
             seen, submitted, no_data, eol, idle_pause, rdr_rec_free,
             rdr_chunk_free, no_free_data, no_free_chunk, len_hi, key_hi,
-            len_overflows, truncated, key_overflows, vcl_log_err, vsl_errs,
-            closed, overrun, ioerr, reacquire);
+            len_overflows, truncated, key_overflows, vcl_log_err, no_timestamp,
+            vsl_errs, closed, overrun, ioerr, reacquire);
 }
 
 int
@@ -566,6 +565,12 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
         return status;
     }
 
+    if (latest_t.tv_sec == 0) {
+        double t = VTIM_real();
+        latest_t.tv_sec = (long) t;
+        latest_t.tv_usec = (t - (double)latest_t.tv_sec) * 1e6;
+        no_timestamp++;
+    }
     snprintf(reqend_str, REQEND_T_LEN, "%s=%u.%06lu", REQEND_T_VAR,
              (unsigned) latest_t.tv_sec, latest_t.tv_usec);
     chunks = append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
