@@ -813,14 +813,14 @@ CHILD_Main(int readconfig)
             take_free();
             eol++;
             /* re-adjust idle pause every 1024 seen txn */
-            if (seen >> 10 > last_seen) {
+            if ((seen & (~0L << 10)) > (last_seen & (~0L << 10))) {
                 double t = VTIM_mono();
-                idle_pause = (t - last_t) / (double) (seen - (last_seen << 10));
-                last_seen = seen >> 10;
+                idle_pause = (t - last_t) / (double) (seen - last_seen);
+                last_seen = seen;
                 if (idle_pause > MAX_IDLE_PAUSE)
                     idle_pause = MAX_IDLE_PAUSE;
-                if (idle_pause < 1e-9)
-                    idle_pause = 1e-9;
+                if (idle_pause < 1e-6)
+                    idle_pause = 1e-6;
                 last_t = t;
             }
             VTIM_sleep(idle_pause);
