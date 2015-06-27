@@ -99,4 +99,6 @@ test_worker_LDADD = \
 	../data.$(OBJEXT) \
 	../assert.$(OBJEXT) \
 	../vtim.$(OBJEXT) \
+	../config.$(OBJEXT) \
+	../config_common.$(OBJEXT) \
 	-L${VARNISH_PKG_LIB}/varnish -lvarnish

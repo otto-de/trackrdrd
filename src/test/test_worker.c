@@ -109,11 +109,9 @@ static char
 
     printf("... testing worker initialization\n");
 
-    config.max_records = DEF_MAX_RECORDS;
-    config.max_reclen = DEF_MAX_RECLEN;
-    config.maxkeylen = DEF_MAXKEYLEN;
+    CONF_Init();
+
     config.nworkers = NWORKERS;
-    config.chunk_size = DEF_CHUNK_SIZE;
     strcpy(config.mq_config_file, MQ_CONFIG);
 
     error = mqf.global_init(config.nworkers, config.mq_config_file);

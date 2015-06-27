@@ -140,6 +140,7 @@ CONF_Add(const char *lval, const char *rval)
     confUnsigned("maxkeylen", maxkeylen);
     confUnsigned("qlen.goal", qlen_goal);
     confUnsigned("nworkers", nworkers);
+    confUnsigned("worker.stack", worker_stack);
     confUnsigned("restarts", restarts);
     confUnsigned("restart.pause", restart_pause);
     confUnsigned("thread.restarts", thread_restarts);
@@ -239,6 +240,7 @@ CONF_Init(void)
     config.mq_module[0] = '\0';
     config.mq_config_file[0] = '\0';
     config.nworkers = 1;
+    config.worker_stack = 128 * 1024;
     config.restarts = 1;
     config.restart_pause = 1;
     config.thread_restarts = 1;
