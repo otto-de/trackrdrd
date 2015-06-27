@@ -893,7 +893,8 @@ CHILD_Main(int readconfig)
         if (flush && !term) {
             LOG_Log0(LOG_NOTICE, "Flushing transactions");
             take_free();
-            VSLQ_Flush(vslq, dispatch, NULL);
+            do {}
+            while (VSLQ_Flush(vslq, dispatch, NULL) != DISPATCH_RETURN_OK);
             flush = 0;
             if (EMPTY(config.varnish_bindump) && status != DISPATCH_CLOSED
                 && status != DISPATCH_OVERRUN && status != DISPATCH_IOERR)
@@ -929,7 +930,8 @@ CHILD_Main(int readconfig)
     if (term && status != DISPATCH_EOF && flush && vslq != NULL) {
         LOG_Log0(LOG_NOTICE, "Flushing transactions");
         take_free();
-        VSLQ_Flush(vslq, dispatch, NULL);
+        do {}
+        while (VSLQ_Flush(vslq, dispatch, NULL) != DISPATCH_RETURN_OK);
     }
 
     WRK_Halt();
