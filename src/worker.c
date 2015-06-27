@@ -406,21 +406,36 @@ WRK_Init(void)
 }
 
 void
+wrk_pthread_attr_init(pthread_attr_t *attr)
+{
+    AZ(pthread_attr_init(attr));
+    AZ(pthread_attr_setstacksize(attr, config.worker_stack));
+}
+
+void
 WRK_Start(void)
 {
+    pthread_attr_t attr;
+
+    wrk_pthread_attr_init(&attr);
     run = 1;
     for (int i = 0; i < config.nworkers; i++) {
         CHECK_OBJ_NOTNULL(thread_data[i].wrk_data, WORKER_DATA_MAGIC);
-        AZ(pthread_create(&thread_data[i].worker, NULL, wrk_main,
+        AZ(pthread_create(&thread_data[i].worker, &attr, wrk_main,
                           thread_data[i].wrk_data));
     }
+    AZ(pthread_attr_destroy(&attr));
 }
 
 int
 WRK_Restart(void)
 {
+    int err = 0;
     worker_data_t *wrk;
-    
+    pthread_attr_t attr;
+
+    wrk_pthread_attr_init(&attr);
+
     for (int i = 0; i < config.nworkers; i++) {
         CHECK_OBJ_NOTNULL(thread_data[i].wrk_data, WORKER_DATA_MAGIC);
         wrk = thread_data[i].wrk_data;
@@ -442,18 +457,20 @@ WRK_Restart(void)
             wrk->restarts++;
             MON_StatsUpdate(STATS_RESTART, 0, 0);
             wrk->state = WRK_NOTSTARTED;
-            if (pthread_create(&thread_data[i].worker, NULL, wrk_main, wrk)
+            if (pthread_create(&thread_data[i].worker, &attr, wrk_main, wrk)
                 != 0) {
                 /* EAGAIN means we've hit a system limit trying to restart
                    threads, so it's time to give up. Any other errno is a
                    programming error.
                 */
                 assert(errno == EAGAIN);
-                return errno;
+                err = errno;
+                break;
             }
         }
     }
-    return 0;
+    AZ(pthread_attr_destroy(&attr));
+    return err;
 }
 
 void

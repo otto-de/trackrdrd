@@ -492,6 +492,11 @@ Parameter            CLI Option Description                                     
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``nworkers``                    Number of worker threads used to send messages to the message broker(s).                  1
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
+``worker.stack``                Stack size for worker threads started by trackrdrd.                                       131072
+                                Note: mq modules may start additional threads to which this limit does not apply
+                                Observed actual stack sizes are <64k, so the default leaves plenty of room.               (128 KB)
+                                Increase only if segmentation faults on stack addresses are observed
+-------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``max.records``                 The maximum number of buffered records waiting to be sent to message brokers.             1024
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``max.reclen``                  The maximum length of a data record in characters. Should be at least as large the        1024

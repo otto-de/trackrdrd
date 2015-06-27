@@ -219,6 +219,7 @@ struct config {
 #define DEF_QLEN_GOAL 512
 
     unsigned	nworkers;
+    size_t	worker_stack;
     unsigned	restarts;
     unsigned	restart_pause;
     unsigned	thread_restarts;
