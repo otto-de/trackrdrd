@@ -34,6 +34,8 @@
 
 #include <librdkafka/rdkafka.h>
 
+#include <syslog.h>
+
 #define AZ(foo)         do { assert((foo) == 0); } while (0)
 #define AN(foo)         do { assert((foo) != 0); } while (0)
 
@@ -66,6 +68,7 @@ char zoolog[PATH_MAX];
 unsigned zoo_timeout;
 unsigned stats_interval;
 unsigned wrk_shutdown_timeout;
+unsigned log_error_data;
 
 rd_kafka_topic_conf_t *topic_conf;
 rd_kafka_conf_t *conf;

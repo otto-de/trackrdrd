@@ -35,6 +35,7 @@
 #include <errno.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "mq_kafka.h"
 
@@ -70,6 +71,7 @@ CONF_Init(void)
     zoolog[0] = '\0';
     brokerlist[0] = '\0';
     wrk_shutdown_timeout = 1000;
+    log_error_data = false;
 }
 
 int
@@ -134,6 +136,23 @@ CONF_Add(const char *lval, const char *rval)
             return EINVAL;
         return(0);
     }
+    if (strcmp(lval, "log_error_data") == 0) {
+        if (strcasecmp(rval, "true") == 0
+            || strcasecmp(rval, "on") == 0
+            || strcasecmp(rval, "yes") == 0
+            || strcmp(rval, "1") == 0) {
+            log_error_data = true;
+            return(0);
+        }
+        if (strcasecmp(rval, "false") == 0
+            || strcasecmp(rval, "off") == 0
+            || strcasecmp(rval, "no") == 0
+            || strcmp(rval, "0") == 0) {
+            log_error_data = false;
+            return(0);
+        }
+        return(EINVAL);
+    }
 
     result = rd_kafka_topic_conf_set(topic_conf, lval, rval, errstr, LINE_MAX);
     if (result == RD_KAFKA_CONF_UNKNOWN)
@@ -152,6 +171,7 @@ CONF_Dump(void)
     MQ_LOG_Log(LOG_DEBUG, "zookeeper.timeout = %u", zoo_timeout);
     MQ_LOG_Log(LOG_DEBUG, "zookeeper.log = %s", zoolog);
     MQ_LOG_Log(LOG_DEBUG, "topic = %s", topic);
-    MQ_LOG_Log(LOG_DEBUG, "worker.shutdown.timeout.ms = %u",
-               wrk_shutdown_timeout);
+    MQ_LOG_Log(LOG_DEBUG, "worker.shutdown.timeout.ms = %u", wrk_shutdown_timeout);
+    MQ_LOG_Log(LOG_DEBUG, "log_error_data = %s",
+               log_error_data ? "true" : "false");
 }

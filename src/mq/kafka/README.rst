@@ -174,6 +174,13 @@ Parameter                           Description
                                     indefinitely for message delivery, but don't
                                     wait for rdkafka finalization. (optional,
                                     default 1000 ms)
+----------------------------------- --------------------------------------------
+``log_error_data``                  Boolean. If false, only the error message is
+                                    logged for missing or illegal shard keys, or
+                                    missing message payloads. If true, the
+                                    offending message is also logged (an empty
+                                    field in the case of the missing payload).
+                                    (optional, default false)
 =================================== ============================================
 
 Except as noted below, the configuration can specify any parameters for
