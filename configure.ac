@@ -81,6 +81,9 @@ case $target in
         ;;
 esac
 
+AC_CHECK_LIBM
+AC_SUBST(LIBM)
+
 # optionally choose the MQ plugins to build, by default all
 AC_ARG_ENABLE([kafka], [AS_HELP_STRING([--enable-kafka],
                        [build the Kafka MQ plugin @<:@default=yes@:>@])],

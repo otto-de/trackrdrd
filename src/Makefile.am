@@ -25,7 +25,7 @@ trackrdrd_SOURCES = \
 	vtim.c
 
 trackrdrd_LDADD = \
-	${PTHREAD_LIBS} @VARNISH_LIBS@ \
+	${PTHREAD_LIBS} @VARNISH_LIBS@ ${LIBM} \
 	-L${VARNISH_PKG_LIB}/varnish -lvarnish
 
 trackrdrd_LDFLAGS = -ldl
