@@ -293,9 +293,14 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
     if (key == NULL || keylen == 0) {
         snprintf(wrk->errmsg, LINE_MAX, "%s message shard key is missing",
                  rd_kafka_name(wrk->kafka));
-        MQ_LOG_Log(LOG_ERR, wrk->errmsg);
-        MQ_LOG_Log(LOG_DEBUG, "%s data=[%.*s] key=", rd_kafka_name(wrk->kafka),
-                   len, data);
+        if (log_error_data) {
+            MQ_LOG_Log(LOG_ERR, "%s: data=[%.*s] key=", wrk->errmsg, len, data);
+        }
+        else {
+            MQ_LOG_Log(LOG_ERR, wrk->errmsg);
+            MQ_LOG_Log(LOG_DEBUG, "%s data=[%.*s] key=",
+                       rd_kafka_name(wrk->kafka), len, data);
+        }
         wrk->nokey++;
         *error = wrk->errmsg;
         return 1;
@@ -303,9 +308,15 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
     if (data == NULL) {
         snprintf(wrk->errmsg, LINE_MAX, "%s message payload is NULL",
                  rd_kafka_name(wrk->kafka));
-        MQ_LOG_Log(LOG_DEBUG, "%s data= key=[%.*s]", rd_kafka_name(wrk->kafka),
-                   keylen, key);
-        MQ_LOG_Log(LOG_ERR, wrk->errmsg);
+        if (log_error_data) {
+            MQ_LOG_Log(LOG_ERR, "%s: data= key=[%.*s]", wrk->errmsg, keylen,
+                       key);
+        }
+        else {
+            MQ_LOG_Log(LOG_ERR, wrk->errmsg);
+            MQ_LOG_Log(LOG_DEBUG, "%s data= key=[%.*s]",
+                       rd_kafka_name(wrk->kafka), keylen, key);
+        }
         wrk->nodata++;
         *error = wrk->errmsg;
         return 1;
@@ -317,9 +328,16 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         if (!isxdigit(key[i])) {
             snprintf(wrk->errmsg, LINE_MAX, "%s message shard key is not hex",
                      rd_kafka_name(wrk->kafka));
-            MQ_LOG_Log(LOG_ERR, wrk->errmsg);
-            MQ_LOG_Log(LOG_DEBUG, "%s data=[%.*s] key=[%.*s]",
-                       rd_kafka_name(wrk->kafka), len, data, keylen, key);
+            if (log_error_data) {
+                MQ_LOG_Log(LOG_ERR, "%s: data=[%.*s] key=[%.*s]", wrk->errmsg,
+                           len, data, keylen, key);
+            }
+            else {
+                MQ_LOG_Log(LOG_ERR, wrk->errmsg);
+                MQ_LOG_Log(LOG_DEBUG, "%s data=[%.*s] key=[%.*s]",
+                           rd_kafka_name(wrk->kafka), len, data, keylen, key);
+
+            }
             *error = wrk->errmsg;
             wrk->badkey++;
             return 1;
