@@ -405,7 +405,7 @@ WRK_Init(void)
     return 0;
 }
 
-void
+static void
 wrk_pthread_attr_init(pthread_attr_t *attr)
 {
     AZ(pthread_attr_init(attr));
