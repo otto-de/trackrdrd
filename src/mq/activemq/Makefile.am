@@ -1,4 +1,4 @@
-INCLUDES = @VARNISH_CFLAGS@ -I$(top_srcdir)/include \
+AM_CPPFLAGS = @VARNISH_CFLAGS@ -I$(top_srcdir)/include \
 	 @AMQ_CFLAGS@ @APR_CFLAGS@ @APU_CFLAGS@
 
 pkglib_LTLIBRARIES = libtrackrdr-activemq.la
