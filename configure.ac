@@ -66,6 +66,10 @@ AC_CHECK_HEADERS([execinfo.h])
 
 # Check for library functions
 AC_CHECK_FUNCS([getline])
+AC_CHECK_FUNCS([gethrtime])
+AC_CHECK_FUNCS([clock_gettime])
+AC_CHECK_FUNCS([timegm])
+AC_CHECK_FUNCS([nanosleep])
 
 ## From Varnish configure.ac
 # white lie - we don't actually test it
