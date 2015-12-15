@@ -35,8 +35,11 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "mq_kafka.h"
+
+#define ISO8601_LEN (sizeof("YYYY-MM-DDTHH:mm:SS.012345") + 1)
 
 static int lvl = LOG_INFO;
 static const char *level2name[LOG_DEBUG+1];
@@ -58,16 +61,27 @@ init_lvlnames(void)
 void
 MQ_LOG_Log(int level, const char *msg, ...)
 {
-    time_t t;
-    char timestr[26];
+    struct timeval tv;
+    struct tm tm;
+    char buf[ISO8601_LEN], timestr[ISO8601_LEN];
     va_list ap;
     
     if (level > lvl || out == NULL)
         return;
 
-    t = time(NULL);
-    ctime_r(&t, timestr);
-    timestr[24] = '\0';
+    /* cf. VTIM_real() and VTIM_timeval() in vtim.c */
+#ifdef HAVE_CLOCK_GETTIME
+    struct timespec ts;
+
+    AZ(clock_gettime(CLOCK_REALTIME, &ts));
+    tv.tv_sec = ts.tv_sec;
+    tv.tv_usec = (int)(1e3 * ts.tv_nsec);
+#else
+    AZ(gettimeofday(&tv, NULL));
+#endif
+    AN(localtime_r(&tv.tv_sec, &tm));
+    strftime(buf, sizeof(buf), "%FT%T.%%06u", &tm);
+    snprintf(timestr, sizeof(timestr), buf, tv.tv_usec);
 
     flockfile(out);
     fprintf(out, "%s [%s]: ", timestr, level2name[level]);
