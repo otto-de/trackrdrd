@@ -294,11 +294,12 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         snprintf(wrk->errmsg, LINE_MAX, "%s message shard key is missing",
                  rd_kafka_name(wrk->kafka));
         if (log_error_data) {
-            MQ_LOG_Log(LOG_ERR, "%s: data=[%.*s] key=", wrk->errmsg, len, data);
+            MQ_LOG_Log(LOG_ERR, "%s: data=[%.*s] key=[]", wrk->errmsg, len,
+                       data);
         }
         else {
             MQ_LOG_Log(LOG_ERR, wrk->errmsg);
-            MQ_LOG_Log(LOG_DEBUG, "%s data=[%.*s] key=",
+            MQ_LOG_Log(LOG_DEBUG, "%s data=[%.*s] key=[]",
                        rd_kafka_name(wrk->kafka), len, data);
         }
         wrk->nokey++;
@@ -309,12 +310,12 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         snprintf(wrk->errmsg, LINE_MAX, "%s message payload is NULL",
                  rd_kafka_name(wrk->kafka));
         if (log_error_data) {
-            MQ_LOG_Log(LOG_ERR, "%s: data= key=[%.*s]", wrk->errmsg, keylen,
+            MQ_LOG_Log(LOG_ERR, "%s: data=[] key=[%.*s]", wrk->errmsg, keylen,
                        key);
         }
         else {
             MQ_LOG_Log(LOG_ERR, wrk->errmsg);
-            MQ_LOG_Log(LOG_DEBUG, "%s data= key=[%.*s]",
+            MQ_LOG_Log(LOG_DEBUG, "%s data=[] key=[%.*s]",
                        rd_kafka_name(wrk->kafka), keylen, key);
         }
         wrk->nodata++;
