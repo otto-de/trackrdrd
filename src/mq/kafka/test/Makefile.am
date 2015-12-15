@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir)/include
+AM_CPPFLAGS = -I$(top_srcdir)/include
 
 TESTS = test_partition test_kafka
 
