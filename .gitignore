@@ -66,3 +66,15 @@ src/test/trackrdrd_002.conf.new
 src/test/trackrdrd_003.conf.new
 src/mq/kafka/test/kafka.log
 src/mq/kafka/test/zoo.log
+
+# make check artifacts
+test-suite.log
+/test-driver
+src/mq/activemq/test/test_*.log
+src/mq/activemq/test/test_*.trs
+src/mq/kafka/test/test_*.log
+src/mq/kafka/test/test_*.trs
+src/test/test_*.log
+src/test/test_*.trs
+src/test/regress.sh.log
+src/test/regress.sh.trs
