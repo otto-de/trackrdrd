@@ -17,4 +17,5 @@ test_activemq_LDADD = \
 	${PTHREAD_LIBS} \
 	@AMQ_LIBS@ \
 	@APR_LIBS@ \
-	@APU_LIBS@
+	@APU_LIBS@ \
+	-lstdc++
