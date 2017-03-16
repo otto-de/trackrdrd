@@ -21,12 +21,13 @@ trackrdrd_SOURCES = \
 	child.c \
 	handler.c \
 	assert.c \
-	vtim.h \
-	vtim.c
+	vfl.h \
+	vfl.c \
+	vpf.h \
+	vpf.c
 
 trackrdrd_LDADD = \
-	${PTHREAD_LIBS} @VARNISH_LIBS@ ${LIBM} \
-	-L${VARNISH_PKG_LIB}/varnish -lvarnish
+	${PTHREAD_LIBS} @VARNISH_LIBS@ ${LIBM}
 
 trackrdrd_LDFLAGS = -ldl
 

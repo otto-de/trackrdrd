@@ -1,6 +1,6 @@
 AC_PREREQ(2.63)
-AC_COPYRIGHT([Copyright (c) 2012-2015 Otto Gmbh & Co KG])
-AC_INIT([trackrdrd], [4.1])
+AC_COPYRIGHT([Copyright (c) 2012-2017 Otto Gmbh & Co KG])
+AC_INIT([trackrdrd], [trunk])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(src/trackrdrd.c)
 AM_CONFIG_HEADER(config.h)
@@ -45,9 +45,9 @@ AM_CONDITIONAL(HAVE_RST2MAN, [test "x$RST2MAN" != "xno"])
 # Check for pkg-config
 PKG_PROG_PKG_CONFIG
 
-PKG_CHECK_MODULES([VARNISH], [varnishapi >= 4.1.0 varnishapi <= 5.0.0],
+PKG_CHECK_MODULES([VARNISH], [varnishapi >= 5.1.0],
                   [ac_varnish_pkgdatadir=`$PKG_CONFIG --variable=pkgdatadir varnishapi`],
-                  [AC_MSG_ERROR([Varnish 4.1.x or 5.0.0 installation is required])])
+                  [AC_MSG_ERROR([Varnish 5.1.0 or later is required])])
 if test "x$ac_varnish_pkgdatadir" = x; then
    AC_MSG_ERROR([couldn't get Varnish data dir from pkg-config])
 fi
@@ -58,7 +58,6 @@ AC_SUBST(VARNISH_LIBS)
 AC_SUBST(VARNISH_PKG_INCLUDE, $ac_varnish_pkgincludedir)
 AC_SUBST(VARNISH_SHARE_INCLUDE, "$ac_varnish_pkgdatadir/include")
 AC_SUBST(VARNISH_PKG_LIB, $ac_varnish_libdir)
-AC_SUBST(VARNISH_LIBVARNISH_LIB, "-L$ac_varnish_libdir/varnish")
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -66,10 +65,6 @@ AC_CHECK_HEADERS([execinfo.h])
 
 # Check for library functions
 AC_CHECK_FUNCS([getline])
-AC_CHECK_FUNCS([gethrtime])
-AC_CHECK_FUNCS([clock_gettime])
-AC_CHECK_FUNCS([timegm])
-AC_CHECK_FUNCS([nanosleep])
 
 ## From Varnish configure.ac
 # white lie - we don't actually test it
