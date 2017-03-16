@@ -49,6 +49,7 @@
 #endif
 
 #include "vas.h"
+#include "vdef.h"
 #include "vsb.h"
 
 #include "trackrdrd.h"
