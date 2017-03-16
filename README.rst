@@ -219,11 +219,11 @@ BUILD/INSTALL
 Requirements
 ------------
 
-Since version 4.0, the tracking reader is compatible with Varnish
-4.0.x (and has been tested with Varnish 4.0.3). ``trackrdrd`` is built
-against an existing Varnish installation on the same host, which in
-the standard case can be found with usual settings for the ``PATH``
-environment variable in the ``configure`` step described below.
+Version 4.0 of the tracking reader requires Varnish version 4.0.3 or
+4.0.4. ``trackrdrd`` is built against an existing Varnish installation
+on the same host, which in the standard case can be found with usual
+settings for the ``PATH`` environment variable in the ``configure``
+step described below.
 
 The build requires the following tools/packages:
 
