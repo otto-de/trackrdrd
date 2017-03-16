@@ -29,7 +29,7 @@ rm -f $LOG $MSG
 # "Not running as root" filtered so that the test is independent of
 # the user running it
 CKSUM=$( grep -v 'Worker 1' $LOG |  sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(Running as\) \([a-zA-Z0-9]*\)$/\1/' | grep -v 'Not running as root' | cksum)
-if [ "$CKSUM" != '3927549947 214347' ]; then
+if [ "$CKSUM" != '3352465725 375518' ]; then
     echo "ERROR: Regression test incorrect reader log cksum: $CKSUM"
     exit 1
 fi
@@ -39,14 +39,14 @@ fi
 # in different runs.
 # Also filter the version/revision from the "connected" line.
 CKSUM=$( grep 'Worker 1' $LOG | egrep -v 'returned [0-9]+ [^ ]+ to free list' | sed -e 's/\(connected\) \(.*\)/\1/' | cksum)
-if [ "$CKSUM" != '4004155691 35506' ]; then
+if [ "$CKSUM" != '3908916621 57319' ]; then
     echo "ERROR: Regression test incorrect worker log cksum: $CKSUM"
     exit 1
 fi
 
 # Check the messages and keys
 CKSUM=$(cksum $MSG)
-if [ "$CKSUM" != "3675018591 29491 $MSG" ]; then
+if [ "$CKSUM" != "1139478852 48689 $MSG" ]; then
     echo "ERROR: Regression test incorrect output cksum: $CKSUM"
     exit 1
 fi

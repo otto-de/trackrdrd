@@ -40,6 +40,7 @@
 
 #include "vas.h"
 #include "miniobj.h"
+#include "vdef.h"
 #include "vsb.h"
 
 /* Preprend head2 before head1, result in head1, head2 empty afterward */

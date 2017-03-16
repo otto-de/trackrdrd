@@ -60,6 +60,7 @@
 #include "vcs_version.h"
 #include "vtim.h"
 
+#include "vapi/vsm.h"
 #include "vapi/vsl.h"
 #include "miniobj.h"
 #include "vas.h"

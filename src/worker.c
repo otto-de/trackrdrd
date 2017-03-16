@@ -39,6 +39,7 @@
 #include "trackrdrd.h"
 #include "vas.h"
 #include "miniobj.h"
+#include "vdef.h"
 #include "vsb.h"
 
 #define VERSION_LEN 80
