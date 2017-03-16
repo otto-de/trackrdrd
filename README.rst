@@ -9,8 +9,8 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2015-05-08
-:Version: 4.0
+:Date:   2017-03-16
+:Version: 4.1
 :Manual section: 3
 
 SYNOPSIS
@@ -219,11 +219,11 @@ BUILD/INSTALL
 Requirements
 ------------
 
-Since version 4.0, the tracking reader is compatible with Varnish
-4.0.x (and has been tested with Varnish 4.0.3). ``trackrdrd`` is built
-against an existing Varnish installation on the same host, which in
-the standard case can be found with usual settings for the ``PATH``
-environment variable in the ``configure`` step described below.
+This version of the tracking reader is compatible with Varnish
+versions 4.1.x and 5.0.0. ``trackrdrd`` is built against an existing
+Varnish installation on the same host, which in the standard case can
+be found with usual settings for the ``PATH`` environment variable in
+the ``configure`` step described below.
 
 The build requires the following tools/packages:
 
