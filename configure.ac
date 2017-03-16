@@ -1,6 +1,6 @@
 AC_PREREQ(2.63)
 AC_COPYRIGHT([Copyright (c) 2012-2015 Otto Gmbh & Co KG])
-AC_INIT([trackrdrd], [4.0])
+AC_INIT([trackrdrd], [4.1])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(src/trackrdrd.c)
 AM_CONFIG_HEADER(config.h)
@@ -45,9 +45,9 @@ AM_CONDITIONAL(HAVE_RST2MAN, [test "x$RST2MAN" != "xno"])
 # Check for pkg-config
 PKG_PROG_PKG_CONFIG
 
-PKG_CHECK_MODULES([VARNISH], [varnishapi >= 4.0.0],
+PKG_CHECK_MODULES([VARNISH], [varnishapi >= 4.1.0 varnishapi <= 5.0.0],
                   [ac_varnish_pkgdatadir=`$PKG_CONFIG --variable=pkgdatadir varnishapi`],
-                  [AC_MSG_ERROR([Varnish >= 4.0.0 installation is required])])
+                  [AC_MSG_ERROR([Varnish 4.1.x or 5.0.0 installation is required])])
 if test "x$ac_varnish_pkgdatadir" = x; then
    AC_MSG_ERROR([couldn't get Varnish data dir from pkg-config])
 fi
