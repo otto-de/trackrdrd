@@ -45,9 +45,9 @@ AM_CONDITIONAL(HAVE_RST2MAN, [test "x$RST2MAN" != "xno"])
 # Check for pkg-config
 PKG_PROG_PKG_CONFIG
 
-PKG_CHECK_MODULES([VARNISH], [varnishapi >= 4.0.0],
+PKG_CHECK_MODULES([VARNISH], [varnishapi >= 4.0.3 varnishapi <= 4.0.4],
                   [ac_varnish_pkgdatadir=`$PKG_CONFIG --variable=pkgdatadir varnishapi`],
-                  [AC_MSG_ERROR([Varnish >= 4.0.0 installation is required])])
+                  [AC_MSG_ERROR([Varnish 4.0.3 or 4.0.4 installation is required])])
 if test "x$ac_varnish_pkgdatadir" = x; then
    AC_MSG_ERROR([couldn't get Varnish data dir from pkg-config])
 fi
