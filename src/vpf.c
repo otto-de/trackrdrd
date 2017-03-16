@@ -40,8 +40,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "flopen.h"
-#include "vas.h"
+#include "vas.h"	// XXX Flexelint "not used" - but req'ed for assert()
+#include "vfl.h"
 #include "vpf.h"
 
 struct vpf_fh {
@@ -128,7 +128,7 @@ VPF_Open(const char *path, mode_t mode, pid_t *pidptr)
 	 * PID file will be truncated again in VPF_Write(), so
 	 * VPF_Write() can be called multiple times.
 	 */
-	fd = flopen(pfh->pf_path,
+	fd = VFL_Open(pfh->pf_path,
 	    O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK, mode);
 	if (fd == -1) {
 		if (errno == EWOULDBLOCK && pidptr != NULL) {

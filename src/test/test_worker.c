@@ -35,9 +35,10 @@
 
 #include "minunit.h"
 
+#include "vtim.h"
+
 #include "../trackrdrd.h"
 #include "../data.h"
-#include "../vtim.h"
 
 #define DEBUG 0
 #define debug_print(fmt, ...) \
