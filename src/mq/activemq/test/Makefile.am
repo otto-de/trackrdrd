@@ -12,7 +12,7 @@ test_activemq_SOURCES = \
 test_activemq_LDADD = \
 	../amq_connection.$(OBJEXT)  \
 	../amq.$(OBJEXT)  \
-	../config_common.$(OBJEXT)  \
+	$(abs_top_srcdir)/src/config_common.$(OBJEXT)  \
 	../mq.$(OBJEXT) \
 	${PTHREAD_LIBS} \
 	@AMQ_LIBS@ \

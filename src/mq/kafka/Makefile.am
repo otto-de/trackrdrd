@@ -1,3 +1,5 @@
+AUTOMAKE_OPTIONS = subdir-objects
+
 AM_CPPFLAGS = -I$(top_srcdir)/include
 
 CURRENT = 5
@@ -17,7 +19,7 @@ libtrackrdr_kafka_la_SOURCES = \
 	worker.c \
 	callback.c \
 	config.c \
-	$(top_srcdir)/src/config_common.c
+	$(abs_top_srcdir)/src/config_common.c
 
 libtrackrdr_kafka_la_LIBADD = \
 	${PTHREAD_LIBS} \

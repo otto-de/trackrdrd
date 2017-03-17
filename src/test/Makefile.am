@@ -1,3 +1,5 @@
+AUTOMAKE_OPTIONS = subdir-objects
+
 AM_CPPFLAGS = @VARNISH_CFLAGS@ -I$(top_srcdir)/include
 
 TESTS = test_parse test_data test_append test_mq test_spmcq	\
