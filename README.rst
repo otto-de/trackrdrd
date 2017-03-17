@@ -9,8 +9,8 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2017-03-16
-:Version: 4.1
+:Date:   2017-03-17
+:Version: trunk
 :Manual section: 3
 
 SYNOPSIS
@@ -35,31 +35,32 @@ system, such as ActiveMQ or Kafka.
 in this format by the ``varnishlog`` tool for client request
 transactions::
 
-  VCL_Log        track <XID> <DATA>
+  VCL_Log        track <DATA>
 
-* ``XID``: XID (request identifier) assigned by Varnish
 * ``DATA``: data to be logged
 
 The ``VCL_Log`` entries may also specify a sharding key for the
 message brokers, in this format::
 
-  VCL_Log        track <XID> key <KEY>
+  VCL_Log        track key <KEY>
 
 * ``KEY``: the sharding key
 
 ``VCL_Log`` entries result from use of the ``log()`` function provided
 by the standard vmod ``std`` distributed with Varnish. The ``log()``
-call must include the prefix ``track``, the XID and the data to be
-logged, or a sharding key. These log entries can be created with VCL
-code such as::
+call must include the prefix ``track`` and the data to be logged, or a
+sharding key. Note that DATA entries cannot begin with the word "key"
+followed by a space; these will be interpreted as KEY entries.
+
+These log entries can be created with VCL code such as::
 
   import std;
 
   sub vcl_recv {
       /* ... */
-      std.log("track " + req.xid + " url=" + req.url);
-      std.log("track " + req.xid + " http_Host=" + req.http.Host);
-      std.log("track " + req.xid + " key " + req.http.X-Key);
+      std.log("track url=" + req.url);
+      std.log("track http_Host=" + req.http.Host);
+      std.log("track key " + req.http.X-Key);
       /* ... */
   }
 
@@ -107,9 +108,9 @@ to the data displayed with this ``varnishlog`` command::
 Thus the VCL example shown above may result in log entries such as::
 
   *   << Request  >> 591570    
-  -   VCL_Log        track 591570 url=/index.html
-  -   VCL_Log        track 591570 http_Host=foo.bar.org
-  -   VCL_Log        track 591570 key 12345678
+  -   VCL_Log        track url=/index.html
+  -   VCL_Log        track http_Host=foo.bar.org
+  -   VCL_Log        track key 12345678
   -   Timestamp      Resp: 1430835449.167329 0.000681 0.000352
 
 In this case, ``trackrdrd`` sends this data to message brokers, with
