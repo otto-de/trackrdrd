@@ -58,18 +58,23 @@ parse_UnsignedDec(const char *str, int len, unsigned *num)
    len is length from that char to end of data
 */
 int
-Parse_VCL_Log(const char *ptr, int len, char **data, int *datalen,
+Parse_VCL_Log(const char *ptr, int len, const char **data, int *datalen,
               vcl_log_t *type)
 {
+    const char *c = ptr;
+
     *type = VCL_LOG_DATA;
-    char *blank = memchr(ptr, ' ', len);
-    if (blank == NULL)
-        return EINVAL;
-    if (strncmp(blank + 1, "key ", 4) == 0) {
-        blank += 4;
+    while (isdigit(*c))
+        c++;
+    if (*c == ' ' && (c - ptr + 1 < len))
+        c++;
+    else
+        c = ptr;
+    if (strncmp(c, "key ", 4) == 0) {
+        c += 4;
         *type = VCL_LOG_KEY;
     }
-    *data = blank + 1;
+    *data = c;
     *datalen = ptr + len - *data;
     return(0);
 }

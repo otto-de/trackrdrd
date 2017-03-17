@@ -46,12 +46,21 @@ static char
 *test_vcl_log(void)
 {
     int err, len;
-    char *data;
+    const char *data;
     vcl_log_t type;
 
     printf("... testing Parse_VCL_Log\n");
 
-    #define VCLLOG "1253687608 url=%2Frdrtestapp%2F"
+    #define VCLLOG_LEGACY "1253687608 url=%2Frdrtestapp%2F"
+    err = Parse_VCL_Log(VCLLOG_LEGACY, strlen(VCLLOG_LEGACY), &data, &len,
+                        &type);
+    VMASSERT(err == 0, "VCL_Log %s: %s", VCLLOG_LEGACY, strerror(err));
+    MASSERT(len == 20);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, "url=%2Frdrtestapp%2F", 20) == 0,
+             "VCL_Log %s: returned data=[%.*s]", VCLLOG_LEGACY, len, data);
+
+    #define VCLLOG "url=%2Frdrtestapp%2F"
     err = Parse_VCL_Log(VCLLOG, strlen(VCLLOG), &data, &len, &type);
     VMASSERT(err == 0, "VCL_Log %s: %s", VCLLOG, strerror(err));
     MASSERT(len == 20);
@@ -60,12 +69,26 @@ static char
              "VCL_Log %s: returned data=[%.*s]", VCLLOG, len, data);
 
     err = Parse_VCL_Log("foo", 3, &data, &len, &type);
-    VMASSERT(err == EINVAL, "VCL_Log foo: expected EINVAL, got %d", err);
+    VMASSERT(err == 0, "VCL_Log foo: %s", strerror(err));
+    MASSERT(len == 3);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, "foo", 3) == 0,
+             "VCL_Log foo: returned data=[%.*s]", len, data);
 
-    #define VCLLOG_INVALID "foo url=%2Frdrtestapp%2F"
-    err = Parse_VCL_Log(VCLLOG_INVALID, 3, &data, &len, &type);
-    VMASSERT(err == EINVAL, "VCL_Log %s: expected EINVAL, got %d",
-             VCLLOG_INVALID, err);
+    #define VCLLOG_SPACE "foo url=%2Frdrtestapp%2F"
+    err = Parse_VCL_Log(VCLLOG_SPACE, 3, &data, &len, &type);
+    VMASSERT(err == 0, "VCL_Log %s: %s", VCLLOG_SPACE, strerror(err));
+    MASSERT(len == 3);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, "foo", 3) == 0,
+             "VCL_Log %s: returned data=[%.*s]", VCLLOG_SPACE, len, data);
+
+    err = Parse_VCL_Log(VCLLOG_SPACE, strlen(VCLLOG_SPACE), &data, &len, &type);
+    VMASSERT(err == 0, "VCL_Log foo: %s", strerror(err));
+    MASSERT(len == strlen(VCLLOG_SPACE));
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, VCLLOG_SPACE, strlen(VCLLOG_SPACE)) == 0,
+             "VCL_Log %s: returned data=[%.*s]", VCLLOG_SPACE, len, data);
 
     /* 1024 chars */
     #define LONG_STRING \
@@ -85,15 +108,32 @@ static char
         "1234567890123456789012345678901234567890123456789012345678901234" \
         "1234567890123456789012345678901234567890123456789012345678901234" \
         "1234567890123456789012345678901234567890123456789012345678901234"
-    #define VCLLOG_LONG "1253687608 foo=" LONG_STRING
-    err = Parse_VCL_Log(VCLLOG_LONG, 1039, &data, &len, &type);
+    #define VCLLOG_LONG_LEGACY "1253687608 foo=" LONG_STRING
+    err = Parse_VCL_Log(VCLLOG_LONG_LEGACY, 1039, &data, &len, &type);
+    VMASSERT(err == 0, "VCL_Log legacy long string: %s", strerror(err));
+    MASSERT(len == 1028);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, "foo=" LONG_STRING, 1028) == 0,
+             "VCL_Log legacy long string: returned data=[%.*s]", len, data);
+
+    #define VCLLOG_LONG "foo=" LONG_STRING
+    err = Parse_VCL_Log(VCLLOG_LONG, strlen(VCLLOG_LONG), &data, &len, &type);
     VMASSERT(err == 0, "VCL_Log long string: %s", strerror(err));
     MASSERT(len == 1028);
     MASSERT(type == VCL_LOG_DATA);
     VMASSERT(strncmp(data, "foo=" LONG_STRING, 1028) == 0,
              "VCL_Log long string: returned data=[%.*s]", len, data);
 
-    #define VCLKEY "1253687608 key foobarbazquux"
+    #define VCLKEY_LEGACY "1253687608 key foobarbazquux"
+    err = Parse_VCL_Log(VCLKEY_LEGACY, strlen(VCLKEY_LEGACY), &data, &len,
+                        &type);
+    VMASSERT(err == 0, "VCL_Log %s: %s", VCLKEY_LEGACY, strerror(err));
+    MASSERT(len == 13);
+    MASSERT(type == VCL_LOG_KEY);
+    VMASSERT(strncmp(data, "foobarbazquux", 13) == 0,
+             "VCL_Log %s: returned data=[%.*s]", VCLKEY_LEGACY, len, data);
+
+    #define VCLKEY "key foobarbazquux"
     err = Parse_VCL_Log(VCLKEY, strlen(VCLKEY), &data, &len, &type);
     VMASSERT(err == 0, "VCL_Log %s: %s", VCLKEY, strerror(err));
     MASSERT(len == 13);
@@ -101,8 +141,17 @@ static char
     VMASSERT(strncmp(data, "foobarbazquux", 13) == 0,
              "VCL_Log %s: returned data=[%.*s]", VCLKEY, len, data);
 
-    #define VCLKEY_LONG "1253687608 key " LONG_STRING
-    err = Parse_VCL_Log(VCLKEY_LONG, 1039, &data, &len, &type);
+    #define VCLKEY_LONG_LEGACY "1253687608 key " LONG_STRING
+    err = Parse_VCL_Log(VCLKEY_LONG_LEGACY, strlen(VCLKEY_LONG_LEGACY), &data,
+                        &len, &type);
+    VMASSERT(err == 0, "VCL_Log legacy long key: %s", strerror(err));
+    MASSERT(len == 1024);
+    MASSERT(type == VCL_LOG_KEY);
+    VMASSERT(strncmp(data, LONG_STRING, 1024) == 0,
+             "VCL_Log legacy long key: returned data=[%.*s]", len, data);
+
+    #define VCLKEY_LONG "key " LONG_STRING
+    err = Parse_VCL_Log(VCLKEY_LONG, 1028, &data, &len, &type);
     VMASSERT(err == 0, "VCL_Log long key: %s", strerror(err));
     MASSERT(len == 1024);
     MASSERT(type == VCL_LOG_KEY);

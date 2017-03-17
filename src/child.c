@@ -348,11 +348,12 @@ get_chunk(dataentry *entry)
 }
 
 static unsigned
-append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
+append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, const char *data,
        int datalen)
 {
     chunk_t *chunk;
-    char *null, *p;
+    char *null;
+    const char *p;
     unsigned chunks_added = 0;
     int n;
 
@@ -411,7 +412,7 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
 }
 
 static inline void
-addkey(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *key,
+addkey(dataentry *entry, enum VSL_tag_e tag, unsigned xid, const char *key,
        int keylen)
 {
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
@@ -516,7 +517,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 
             switch (VSL_TAG(t->c->rec.ptr)) {
                 int datalen;
-                char *data;
+                const char *data;
                 vcl_log_t data_type;
                 struct timeval reqend_t;
 
