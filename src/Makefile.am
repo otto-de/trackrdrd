@@ -1,3 +1,5 @@
+AUTOMAKE_OPTIONS = subdir-objects
+
 AM_CPPFLAGS = -I${VARNISH_SHARE_INCLUDE} -I${VARNISH_PKG_INCLUDE} \
 	-I$(top_srcdir)/include
 

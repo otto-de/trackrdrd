@@ -9,6 +9,7 @@ Makefile.in
 *.Po
 *.la
 *~
+.dirstamp
 
 # Various auto-tools artifacts
 /aclocal.m4
