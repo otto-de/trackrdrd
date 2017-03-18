@@ -39,7 +39,8 @@
 #include "vas.h"
 
 static int
-parse_UnsignedDec(const char *str, int len, unsigned *num)
+parse_UnsignedDec(const char * const restrict str, const int len,
+                  unsigned * const restrict num)
 {
     unsigned new;
     *num = 0;
@@ -58,8 +59,9 @@ parse_UnsignedDec(const char *str, int len, unsigned *num)
    len is length from that char to end of data
 */
 int
-Parse_VCL_Log(const char *ptr, int len, const char **data, int *datalen,
-              vcl_log_t *type)
+Parse_VCL_Log(const char * const ptr, const int len,
+              const char ** const restrict data,
+              int * const restrict datalen, vcl_log_t * const restrict type)
 {
     const char *c = ptr;
 
@@ -83,7 +85,8 @@ Parse_VCL_Log(const char *ptr, int len, const char **data, int *datalen,
 }
 
 int
-Parse_Timestamp(const char *ptr, int len, struct timeval *t)
+Parse_Timestamp(const char * const restrict ptr, const int len,
+                struct timeval * const restrict t)
 {
     unsigned num;
     const char *p = ptr + (sizeof("Resp: ") - 1);
