@@ -288,6 +288,9 @@ void MON_StatsUpdate(stats_update_t update, unsigned nchunks, unsigned nbytes);
 /* Whether a VCL_Log entry contains a data payload or a shard key */
 typedef enum { VCL_LOG_DATA, VCL_LOG_KEY } vcl_log_t;
 
-int Parse_VCL_Log(const char *ptr, int len, const char **data, int *datalen,
-                  vcl_log_t *type);
-int Parse_Timestamp(const char *ptr, int len, struct timeval *t);
+int Parse_VCL_Log(const char * const ptr, int len,
+                  const char ** const restrict data,
+                  int * const restrict datalen,
+                  vcl_log_t * const restrict type);
+int Parse_Timestamp(const char * const restrict ptr, int len,
+                    struct timeval * const restrictt);
