@@ -158,6 +158,42 @@ static char
     VMASSERT(strncmp(data, LONG_STRING, 1024) == 0,
              "VCL_Log long key: returned data=[%.*s]", len, data);
 
+    #define VCLLOG_ONE_SPACE " "
+    err = Parse_VCL_Log(VCLLOG_ONE_SPACE, strlen(VCLLOG_ONE_SPACE), &data,
+                        &len, &type);
+    VMASSERT(err == 0, "VCL_Log one space: %s", strerror(err));
+    MASSERT(len == 1);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, VCLLOG_ONE_SPACE, 1) == 0,
+             "VCL_Log one space: returned data=[%.*s]", len, data);
+
+    #define VCLLOG_TWO_SPACES "  "
+    err = Parse_VCL_Log(VCLLOG_TWO_SPACES, strlen(VCLLOG_TWO_SPACES), &data,
+                        &len, &type);
+    VMASSERT(err == 0, "VCL_Log two spaces: %s", strerror(err));
+    MASSERT(len == 2);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, VCLLOG_TWO_SPACES, 2) == 0,
+             "VCL_Log two spaces: returned data=[%.*s]", len, data);
+
+    #define VCLLOG_NUM_PREFIX "4711foo"
+    err = Parse_VCL_Log(VCLLOG_NUM_PREFIX, strlen(VCLLOG_NUM_PREFIX), &data,
+                        &len, &type);
+    VMASSERT(err == 0, "VCL_Log numeric prefix: %s", strerror(err));
+    MASSERT(len == 7);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, VCLLOG_NUM_PREFIX, 7) == 0,
+             "VCL_Log numeric prefix: returned data=[%.*s]", len, data);
+
+    #define VCLLOG_TRAIL_SPACE "4711 "
+    err = Parse_VCL_Log(VCLLOG_TRAIL_SPACE, strlen(VCLLOG_TRAIL_SPACE), &data,
+                        &len, &type);
+    VMASSERT(err == 0, "VCL_Log trailing space: %s", strerror(err));
+    MASSERT(len == 5);
+    MASSERT(type == VCL_LOG_DATA);
+    VMASSERT(strncmp(data, VCLLOG_TRAIL_SPACE, 5) == 0,
+             "VCL_Log trailing space: returned data=[%.*s]", len, data);
+
     return NULL;
 }
 

@@ -64,12 +64,15 @@ Parse_VCL_Log(const char *ptr, int len, const char **data, int *datalen,
     const char *c = ptr;
 
     *type = VCL_LOG_DATA;
-    while (isdigit(*c))
-        c++;
-    if (*c == ' ' && (c - ptr + 1 < len))
-        c++;
-    else
-        c = ptr;
+    if (isdigit(*c)) {
+        do {
+            c++;
+        } while (isdigit(*c));
+        if (*c == ' ' && (c - ptr + 1 < len))
+            c++;
+        else
+            c = ptr;
+    }
     if (strncmp(c, "key ", 4) == 0) {
         c += 4;
         *type = VCL_LOG_KEY;
