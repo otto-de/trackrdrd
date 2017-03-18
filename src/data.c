@@ -127,7 +127,8 @@ DATA_Init(void)
 }
 
 unsigned
-DATA_Reset(dataentry *entry, chunkhead_t * const freechunk)
+DATA_Reset(dataentry * const restrict entry,
+           chunkhead_t * const restrict freechunk)
 {
     chunk_t *chunk;
     unsigned nchunk = 0;
