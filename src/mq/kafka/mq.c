@@ -347,7 +347,7 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
     REPLACE(payload, data);
     if (rd_kafka_produce(wrk->topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_FREE,
                          payload, len, key, keylen, NULL) == -1) {
-        snprintf(wrk->errmsg, LINE_MAX,
+        snprintf(wrk->errmsg, LINE_MAX, "%s",
                  rd_kafka_err2str(rd_kafka_errno2err(errno)));
         MQ_LOG_Log(LOG_ERR, "%s message send failure (%d): %s",
                    rd_kafka_name(wrk->kafka), errno, wrk->errmsg);

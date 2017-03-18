@@ -46,7 +46,7 @@
 
 static void __attribute__((__noreturn__))
 VAS_Fail_default(const char *func, const char *file, int line, const char *cond,
-                 int err, enum vas_e type)
+                 enum vas_e type)
 {
     switch(type) {
     case VAS_ASSERT:
@@ -69,8 +69,8 @@ VAS_Fail_default(const char *func, const char *file, int line, const char *cond,
         assert(0 != 0);
         break;
     }
-    if (err)
-        LOG_Log(LOG_ALERT, "errno = %d (%s)", err, strerror(err));
+    if (errno)
+        LOG_Log(LOG_ALERT, "errno = %d (%s)", errno, strerror(errno));
     abort();
 }
 

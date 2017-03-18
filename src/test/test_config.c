@@ -97,7 +97,7 @@ saveConfig(const char * fname)
        perror(fname);
        return 4;
     }
-    fprintf(fp, getConfigContent());
+    fprintf(fp, "%s", getConfigContent());
     fclose ( fp );
     return 0;
 }

@@ -437,8 +437,8 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     int status = DISPATCH_RETURN_OK, hasdata = 0, chunks = 0;
     dataentry *de = NULL;
     char reqend_str[REQEND_T_LEN];
-    int32_t vxid;
-    struct timeval latest_t = { 0 };
+    int32_t vxid = 0;
+    struct timeval latest_t = { 0, 0 };
     unsigned chunks_added = 0;
     (void) priv;
 
@@ -594,6 +594,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     }
     snprintf(reqend_str, REQEND_T_LEN, "%s=%u.%06lu", REQEND_T_VAR,
              (unsigned) latest_t.tv_sec, latest_t.tv_usec);
+    AN(vxid);
     chunks = append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
     if (chunks < 0) {
         if (debug)
