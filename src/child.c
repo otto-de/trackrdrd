@@ -356,14 +356,7 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, char *data,
     int n;
 
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
-    /* Data overflow */
-    if (entry->end + datalen + 1 > config.max_reclen) {
-        LOG_Log(LOG_ERR, "%s: Data too long, XID=%d, current length=%d, "
-            "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
-            datalen, data);
-        len_overflows++;
-        return -1;
-    }
+
     /* Null chars in the payload means that the data was truncated in the
        log, due to exceeding shm_reclen. */
     if ((null = memchr(data, '\0', datalen)) != NULL) {
@@ -486,9 +479,8 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 
                 chunk = get_chunk(de);
                 if (chunk == NULL) {
-                    if (debug)
-                        LOG_Log(LOG_DEBUG, "Free chunks exhausted, "
-                                "DATA DISCARDED: [Tx %d]", t->vxid);
+                    LOG_Log(LOG_ERR, "Free chunks exhausted, DATA DISCARDED: "
+                            "[Tx %d]", t->vxid);
                     data_free(de);
                     return status;
                 }
@@ -538,13 +530,19 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
                             datalen, data);
 
                 if (data_type == VCL_LOG_DATA) {
+                    if (de->end + datalen + 1 > config.max_reclen) {
+                        /* Data overflow */
+                        LOG_Log(LOG_ERR, "%s: Data too long, XID=%d, current "
+                                "length=%d, DISCARDING data=[%.*s]",
+                                VSL_tags[tag], xid, de->end, datalen, data);
+                        len_overflows++;
+                        continue;
+                    }
                     chunks = append(de, tag, xid, data, datalen);
                     if (chunks < 0) {
-                        if (debug)
-                            LOG_Log(LOG_DEBUG, "Chunks exhausted, DATA "
-                                    "DISCARDED: %.*s", datalen, data);
-                        data_free(de);
-                        return status;
+                        LOG_Log(LOG_DEBUG, "Chunks exhausted, DATA DISCARDED "
+                                "XID=%d: %.*s", xid, datalen, data);
+                        continue;
                     }
                     chunks_added += chunks;
                     hasdata = 1;
@@ -594,12 +592,11 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
              (unsigned) latest_t.tv_sec, latest_t.tv_usec);
     chunks = append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
     if (chunks < 0) {
-        if (debug)
-            LOG_Log(LOG_DEBUG, "Chunks exhausted, DATA DISCARDED: Tx %u", vxid);
-        data_free(de);
-        return status;
+        LOG_Log(LOG_ERR, "Chunks exhausted, DATA DISCARDED XID=%u: %s", vxid,
+            reqend_str);
     }
-    chunks_added += chunks;
+    else
+        chunks_added += chunks;
     de->occupied = 1;
     MON_StatsUpdate(STATS_OCCUPANCY, chunks_added, 0);
     data_submit(de);

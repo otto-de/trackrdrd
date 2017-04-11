@@ -1,7 +1,7 @@
 AM_CPPFLAGS = @VARNISH_CFLAGS@ -I$(top_srcdir)/include
 
 TESTS = test_parse test_data test_append test_mq test_spmcq	\
-	test_config test_spmcq_loop.sh test_worker regress.sh
+	test_config test_spmcq_loop.sh test_worker regress.sh toolong.sh
 
 check_PROGRAMS = test_parse test_data test_append test_mq	\
 	test_spmcq test_config test_worker
