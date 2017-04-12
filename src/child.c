@@ -590,13 +590,20 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     }
     snprintf(reqend_str, REQEND_T_LEN, "%s=%u.%06lu", REQEND_T_VAR,
              (unsigned) latest_t.tv_sec, latest_t.tv_usec);
-    chunks = append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
-    if (chunks < 0) {
-        LOG_Log(LOG_ERR, "Chunks exhausted, DATA DISCARDED XID=%u: %s", vxid,
-            reqend_str);
+    if (de->end + REQEND_T_LEN > config.max_reclen) {
+        /* Data overflow */
+        LOG_Log(LOG_ERR, "Timestamp: Data too long, XID=%u, current length=%d, "
+                "DISCARDING data=[%s]", vxid, de->end, reqend_str);
+        len_overflows++;
     }
-    else
-        chunks_added += chunks;
+    else {
+        chunks = append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
+        if (chunks < 0)
+            LOG_Log(LOG_ERR, "Chunks exhausted, DATA DISCARDED XID=%u: %s",
+                    vxid, reqend_str);
+        else
+            chunks_added += chunks;
+    }
     de->occupied = 1;
     MON_StatsUpdate(STATS_OCCUPANCY, chunks_added, 0);
     data_submit(de);

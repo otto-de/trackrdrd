@@ -22,18 +22,18 @@ rm -f $LOG $MSG
 
 ../trackrdrd -D -f toolong.log -l $LOG -d -c toolong.conf
 
-# Just filter out the worker thread entries, and the read the last 18 lines
+# Just filter out the worker thread entries, and the read the last lines
 # in which the data read was logged, as well as the error messages.
-CKSUM=$( grep -v 'Worker 1' $LOG |  tail -18 | cksum)
-if [ "$CKSUM" != '921644137 1188' ]; then
+CKSUM=$( grep -v 'Worker 1' $LOG |  tail -32 | cksum)
+if [ "$CKSUM" != '2318467638 2021' ]; then
     echo "ERROR: Too long test incorrect reader log cksum: $CKSUM"
     exit 1
 fi
 
-# Just check the whole contents of the file MQ output.
-MSGS=$(cat $MSG)
-if [ "$MSGS" != 'key=32772: XID=32772&foo=bar&foo=bar&foo=bar&foo=bar&' ]; then
-    echo "ERROR: Too long test incorrect output: $MSGS"
+# Check the contents of the file MQ output.
+CKSUM=$(cksum $MSG)
+if [ "$CKSUM" != "4088438759 125 $MSG" ]; then
+    echo "ERROR: Too long test incorrect output log cksum: $CKSUM"
     exit 1
 fi
 

@@ -76,5 +76,5 @@ src/mq/kafka/test/test_*.log
 src/mq/kafka/test/test_*.trs
 src/test/test_*.log
 src/test/test_*.trs
-src/test/regress.sh.log
-src/test/regress.sh.trs
+src/test/*.sh.log
+src/test/*.sh.trs
