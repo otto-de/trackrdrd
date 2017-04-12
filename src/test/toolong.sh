@@ -24,8 +24,11 @@ rm -f $LOG $MSG
 
 # Just filter out the worker thread entries, and the read the last lines
 # in which the data read was logged, as well as the error messages.
-CKSUM=$( grep -v 'Worker 1' $LOG |  tail -32 | cksum)
-if [ "$CKSUM" != '2318467638 2021' ]; then
+# Transaction 8 (the backend transaction) is filtered due to custom
+# patches in the logging API that suppress all backend transaction
+# reads when the -c flag is set.
+CKSUM=$( grep -v 'Worker 1' $LOG |  grep -v 'Reader read tx: \[8\]' | tail -31 | cksum)
+if [ "$CKSUM" != '2418589262 1994' ]; then
     echo "ERROR: Too long test incorrect reader log cksum: $CKSUM"
     exit 1
 fi
