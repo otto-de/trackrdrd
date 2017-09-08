@@ -179,7 +179,6 @@ char cli_config_filename[PATH_MAX + 1];
 struct config {
     char	pid_file[PATH_MAX];
     char	varnish_name[PATH_MAX];
-    char	vsmfile[PATH_MAX];
     char	log_file[PATH_MAX];
     char	varnish_bindump[PATH_MAX];
     char	mq_module[PATH_MAX];

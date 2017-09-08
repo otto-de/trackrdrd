@@ -222,8 +222,8 @@ main(int argc, char * const *argv)
 {
     int c, d_flag = 0, D_flag = 0, err;
     const char *P_arg = NULL, *l_arg = NULL, *n_arg = NULL, *f_arg = NULL,
-        *y_arg = NULL, *c_arg = NULL, *u_arg = NULL, *N_arg = NULL,
-        *L_arg = NULL, *T_arg = NULL;
+        *y_arg = NULL, *c_arg = NULL, *u_arg = NULL, *L_arg = NULL,
+        *T_arg = NULL;
     pid_t child_pid;
 
     CONF_Init();
@@ -235,7 +235,7 @@ main(int argc, char * const *argv)
     }
     cli_config_filename[0] = '\0';
 
-    while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:DN:L:T:")) != -1) {
+    while ((c = getopt(argc, argv, "u:P:Vn:hl:df:y:c:DL:T:")) != -1) {
         switch (c) {
         case 'P':
             P_arg = optarg;
@@ -245,9 +245,6 @@ main(int argc, char * const *argv)
             exit(EXIT_SUCCESS);
         case 'n':
             n_arg = optarg;
-            break;
-        case 'N':
-            N_arg = optarg;
             break;
         case 'l':
             l_arg = optarg;
@@ -293,9 +290,7 @@ main(int argc, char * const *argv)
             exit(EXIT_FAILURE);
     }
 
-    if (n_arg && N_arg)
-        usage(EXIT_FAILURE);
-    if (f_arg && (n_arg || N_arg))
+    if (f_arg && n_arg)
         usage(EXIT_FAILURE);
     if (l_arg && y_arg)
         usage(EXIT_FAILURE);
@@ -324,8 +319,6 @@ main(int argc, char * const *argv)
         bprintf(config.log_file, "%s", l_arg);
     if (f_arg)
         bprintf(config.varnish_bindump, "%s", f_arg);
-    if (N_arg)
-        bprintf(config.vsmfile, "%s", N_arg);
 
     if (L_arg && ((err = CONF_Add("tx.limit", L_arg)) != 0)) {
         fprintf(stderr, "-L: %s\n", strerror(err));
