@@ -9,7 +9,7 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2017-03-17
+:Date:   2017-09-08
 :Version: trunk
 :Manual section: 3
 
@@ -17,7 +17,7 @@ SYNOPSIS
 ========
 
 
-|  trackrdrd [[-n varnish_name] | [-f varnish_binlog] | [-N vsm_file]]
+|  trackrdrd [[-n varnish_name] | [-f varnish_binlog]]
 |            [-c config_file] [-u user] [-P pid_file]
 |            [[-l log_file] | [-y syslog_facility]]
 |            [-L tx_limit] [-T tx_timeout]
@@ -131,15 +131,8 @@ OPTIONS
         i.e. the 'varnish name' indicating the directory containing
         the mmap'd file used by varnishd for the shared memory log. By
         default, the host name is assumed (as with varnishd). Also set
-        by the config parameter 'varnish.name'. The -n, -N and -f
-        options are mutually exclusive.
-
-    -N vsm_file
-        Same as the -N option for Varnish binaries; i.e. the full path
-        of a mmap'd VSM file, usually named ``_.vsm``. The default is
-        ``-n hostname`` as explained above. Also set by the config
-        parameter 'varnish.file'. The -n. -N and -f options are
-        mutually exclusive.
+        by the config parameter 'varnish.name'. The -n and -f options
+        are mutually exclusive.
 
     -c config_file
         Path of a configuration file. If /etc/trackrdrd.conf exists
@@ -179,12 +172,12 @@ OPTIONS
         management (parent) process and worker (child) process.
 
     -f varnish_binlog
-        A binary dump of the Varnish SHM log produced by
-        'varnishlog -B -w'. If this option is specified, trackrdrd
-        reads from the dump instead of a live SHM log (useful for
-        debugging and replaying traffic). The options -f, -n and -N
-        are mutually exclusive; -n is the default. Also set by the
-        config parameter 'varnish.bindump'.
+        A binary dump of the Varnish SHM log produced by 'varnishlog
+        -w'. If this option is specified, trackrdrd reads from the
+        dump instead of a live SHM log (useful for debugging and
+        replaying traffic). The options -f and -n are mutually
+        exclusive; -n is the default. Also set by the config parameter
+        'varnish.bindump'.
 
     -L limit
         Sets the upper limit of incomplete transactions kept by the
@@ -221,7 +214,7 @@ Requirements
 ------------
 
 This version of the tracking reader is compatible with Varnish since
-version 5.1.0. ``trackrdrd`` is built against an existing Varnish
+version 5.2. ``trackrdrd`` is built against an existing Varnish
 installation on the same host, which in the standard case can be found
 with usual settings for the ``PATH`` environment variable in the
 ``configure`` step described below.
@@ -479,11 +472,8 @@ command-line options, as shown below.
 Parameter            CLI Option Description                                                                               Default
 ==================== ========== ========================================================================================= =======
 ``varnish.name``     ``-n``     Like the ``-n`` option for Varnish, this is the directory containing the file that is     default for Varnish (the host name)
-                                mmap'd to the shared memory segment for the Varnish log. This parameter, ``varnish.file``
-                                and ``varnish.bindump`` are mutually exclusive.
--------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``varnish.file``     ``-N``     Like the ``-N`` option for Varnish, this is the full path to the mmap'd shared memory     default for Varnish (the host name)
-                                file. This parameter, ``varnish.name`` and ``varnish.bindump`` are mutually exclusive.
+                                mmap'd to the shared memory segment for the Varnish log. This parameter and
+                                ``varnish.bindump`` are mutually exclusive.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``mq.module``                   Name of the shared object implementing the MQ interface. May be an absolute path, or the  None, this parameter is required.
                                 SO name of a library that the dynamic linker finds according to the rules described in
@@ -551,10 +541,10 @@ Parameter            CLI Option Description                                     
 ``syslog.facility``  ``-y``     See ``syslog(3)``; legal values are ``user`` or ``local0`` through ``local7``. This       ``local0``
                                 parameter and ``log.file`` are mutually exclusive. 
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
-``varnish.bindump``  ``-f``     A binary dump of the Varnish shared memory log obtained from ``varnishlog -B -w``. If a
+``varnish.bindump``  ``-f``     A binary dump of the Varnish shared memory log obtained from ``varnishlog -w``. If a
                                 value is specified, ``trackrdrd`` reads from that file instead of a live Varnish log
-                                (useful for testing, debugging and replaying traffic). This parameter ```varnish.name``
-                                and ``varnish.file`` are mutually exclusive. 
+                                (useful for testing, debugging and replaying traffic). This parameter and
+                                ``varnish.name`` are mutually exclusive.
 ==================== ========== ========================================================================================= =======
 
 LOGGING AND MONITORING

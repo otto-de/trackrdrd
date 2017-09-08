@@ -60,11 +60,11 @@ function regress {
 }
 
 echo '... standard VCL_Log syntax'
-regress 'varnish.binlog' '4116554635 333344' '1274763305 56045' \
+regress 'varnish.binlog' '4193098095 333282' '1274763305 56045' \
         '1485621276 46141'
 
 echo '... legacy VCL_Log syntax'
-regress 'varnish.legacy.binlog' '3787836061 375539' '3908916621 57319' \
+regress 'varnish.legacy.binlog' '3334052518 375477' '3908916621 57319' \
         '1139478852 48689'
 
 exit 0

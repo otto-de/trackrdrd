@@ -3,15 +3,8 @@
         i.e. the 'varnish name' indicating the directory containing
         the mmap'd file used by varnishd for the shared memory log. By
         default, the host name is assumed (as with varnishd). Also set
-        by the config parameter 'varnish.name'. The -n, -N and -f
-        options are mutually exclusive.
-
-    -N vsm_file
-        Same as the -N option for Varnish binaries; i.e. the full path
-        of a mmap'd VSM file, usually named ``_.vsm``. The default is
-        ``-n hostname`` as explained above. Also set by the config
-        parameter 'varnish.file'. The -n. -N and -f options are
-        mutually exclusive.
+        by the config parameter 'varnish.name'. The -n and -f options
+        are mutually exclusive.
 
     -c config_file
         Path of a configuration file. If /etc/trackrdrd.conf exists
@@ -52,9 +45,9 @@
 
     -f varnishlog_bindump
         A binary dump of the Varnish SHM log produced by 'varnishlog
-        -B -w'. If this option is specified, trackrdrd reads from the
+        -w'. If this option is specified, trackrdrd reads from the
         dump instead of a live SHM log (useful for debugging and
-        replaying traffic). The options -f, -n and -N are mutually
+        replaying traffic). The options -f and -n are mutually
         exclusive; -n is the default. Also set by the config parameter
         'varnish.bindump'.
 
