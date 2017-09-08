@@ -626,10 +626,11 @@ CHILD_Main(int readconfig)
     void *mqh;
     struct VSL_data *vsl;
     struct VSLQ *vslq;
-    struct VSM_data *vsm = NULL;
+    struct vsm *vsm = NULL;
     struct VSL_cursor *cursor;
     unsigned long last_seen = 0;
     double last_t;
+    char *vsm_name = NULL;
 
     MON_StatsInit();
     debug = (LOG_GetLevel() == LOG_DEBUG);
@@ -722,21 +723,18 @@ CHILD_Main(int readconfig)
         vsm = VSM_New();
         AN(vsm);
         if (!EMPTY(config.varnish_name)
-            && VSM_n_Arg(vsm, config.varnish_name) <= 0) {
+            && VSM_Arg(vsm, 'n', config.varnish_name) <= 0) {
             LOG_Log(LOG_CRIT, "-n %s: %s\n", config.varnish_name,
                     VSM_Error(vsm));
             exit(EXIT_FAILURE);
         }
-        else if (!EMPTY(config.vsmfile)
-                 && VSM_N_Arg(vsm, config.vsmfile) <= 0) {
-            LOG_Log(LOG_CRIT, "-N %s: %s\n", config.vsmfile, VSM_Error(vsm));
+        if (VSM_Attach(vsm, -1) < 0) {
+            LOG_Log(LOG_CRIT, "Cannot attach to shared memory: %s",
+                    VSM_Error(vsm));
             exit(EXIT_FAILURE);
         }
-        if (VSM_Open(vsm) < 0) {
-            LOG_Log(LOG_CRIT, "Cannot attach to shared memory for instance %s: "
-                    "%s", VSM_Name(vsm), VSM_Error(vsm));
-            exit(EXIT_FAILURE);
-        }
+        vsm_name = VSM_Dup(vsm, "Arg", "-i");
+        AN(vsm_name);
         cursor = VSL_CursorVSM(vsl, vsm, VSL_COPT_BATCH | VSL_COPT_TAIL);
     }
     else
@@ -754,10 +752,10 @@ CHILD_Main(int readconfig)
     if (!EMPTY(config.varnish_bindump))
         LOG_Log(LOG_INFO, "Reading from file: %s", config.varnish_bindump);
     else {
-        if (EMPTY(VSM_Name(vsm)))
+        if (EMPTY(vsm_name))
             LOG_Log0(LOG_INFO, "Reading default varnish instance");
         else
-            LOG_Log(LOG_INFO, "Reading varnish instance %s", VSM_Name(vsm));
+            LOG_Log(LOG_INFO, "Reading varnish instance %s", vsm_name);
     }
 
     /* Log filters */
@@ -909,7 +907,7 @@ CHILD_Main(int readconfig)
             while (vslq == NULL) {
                 AN(vsm);
                 VTIM_sleep(0.1);
-                if (VSM_Open(vsm)) {
+                if (VSM_Attach(vsm, -1) < 0) {
                     VSM_ResetError(vsm);
                     continue;
                 }
@@ -917,7 +915,6 @@ CHILD_Main(int readconfig)
                                        VSL_COPT_TAIL | VSL_COPT_BATCH);
                 if (cursor == NULL) {
                     VSL_ResetError(vsl);
-                    VSM_Close(vsm);
                     continue;
                 }
                 vslq = VSLQ_New(vsl, &cursor, VSL_g_request, NULL);
