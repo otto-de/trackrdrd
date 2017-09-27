@@ -833,7 +833,7 @@ CHILD_Main(int readconfig)
             take_free();
             eol++;
             /* re-adjust idle pause every 1024 seen txn */
-            if ((seen & (~0L << 10)) > (last_seen & (~0L << 10))) {
+            if ((seen & (~0UL << 10)) > (last_seen & (~0UL << 10))) {
                 double t = VTIM_mono();
                 idle_pause = (t - last_t) / (double) (seen - last_seen);
                 last_seen = seen;
