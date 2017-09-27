@@ -32,18 +32,19 @@
 #include "amq_connection.h"
 #include <decaf/lang/exceptions/NullPointerException.h>
 
-#define CATCHALL                \
-catch (CMSException& cex) {     \
-    return cex.what();          \
- }                              \
-catch (Throwable& th) {         \
-    return th.what();           \
- }                              \
-catch (std::exception& sex) {   \
-    return sex.what();          \
- }                              \
-catch (...) {                   \
-     return "Unexpected error"; \
+#define CATCHALL                                \
+catch (CMSException& cex) {                     \
+    string *msg = new string(cex.getMessage()); \
+    return msg->c_str();                        \
+ }                                              \
+catch (Throwable& th) {                         \
+    return th.what();                           \
+ }                                              \
+catch (std::exception& sex) {                   \
+    return sex.what();                          \
+ }                                              \
+catch (...) {                                   \
+     return "Unexpected error";                 \
  }
 
 using namespace std;
