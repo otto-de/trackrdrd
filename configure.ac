@@ -135,7 +135,8 @@ DEVELOPER_CFLAGS=" \
 
 # Added for compiling C++ for ActiveMQ.
 # -Wstrict-prototypes, -Wmissing-prototypes & -Wnested-externs invalid for C++
-# activemq-cpp fails on -Wshadow and -Wcast-qual
+# activemq-cpp fails on: -Wshadow, -Wcast-qual,-Woverloaded-virtual and
+# -Wunused-parameter
 DEVELOPER_CXXFLAGS=" \
 	-Werror \
 	-Wall \
@@ -145,11 +146,12 @@ DEVELOPER_CXXFLAGS=" \
 	-Wreturn-type \
 	-Wwrite-strings \
 	-Wswitch \
-	-Wunused-parameter \
 	-Wcast-align \
 	-Wchar-subscripts \
 	-Wextra \
 	-Wno-sign-compare \
+	-Wno-overloaded-virtual \
+	-Wno-unused-parameter \
 "
 
 # These are not compliable yet
