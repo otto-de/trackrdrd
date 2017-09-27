@@ -19,7 +19,8 @@ test_parse_SOURCES = \
 test_parse_LDADD = \
 	-lm \
 	../parse.$(OBJEXT) \
-	../assert.$(OBJEXT)
+	../assert.$(OBJEXT) \
+	@VARNISH_LIBS@
 
 test_data_SOURCES = \
 	minunit.h \
@@ -70,7 +71,8 @@ test_spmcq_SOURCES = \
 
 test_spmcq_LDADD = \
 	../spmcq.$(OBJEXT) \
-	../assert.$(OBJEXT)
+	../assert.$(OBJEXT) \
+	@VARNISH_LIBS@
 
 test_config_SOURCES = \
 	minunit.h \
@@ -84,7 +86,8 @@ test_config_SOURCES = \
 
 test_config_LDADD = \
 	../assert.$(OBJEXT) \
-	-lm
+	-lm \
+	@VARNISH_LIBS@
 
 test_worker_SOURCES = \
 	minunit.h \
