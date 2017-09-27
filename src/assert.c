@@ -74,4 +74,4 @@ VAS_Fail_default(const char *func, const char *file, int line, const char *cond,
     abort();
 }
 
-vas_f *VAS_Fail __attribute__((__noreturn__)) = VAS_Fail_default;
+vas_f *VAS_Fail_Func __attribute__((__noreturn__)) = VAS_Fail_default;
