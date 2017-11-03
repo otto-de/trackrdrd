@@ -2,7 +2,7 @@ AM_CPPFLAGS = -I$(top_srcdir)/include
 
 TESTS = test_partition test_kafka
 
-check_PROGRAMS = test_partition test_kafka test_send
+check_PROGRAMS = test_partition test_kafka test_send test_send_ssl
 
 test_partition_SOURCES = \
 	../../minunit.h \
@@ -37,6 +37,23 @@ test_send_SOURCES = \
 	test_send.c
 
 test_send_LDADD = \
+	../../../config_common.$(OBJEXT)  \
+	../mq.$(OBJEXT) \
+	../log.$(OBJEXT) \
+	../monitor.$(OBJEXT) \
+	../zookeeper.$(OBJEXT) \
+	../worker.$(OBJEXT) \
+	../callback.$(OBJEXT) \
+	../config.$(OBJEXT) \
+	${PTHREAD_LIBS} \
+	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
+
+test_send_ssl_SOURCES = \
+	../../minunit.h \
+	../../../../include/mq.h \
+	test_send_ssl.c
+
+test_send_ssl_LDADD = \
 	../../../config_common.$(OBJEXT)  \
 	../mq.$(OBJEXT) \
 	../log.$(OBJEXT) \

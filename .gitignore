@@ -55,6 +55,7 @@ src/mq/activemq/test/test_activemq
 src/mq/kafka/test/test_kafka
 src/mq/kafka/test/test_partition
 src/mq/kafka/test/test_send
+src/mq/kafka/test/test_send_ssl
 
 # Test artifacts
 src/test/stderr.txt
@@ -66,6 +67,7 @@ src/test/trackrdrd_001.conf.new
 src/test/trackrdrd_002.conf.new
 src/test/trackrdrd_003.conf.new
 src/mq/kafka/test/kafka.log
+src/mq/kafka/test/kafka_ssl.log
 src/mq/kafka/test/zoo.log
 
 # make check artifacts
