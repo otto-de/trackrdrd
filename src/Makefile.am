@@ -12,7 +12,7 @@ trackrdrd_SOURCES = \
 	trackrdrd.c \
 	parse.c \
 	log.c \
-	config_common.h \
+	$(top_srcdir)/include/config_common.h \
 	config_common.c \
 	config.c \
 	data.c \

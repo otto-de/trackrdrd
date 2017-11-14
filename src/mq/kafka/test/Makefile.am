@@ -5,7 +5,7 @@ TESTS = test_partition test_kafka
 check_PROGRAMS = test_partition test_kafka test_send test_send_ssl
 
 test_partition_SOURCES = \
-	../../minunit.h \
+	$(top_srcdir)/src/test/minunit.h \
 	../mq_kafka.h \
 	test_partition.c
 
@@ -15,7 +15,7 @@ test_partition_LDADD = \
 	-lrdkafka
 
 test_kafka_SOURCES = \
-	../../minunit.h \
+	$(top_srcdir)/src/test/minunit.h \
 	../../../../include/mq.h \
 	test_kafka.c
 
@@ -32,7 +32,7 @@ test_kafka_LDADD = \
 	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
 
 test_send_SOURCES = \
-	../../minunit.h \
+	$(top_srcdir)/src/test/minunit.h \
 	../../../../include/mq.h \
 	test_send.c
 
@@ -49,7 +49,7 @@ test_send_LDADD = \
 	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
 
 test_send_ssl_SOURCES = \
-	../../minunit.h \
+	$(top_srcdir)/src/test/minunit.h \
 	../../../../include/mq.h \
 	test_send_ssl.c
 
