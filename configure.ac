@@ -16,19 +16,16 @@ LT_INIT
 
 AC_GNU_SOURCE
 AC_PROG_CC
-AC_PROG_CXX
 AC_PROG_CC_STDC
 if test "x$ac_cv_prog_cc_c99" = xno; then
 	AC_MSG_ERROR([Could not find a C99 compatible compiler])
 fi
 AC_PROG_CPP
-AC_PROG_CXXCPP
 
 AX_PTHREAD(,[AC_MSG_ERROR([Could not configure pthreads support])])
 
 LIBS="$PTHREAD_LIBS $LIBS"
 CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
-CXXFLAGS="$CXXFLAGS -std=c++98 $PTHREAD_CFLAGS"
 CC="$PTHREAD_CC"
 
 AC_PROG_INSTALL
@@ -96,17 +93,6 @@ AS_IF([test "x$enable_kafka" != xno],
                    AC_MSG_ERROR([librdkafka is required]))
       ], [])
 
-AC_ARG_ENABLE([activemq], [AS_HELP_STRING([--enable-activemq],
-                          [build the ActiveMQ MQ plugin @<:@default=yes@:>@])],
-                          [], [enable_activemq=yes])
-AM_CONDITIONAL([AMQ_OPT], [test "$enable_activemq" = yes])
-AS_IF([test "x$enable_activemq" != xno],
-      [
-      PKG_CHECK_MODULES([AMQ], [activemq-cpp])
-      PKG_CHECK_MODULES([APR], [apr-1])
-      PKG_CHECK_MODULES([APU], [apr-util-1])
-      ], [])
-
 # From Varnish configure.ac
 # Now that we're done using the compiler to look for functions and
 # libraries, set CFLAGS to what we want them to be for our own code
@@ -131,27 +117,6 @@ DEVELOPER_CFLAGS=" \
 	-Wnested-externs \
 	-Wextra \
 	-Wno-sign-compare \
-"
-
-# Added for compiling C++ for ActiveMQ.
-# -Wstrict-prototypes, -Wmissing-prototypes & -Wnested-externs invalid for C++
-# activemq-cpp fails on: -Wshadow, -Wcast-qual,-Woverloaded-virtual and
-# -Wunused-parameter
-DEVELOPER_CXXFLAGS=" \
-	-Werror \
-	-Wall \
-	-Wno-format-y2k \
-	-W \
-	-Wpointer-arith \
-	-Wreturn-type \
-	-Wwrite-strings \
-	-Wswitch \
-	-Wcast-align \
-	-Wchar-subscripts \
-	-Wextra \
-	-Wno-sign-compare \
-	-Wno-overloaded-virtual \
-	-Wno-unused-parameter \
 "
 
 # These are not compliable yet
@@ -184,17 +149,14 @@ AS_IF([test "x$enable_stack_protector" != xno],
 AC_ARG_ENABLE(developer-warnings,
         AS_HELP_STRING([--enable-developer-warnings],[enable strict warnings (default is NO)]),
         CFLAGS="${CFLAGS} ${DEVELOPER_CFLAGS}"
-        CXXFLAGS="${CXXFLAGS} ${DEVELOPER_CXXFLAGS}"
         )
 
 # --enable-debugging-symbols
 AC_ARG_ENABLE(debugging-symbols,
         AS_HELP_STRING([--enable-debugging-symbols],[enable debugging symbols (default is NO)]),
         CFLAGS="${CFLAGS} -O0 -g -fno-inline"
-        CXXFLAGS="${CXXFLAGS} -O0 -g -fno-inline"
         )
 
-## From activemq-cpp configure.ac
 ## Execute Doxygen macros
 DX_HTML_FEATURE(ON)
 DX_CHM_FEATURE(OFF)
@@ -211,8 +173,6 @@ AC_CONFIG_FILES([
 	src/Makefile
         src/mq/file/Makefile
         src/test/Makefile
-        src/mq/activemq/Makefile
-        src/mq/activemq/test/Makefile
         src/mq/kafka/Makefile
         src/mq/kafka/test/Makefile
 ])
