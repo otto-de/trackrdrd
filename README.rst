@@ -9,7 +9,7 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2017-09-08
+:Date:   2017-11-14
 :Version: trunk
 :Manual section: 3
 
@@ -29,7 +29,7 @@ DESCRIPTION
 The ``trackrdrd`` demon reads from the shared memory log of a running
 instance of Varnish, aggregates data logged in a specific format for
 requests and ESI subrequests, and forwards the data to a messaging
-system, such as ActiveMQ or Kafka.
+system, such as Kafka.
 
 ``trackrdrd`` reads data from ``VCL_Log`` entries that are displayed
 in this format by the ``varnishlog`` tool for client request
@@ -92,9 +92,9 @@ declared in the MQ interface in ``include/mq.h``. See ``mq.h`` for
 documentation of the interface.
 
 The source distribution for ``trackrdrd`` includes implementations of
-the MQ interface for Kafka, ActiveMQ and for file output (the latter
-for testing and debugging); see libtrackrdr-kafka(3),
-libtrackrdr-activemq(3) and libtrackrdr-file(3) for details.
+the MQ interface for Kafka and for file output (the latter for testing
+and debugging); see libtrackrdr-kafka(3) and libtrackrdr-file(3) for
+details.
 
 EXAMPLE
 =======
@@ -235,16 +235,10 @@ Zookeeper (``libzookeeper_mt``)::
         https://github.com/edenhill/librdkafka
         http://zookeeper.apache.org/
 
-To build the messaging plugin for ActiveMQ (``libtrackrdr-activemq``)
-it is neccessary to link with the CMS or ActiveMQ-CPP library
-(``libactivemq-cpp``). The sources can be obtained from::
-
-        http://activemq.apache.org/cms/
-
-The messaging plugins for Kafka and ActiveMQ are optional, and you can
-choose to disable the builds of either or both of them in the
-``configure`` step, as explained below. Requirements do not need to be
-met for plugins that are not built.
+The messaging plugin for Kafka is optional, and you can choose to
+disable its build in the ``configure`` step, as explained
+below. Requirements do not need to be met for plugins that are not
+built.
 
 Building and installing trackrdrd
 ---------------------------------
@@ -256,11 +250,6 @@ recommended for Varnish).  If the builds are executed on the same
 machine (with the same architecture on which they will run), then they
 will likely match by default. When in doubt, set compile-time flags
 such as ``CFLAGS=-m64`` for ``gcc``.
-
-For ActiveMQ, the flag ``CXXFLAGS`` should be set similarly to
-``CFLAGS``, because C++ code is also compiled (unless you choose to
-disable the ActiveMQ plugin). Settings for ``CXXFLAGS`` can be
-obtained from ``pkg-config --cflags apr-1``.
 
 At minimum, run these steps::
 
@@ -288,10 +277,10 @@ be shown with::
 
 	$ configure --help
 
-To disable the build of the Kafka or ActiveMQ MQ implementations,
-specify the options ``--disable-kafka`` or ``disable-activemq`` for
-``configure``. Both are enabled by default. A file output plugin,
-suitable for testing and debugging, is always built.
+To disable the build of the Kafka MQ implementation, specify the
+option ``--disable-kafka`` for ``configure``. It is enabled by
+default. A file output plugin, suitable for testing and debugging, is
+always built.
 
 To specify a non-standard installation prefix, add the ``--prefix``
 option::
@@ -309,8 +298,8 @@ a non-standard location, set these env variables before running
 * export PATH=$PREFIX/bin:$PREFIX/sbin:$PATH
 
 ``PKG_CONFIG_PATH`` might also have to include pkg-config directories
-for other requirements, such as the ActiveMQ C++ libraries, if they
-have been installed into non-default locations.
+for other requirements, such as the Kafka client library, if they have
+been installed into non-default locations.
 
 If the Varnish installation against which ``trackrdrd`` is *run* has a
 non-standard location, it is necessary to specify runtime paths to the
@@ -341,17 +330,15 @@ Building and installing packaged MQ implementations
 ---------------------------------------------------
 
 The ``trackrdrd`` distribution includes implementations of the MQ
-interface for Kafka and ActiveMQ message brokers, as well as the file
-output plugin. For details of the builds and their dependencies, see
-libtrackrdr-kafka(3), libtrackrdr-activemq(3) and libtrackrdr-file(3)
-(``README.rst`` in ``src/mq/kafka``, ``src/mq/activemq`` and
-``src/mq/file``).
+interface for the Kafka message broker as well as the file output
+plugin. For details of the builds and their dependencies, see
+libtrackrdr-kafka(3) and libtrackrdr-file(3) (``README.rst`` in
+``src/mq/kafka`` and ``src/mq/file``).
 
 The global make targets for ``trackrdrd`` also build the MQ
 implementations, unless their builds are disabled in the ``configure``
 step as explained above. If they are enabled, then it is necessary to
-configure the build for them as well, for example by setting
-``CXXFLAGS`` to compile C++ sources.
+configure the build for them as well.
 
 STARTUP AND SHUTDOWN
 ====================
@@ -821,7 +808,6 @@ SEE ALSO
 * ``varnishd(1)``
 * ``libtrackrdr-file(3)``
 * ``libtrackrdr-kafka(3)``
-* ``libtrackrdr-activemq(3)``
 * ``ld.so(8)``
 * ``syslog(3)``
 
