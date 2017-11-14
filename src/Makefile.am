@@ -9,6 +9,7 @@ nodist_trackrdrd_SOURCES = usage.h vcs_version.h
 
 trackrdrd_SOURCES = \
 	trackrdrd.h \
+	signals.h \
 	trackrdrd.c \
 	parse.c \
 	log.c \
@@ -26,7 +27,9 @@ trackrdrd_SOURCES = \
 	vfl.h \
 	vfl.c \
 	vpf.h \
-	vpf.c
+	vpf.c \
+	$(top_srcdir)/options.txt \
+	$(top_srcdir)/synopsis.txt
 
 trackrdrd_LDADD = \
 	${PTHREAD_LIBS} @VARNISH_LIBS@ ${LIBM}
