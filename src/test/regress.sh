@@ -16,6 +16,7 @@ echo '... testing messages & log output at debug level against known checksums'
 
 LOG=mq_log.log
 MSG=mq_test.log
+TESTDIR="${TESTDIR:-.}"
 
 #
 # $1 the binary log to read
@@ -25,6 +26,12 @@ MSG=mq_test.log
 #
 function regress {
     rm -f $LOG $MSG
+
+    if [ "$TESTDIR" != "." ]; then
+        cp $TESTDIR/$1 .
+        cp $TESTDIR/test.conf .
+        cp $TESTDIR/file_mq.conf .
+    fi
 
     ../trackrdrd -D -f $1 -l $LOG -d -c test.conf
 
@@ -66,5 +73,9 @@ regress 'varnish.binlog' '4193098095 333282' '1274763305 56045' \
 echo '... legacy VCL_Log syntax'
 regress 'varnish.legacy.binlog' '3334052518 375477' '3908916621 57319' \
         '1139478852 48689'
+
+if [ "$TESTDIR" != "." ]; then
+    rm -f varnish.binlog varnish.legacy.binlog test.conf file_mq.conf
+fi
 
 exit 0

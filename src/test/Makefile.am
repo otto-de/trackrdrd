@@ -1,12 +1,17 @@
 AUTOMAKE_OPTIONS = subdir-objects
 
-AM_CPPFLAGS = @VARNISH_CFLAGS@ -I$(top_srcdir)/include
+AM_CPPFLAGS = @VARNISH_CFLAGS@ -I$(top_srcdir)/include -I$(builddir)/.. \
+	-DTESTDIR=\"$(srcdir)/\"
 
 TESTS = test_parse test_data test_append test_mq test_spmcq	\
 	test_config test_spmcq_loop.sh test_worker regress.sh
 
 check_PROGRAMS = test_parse test_data test_append test_mq	\
 	test_spmcq test_config test_worker
+
+dist_check_SCRIPTS = test_spmcq_loop.sh regress.sh
+
+AM_TESTS_ENVIRONMENT = TESTDIR=$(srcdir)
 
 CLEANFILES = testing.log stderr.txt trackrdrd.pid trackrdrd_*.conf.new
 DISTCLEANFILES = mq_test.log mq_log.log
@@ -105,3 +110,7 @@ test_worker_LDADD = \
 	../config.$(OBJEXT) \
 	../config_common.$(OBJEXT) \
 	@VARNISH_LIBS@
+
+EXTRA_DIST = file_mq.conf test.conf trackrdrd_001.conf trackrdrd_002.conf \
+	trackrdrd_003.conf trackrdrd_010.conf varnish.binlog \
+	varnish.legacy.binlog
