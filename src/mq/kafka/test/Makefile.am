@@ -1,4 +1,4 @@
-AM_CPPFLAGS = -I$(top_srcdir)/include
+AM_CPPFLAGS = -I$(top_srcdir)/include -DTESTDIR=\"$(srcdir)/\"
 
 TESTS = test_partition test_kafka
 
@@ -66,3 +66,5 @@ test_send_ssl_LDADD = \
 	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
 
 CLEANFILES = kafka.log zoo.log *~
+
+EXTRA_DIST = kafka.conf kafka_ssl.conf

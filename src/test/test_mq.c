@@ -37,6 +37,10 @@
 #include "../trackrdrd.h"
 #include "vas.h"
 
+#ifndef TESTDIR
+#	define TESTDIR "./"
+#endif
+
 #define MQ_MODULE "../mq/file/.libs/libtrackrdr-file.so"
 #define MQ_CONFIG "file_mq.conf"
 
@@ -87,7 +91,7 @@ static char
     printf("... testing MQ global initialization\n");
 
     config.nworkers = NWORKERS;
-    strcpy(config.mq_config_file, MQ_CONFIG);
+    strcpy(config.mq_config_file, TESTDIR MQ_CONFIG);
     err = mqf.global_init(config.nworkers, config.mq_config_file);
     VMASSERT(err == NULL, "MQ_GlobalInit: %s", err);
 

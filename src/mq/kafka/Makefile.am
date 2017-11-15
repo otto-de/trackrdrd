@@ -19,7 +19,7 @@ libtrackrdr_kafka_la_SOURCES = \
 	worker.c \
 	callback.c \
 	config.c \
-	$(top_srcdir)/src/config_common.c
+	$(top_builddir)/src/config_common.c
 
 libtrackrdr_kafka_la_LIBADD = \
 	${PTHREAD_LIBS} \
@@ -41,5 +41,7 @@ libtrackrdr-kafka.3: README.rst
 if HAVE_RST2MAN
 	${RST2MAN} README.rst $@
 endif
+
+EXTRA_DIST = README.rst
 
 CLEANFILES = *~

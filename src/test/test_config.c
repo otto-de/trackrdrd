@@ -44,6 +44,10 @@
 
 /***** defines ****************************************************************/
 
+#ifndef TESTDIR
+#	define TESTDIR "./"
+#endif
+
 #define DEFAULT_USER "nobody"
 #define DEFAULT_PID_FILE "/var/run/trackrdrd.pid"
 #define DEFAULT_RESTART_PAUSE 1
@@ -121,19 +125,21 @@ static char
 
 
 static char
-*readAndCompare(const char * confName)
+*readAndCompare(const char * testDir, const char * confFile)
 {
     int err;
-    char confNameNew[512];
+    char confName[512], confNameNew[512];
 
     err = CONF_ReadDefault();
     VMASSERT(err == 0, "Error code during reading default config: %i", err);
+    strcpy(confName, testDir);
+    strcat(confName, confFile);
     err = CONF_ReadFile(confName, CONF_Add);
     VMASSERT(err == 0,
              "Error code during reading config \"%s\": %i", confName, err);
 //    verbose("Config is:\n%s", getConfigContent());
 
-    strcpy(confNameNew, confName);
+    strcpy(confNameNew, confFile);
     strcat(confNameNew, ".new");
     saveConfig(confNameNew);
     VMASSERT(!TEST_compareFiles(confName, confNameNew),
@@ -152,9 +158,9 @@ static const char
     LOG_Open("trackrdrd");
     LOG_SetLevel(7);
 
-    returnIfNotNull(readAndCompare("trackrdrd_001.conf"));
-    returnIfNotNull(readAndCompare("trackrdrd_002.conf"));
-    returnIfNotNull(readAndCompare("trackrdrd_003.conf"));
+    returnIfNotNull(readAndCompare(TESTDIR, "trackrdrd_001.conf"));
+    returnIfNotNull(readAndCompare(TESTDIR, "trackrdrd_002.conf"));
+    returnIfNotNull(readAndCompare(TESTDIR, "trackrdrd_003.conf"));
 
     return NULL;
 }
@@ -185,8 +191,8 @@ static const char
     printf("... testing CONF_ReadFile\n");
 
     returnIfNotNull(
-        readAndFindError("trackrdrd_010.conf",
-                         "Error in trackrdrd_010.conf line 12 "
+        readAndFindError(TESTDIR "trackrdrd_010.conf",
+                         "Error in " TESTDIR "trackrdrd_010.conf line 12 "
                          "(Invalid argument): "
                          "'unknown.module = /my/path/module.so'\n"));
     return NULL;

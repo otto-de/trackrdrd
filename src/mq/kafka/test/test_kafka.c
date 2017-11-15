@@ -37,6 +37,10 @@
 /* Automake exit code for "skipped" in make check */
 #define EXIT_SKIPPED 77
 
+#ifndef TESTDIR
+#	define TESTDIR "./"
+#endif
+
 #define KAFKA_CONFIG "kafka.conf"
 #define NWORKERS 1
 
@@ -51,7 +55,7 @@ static char
 
     printf("... testing Kafka global initialization\n");
 
-    err = MQ_GlobalInit(NWORKERS, KAFKA_CONFIG);
+    err = MQ_GlobalInit(NWORKERS, TESTDIR KAFKA_CONFIG);
     VMASSERT(err == NULL, "MQ_GlobalInit: %s", err);
 
     return NULL;
