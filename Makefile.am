@@ -22,7 +22,7 @@ endif
 
 include doxygen-include.am
 
-EXTRA_DIST = README.rst autogen.sh $(DX_CONFIG) doc/html
+EXTRA_DIST = README.rst autogen.sh
 
 doc/html: doxygen-run
 
