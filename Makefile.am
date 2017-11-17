@@ -22,7 +22,7 @@ endif
 
 include doxygen-include.am
 
-EXTRA_DIST = README.rst autogen.sh
+EXTRA_DIST = README.rst autogen.sh etc/trackrdrd.conf etc/trackrdr-kafka.conf
 
 doc/html: doxygen-run
 
