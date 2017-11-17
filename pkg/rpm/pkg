@@ -1,0 +1,47 @@
+#! /bin/bash -ex
+
+# Build script for a trackrdrd el7 RPM
+# to be run in the rpmbuild/centos7 docker container.
+
+# The directory mounted to /srv MUST contain these files:
+# - this script (named pkg)
+# - trackrdrd tarball (trackrdrd-$VERSION.tar.gz)
+# - RPM spec file (trackrdrd.spec)
+# - systemd unit file (trackrdrd.service)
+# - yum repo config for varnish5@packagecloud (varnishcache_varnish5.repo)
+#   (see https://packagecloud.io/varnishcache/varnish5/install#manual-rpm)
+
+# At the end of the run, binary, source and debuginfo RPMs are in the
+# directory mounted to /srv.
+
+# delete the peculiar macros from the rpmbuild/centos7 image
+rm /home/builder/.rpmmacros
+
+# set up the build environment
+cd /home/builder
+mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+cp /srv/trackrdrd.spec rpmbuild/SPECS
+cp /srv/trackrdrd-*.tar.gz rpmbuild/SOURCES
+cp /srv/trackrdrd.service rpmbuild/SOURCES
+
+# install epel7 repo
+sudo rpm -Uvh \
+     https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+
+# install cloudera cdh5 repo (for zookeeper-native)
+sudo yum install -y https://archive.cloudera.com/cdh5/one-click-install/redhat/7/x86_64/cloudera-cdh-5-0.x86_64.rpm
+
+# set up varnish repo
+sudo cp /srv/varnishcache_varnish5.repo /etc/yum.repos.d/
+
+sudo yum -q makecache -y --disablerepo='*' --enablerepo='varnishcache_varnish5'
+
+# build requirements
+sudo yum install -y varnish-devel pkgconfig make gcc librdkafka-devel \
+	zookeeper-native pcre-devel zlib-devel python-docutils
+
+# build RPMs
+rpmbuild -ba -D "dist .${DIST}" rpmbuild/SPECS/trackrdrd.spec
+
+sudo cp rpmbuild/RPMS/*/* /srv
+sudo cp rpmbuild/SRPMS/* /srv
