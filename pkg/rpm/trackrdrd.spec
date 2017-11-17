@@ -88,6 +88,9 @@ chmod o-w %{_builddir}/%{name}-%{version}/src/test
 
 make install DESTDIR=%{buildroot}
 
+install -D -m 0644 etc/trackrdrd.conf %{buildroot}%{_sysconfdir}/trackrdrd.conf
+install -D -m 0644 etc/trackrdr-kafka.conf %{buildroot}%{_sysconfdir}/trackrdr-kafka.conf
+
 # None of these for fedora/epel
 find %{buildroot}/%{_libdir}/ -name '*.la' -exec rm -f {} ';'
 find %{buildroot}/%{_libdir}/ -name '*.a' -exec rm -f {} ';'
@@ -99,6 +102,7 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_bindir}/*
 %{_libdir}/*
+%{_sysconfdir}/*
 %{_mandir}/man3/*.3*
 %doc README.rst
 #%license LICENSE
