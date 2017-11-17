@@ -102,9 +102,10 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_bindir}/*
 %{_libdir}/*
-%{_sysconfdir}/*
 %{_mandir}/man3/*.3*
 %doc README.rst
 #%license LICENSE
+%config(noreplace) %{_sysconfdir}/trackrdrd.conf
+%config(noreplace) %{_sysconfdir}/trackrdr-kafka.conf
 
 %changelog
