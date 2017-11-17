@@ -22,7 +22,7 @@ Source1: trackrdrd.service
 Requires: varnish >= 5.2.0
 Requires: librdkafka
 Requires: zookeeper-native
-Requires: lz4
+Requires: zlib
 Requires: pcre
 
 BuildRequires: varnish-devel >= 5.2.0
@@ -32,7 +32,7 @@ BuildRequires: gcc
 BuildRequires: librdkafka-devel
 BuildRequires: zookeeper-native
 BuildRequires: pcre-devel
-BuildRequires: lz4-devel
+BuildRequires: zlib-devel
 BuildRequires: python-docutils >= 0.6
 
 # git builds
