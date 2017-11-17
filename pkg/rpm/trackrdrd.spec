@@ -7,7 +7,7 @@ License: BSD
 Group: System Environment/Daemons
 URL: https://code.uplex.de/uplex-varnish/trackrdrd
 Source0: %{name}-%{version}.tar.gz
-#Source1: varnish.initrc
+Source1: trackrdrd.service
 #Source2: varnish.sysconfig
 #Source3: varnish.logrotate
 #Source4: varnish_reload_vcl
@@ -91,6 +91,8 @@ make install DESTDIR=%{buildroot}
 install -D -m 0644 etc/trackrdrd.conf %{buildroot}%{_sysconfdir}/trackrdrd.conf
 install -D -m 0644 etc/trackrdr-kafka.conf %{buildroot}%{_sysconfdir}/trackrdr-kafka.conf
 
+install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/trackrdrd.service
+
 # None of these for fedora/epel
 find %{buildroot}/%{_libdir}/ -name '*.la' -exec rm -f {} ';'
 find %{buildroot}/%{_libdir}/ -name '*.a' -exec rm -f {} ';'
@@ -107,5 +109,7 @@ rm -rf %{buildroot}
 #%license LICENSE
 %config(noreplace) %{_sysconfdir}/trackrdrd.conf
 %config(noreplace) %{_sysconfdir}/trackrdr-kafka.conf
+
+%{_unitdir}/trackrdrd.service
 
 %changelog
