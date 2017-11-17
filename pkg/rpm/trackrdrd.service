@@ -1,0 +1,21 @@
+[Unit]
+Description=Tracking Log Reader for Varnish Cache
+Documentation=man:trackrdrd(3) man:libtrackrdr-kafka(3)
+After=varnish.service
+
+[Service]
+# If you want to make changes to this file, please copy it to
+# /etc/systemd/system/trackrdrd.service and make your changes there.
+# This will override the file kept at /lib/systemd/system/trackrdrd.service
+
+# Maximum size of the corefile.
+LimitCORE=infinity
+
+Type=forking
+PIDFile=/var/run/trackrdrd.pid
+ExecStart=/usr/bin/trackrdrd
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
