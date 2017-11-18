@@ -8,6 +8,7 @@
 # - trackrdrd tarball (trackrdrd-$VERSION.tar.gz)
 # - RPM spec file (trackrdrd.spec)
 # - systemd unit file (trackrdrd.service)
+# - logrotate config for the Kafka plugin (trackrdr-kafka.logrotate)
 # - yum repo config for varnish5@packagecloud (varnishcache_varnish5.repo)
 #   (see https://packagecloud.io/varnishcache/varnish5/install#manual-rpm)
 
@@ -23,6 +24,7 @@ mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 cp /srv/trackrdrd.spec rpmbuild/SPECS
 cp /srv/trackrdrd-*.tar.gz rpmbuild/SOURCES
 cp /srv/trackrdrd.service rpmbuild/SOURCES
+cp /srv/trackrdr-kafka.logrotate rpmbuild/SOURCES
 
 # install epel7 repo
 sudo rpm -Uvh \
