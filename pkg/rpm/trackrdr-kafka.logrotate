@@ -1,0 +1,12 @@
+# Log of the tracking reader's Kafka messaging plugin
+
+/var/log/trackrdrd/libtrackrdr-kafka.log {
+ hourly
+ size 100M
+ rotate 5
+ compress
+ dateext
+ notifempty
+ missingok
+ copytruncate
+}

@@ -8,14 +8,7 @@ Group: System Environment/Daemons
 URL: https://code.uplex.de/uplex-varnish/trackrdrd
 Source0: %{name}-%{version}.tar.gz
 Source1: trackrdrd.service
-#Source2: varnish.sysconfig
-#Source3: varnish.logrotate
-#Source4: varnish_reload_vcl
-#Source5: varnish.params
-#Source6: varnish.service
-#Source9: varnishncsa.initrc
-#Source10: varnishncsa.service
-#Source11: find-provides
+Source2: trackrdr-kafka.logrotate
 
 # varnish from varnish5 at packagecloud
 # zookeeper-native from cloudera-cdh5.repo
@@ -24,6 +17,7 @@ Requires: librdkafka
 Requires: zookeeper-native
 Requires: zlib
 Requires: pcre
+Requires: logrotate
 
 BuildRequires: varnish-devel >= 5.2.0
 BuildRequires: pkgconfig
@@ -84,6 +78,13 @@ chmod o+w %{_builddir}/%{name}-%{version}/src/test
 make check
 chmod o-w %{_builddir}/%{name}-%{version}/src/test
 
+%pre
+getent group trackrdrd    >/dev/null || groupadd -r trackrdrd
+getent passwd trackrdrd >/dev/null || \
+        useradd -r -g trackrdrd -s /sbin/nologin \
+                -c "Tracking Log Reader" trackrdrd
+exit 0
+
 %install
 
 make install DESTDIR=%{buildroot}
@@ -92,6 +93,9 @@ install -D -m 0644 etc/trackrdrd.conf %{buildroot}%{_sysconfdir}/trackrdrd.conf
 install -D -m 0644 etc/trackrdr-kafka.conf %{buildroot}%{_sysconfdir}/trackrdr-kafka.conf
 
 install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/trackrdrd.service
+
+mkdir -p %{buildroot}/var/log/trackrdrd
+install -D -m 0644 %{SOURCE2} %{buildroot}%{_sysconfdir}/logrotate.d/trackrdr-kafka
 
 # None of these for fedora/epel
 find %{buildroot}/%{_libdir}/ -name '*.la' -exec rm -f {} ';'
@@ -104,12 +108,18 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_bindir}/*
 %{_libdir}/*
+%{_var}/log/trackrdrd
 %{_mandir}/man3/*.3*
 %doc README.rst
 #%license LICENSE
 %config(noreplace) %{_sysconfdir}/trackrdrd.conf
 %config(noreplace) %{_sysconfdir}/trackrdr-kafka.conf
+%config(noreplace) %{_sysconfdir}/logrotate.d/trackrdr-kafka
 
 %{_unitdir}/trackrdrd.service
+
+%post
+chown trackrdrd:trackrdrd /var/log/trackrdrd
+/sbin/ldconfig
 
 %changelog
