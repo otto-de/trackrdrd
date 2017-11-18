@@ -29,7 +29,7 @@ sudo rpm -Uvh \
      https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 
 # install cloudera cdh5 repo (for zookeeper-native)
-sudo yum install -y https://archive.cloudera.com/cdh5/one-click-install/redhat/7/x86_64/cloudera-cdh-5-0.x86_64.rpm
+sudo yum install -y -q https://archive.cloudera.com/cdh5/one-click-install/redhat/7/x86_64/cloudera-cdh-5-0.x86_64.rpm
 
 # set up varnish repo
 sudo cp /srv/varnishcache_varnish5.repo /etc/yum.repos.d/
@@ -37,7 +37,7 @@ sudo cp /srv/varnishcache_varnish5.repo /etc/yum.repos.d/
 sudo yum -q makecache -y --disablerepo='*' --enablerepo='varnishcache_varnish5'
 
 # build requirements
-sudo yum install -y varnish-devel pkgconfig make gcc librdkafka-devel \
+sudo yum install -y -q varnish-devel pkgconfig make gcc librdkafka-devel \
 	zookeeper-native pcre-devel zlib-devel python-docutils
 
 # build RPMs
