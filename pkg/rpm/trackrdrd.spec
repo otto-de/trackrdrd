@@ -79,9 +79,12 @@ make check
 chmod o-w %{_builddir}/%{name}-%{version}/src/test
 
 %pre
-getent group trackrdrd    >/dev/null || groupadd -r trackrdrd
+if [ -z $(getent group varnish) ]; then
+    echo 'Group varnish not found (should have been created by package varnish)'
+    exit 1
+fi
 getent passwd trackrdrd >/dev/null || \
-        useradd -r -g trackrdrd -s /sbin/nologin \
+        useradd -r -g varnish -s /sbin/nologin \
                 -c "Tracking Log Reader" trackrdrd
 exit 0
 
@@ -124,7 +127,7 @@ rm -rf %{buildroot}
 %{_unitdir}/trackrdrd.service
 
 %post
-chown trackrdrd:trackrdrd /var/log/trackrdrd
+chown trackrdrd:varnish /var/log/trackrdrd
 /sbin/ldconfig
 
 %changelog
