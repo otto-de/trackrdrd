@@ -1,8 +1,9 @@
+# -D MUST pass in _version and _release, and SHOULD pass in dist.
 
 Summary: Tracking Log Reader for Varnish Cache
 Name: trackrdrd
-Version: trunk
-Release: 0%{?dist}
+Version: %{_version}
+Release: %{_release}%{?dist}
 License: BSD
 Group: System Environment/Daemons
 URL: https://code.uplex.de/uplex-varnish/trackrdrd
@@ -61,8 +62,7 @@ format for requests and ESI subrequests, and forwards the data to a
 messaging system (such as Kafka).
 
 %prep
-#%setup -n varnish-%{version}%{?vd_rc}
-%setup -q -n trackrdrd-trunk
+%setup -q -n %{name}-%{version}
 
 %build
 # ./autogen.sh
