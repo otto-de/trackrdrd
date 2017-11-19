@@ -97,6 +97,11 @@ install -D -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}/trackrdrd.service
 mkdir -p %{buildroot}/var/log/trackrdrd
 install -D -m 0644 %{SOURCE2} %{buildroot}%{_sysconfdir}/logrotate.d/trackrdr-kafka
 
+cp src/mq/file/README.rst README-mq-file.rst
+cp src/mq/kafka/README.rst README-mq-kafka.rst
+# Only use the version-specific docdir created by %doc below
+rm -rf %{buildroot}%{_docdir}
+
 # None of these for fedora/epel
 find %{buildroot}/%{_libdir}/ -name '*.la' -exec rm -f {} ';'
 find %{buildroot}/%{_libdir}/ -name '*.a' -exec rm -f {} ';'
@@ -110,8 +115,7 @@ rm -rf %{buildroot}
 %{_libdir}/*
 %{_var}/log/trackrdrd
 %{_mandir}/man3/*.3*
-%doc README.rst
-#%license LICENSE
+%doc README.rst COPYING INSTALL.rst LICENSE README-mq-file.rst README-mq-kafka.rst
 %config(noreplace) %{_sysconfdir}/trackrdrd.conf
 %config(noreplace) %{_sysconfdir}/trackrdr-kafka.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/trackrdr-kafka
