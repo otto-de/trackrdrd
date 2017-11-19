@@ -11,7 +11,7 @@ Tracking Log Reader demon
 :Author: Geoffrey Simmons
 :Date:   2017-11-19
 :Version: trunk
-:Manual section: 3
+:Manual section: 1
 
 SYNOPSIS
 ========

@@ -114,6 +114,7 @@ rm -rf %{buildroot}
 %{_bindir}/*
 %{_libdir}/*
 %{_var}/log/trackrdrd
+%{_mandir}/man1/*.1*
 %{_mandir}/man3/*.3*
 %doc README.rst COPYING INSTALL.rst LICENSE README-mq-file.rst README-mq-kafka.rst
 %config(noreplace) %{_sysconfdir}/trackrdrd.conf

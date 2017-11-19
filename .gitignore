@@ -41,6 +41,7 @@ TAGS
 src/vcs_version.h
 src/trackrdrd
 src/usage.h
+*.1
 *.3
 
 # Test binaries

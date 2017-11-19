@@ -7,11 +7,11 @@ endif
 SUBDIRS = src src/mq/file src/test $(MAYBE_KAFKA)
 
 if HAVE_RST2MAN
-dist_man_MANS = trackrdrd.3
+dist_man_MANS = trackrdrd.1
 MAINTAINERCLEANFILES = $(dist_man_MANS) *~
 endif
 
-trackrdrd.3: README.rst
+trackrdrd.1: README.rst
 if HAVE_RST2MAN
 	${RST2MAN} README.rst $@
 else
