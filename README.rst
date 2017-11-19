@@ -9,7 +9,7 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2017-11-14
+:Date:   2017-11-19
 :Version: trunk
 :Manual section: 3
 
@@ -207,26 +207,12 @@ OPTIONS
     -h
        Print usage and exit
 
-BUILD/INSTALL
+REQUIREMENTS
 =============
 
-Requirements
-------------
-
 This version of the tracking reader is compatible with Varnish since
-version 5.2. ``trackrdrd`` is built against an existing Varnish
-installation on the same host, which in the standard case can be found
-with usual settings for the ``PATH`` environment variable in the
-``configure`` step described below.
-
-The build requires the following tools/packages:
-
-* git
-* autoconf
-* automake
-* autoheader
-* pkg-config
-* python-docutils (for rst2man)
+version 5.2. See the source repository for versions that are
+compatible with other versions of Varnish.
 
 The messaging plugin for Kafka (``libtrackrdr-kafka``) requires
 libraries for Kafka (``librdkafka``) and the multi-threaded libary for
@@ -235,110 +221,10 @@ Zookeeper (``libzookeeper_mt``)::
         https://github.com/edenhill/librdkafka
         http://zookeeper.apache.org/
 
-The messaging plugin for Kafka is optional, and you can choose to
-disable its build in the ``configure`` step, as explained
-below. Requirements do not need to be met for plugins that are not
-built.
+INSTALLATION
+============
 
-Building and installing trackrdrd
----------------------------------
-
-The tracking reader and the Varnish instances against which it built
-and run must be built for the same architecture; in particular, they
-must match as to 32- or 64-bit modes (and 64-bit is strongly
-recommended for Varnish).  If the builds are executed on the same
-machine (with the same architecture on which they will run), then they
-will likely match by default. When in doubt, set compile-time flags
-such as ``CFLAGS=-m64`` for ``gcc``.
-
-At minimum, run these steps::
-
-	$ git clone $TRACKRDRD_GIT_URL
-	$ cd trackrdrd
-	$ ./autogen.sh
-	$ CXXFLAGS=-m64 CFLAGS=-m64 ./configure
-	$ make
-
-For self-tests after the build, run::
-
-	$ make check
-
-To install ``trackrdrd``, run ``make install`` as root, for example
-with ``sudo``::
-
-	$ sudo make install
-
-Alternative configurations
---------------------------
-
-In the ``configure`` step, a wide range of additional options may be
-given to affect the configuration. Most of these are standard, and can
-be shown with::
-
-	$ configure --help
-
-To disable the build of the Kafka MQ implementation, specify the
-option ``--disable-kafka`` for ``configure``. It is enabled by
-default. A file output plugin, suitable for testing and debugging, is
-always built.
-
-To specify a non-standard installation prefix, add the ``--prefix``
-option::
-
-	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
-          --prefix=/path/to/trackrdrd_install
-
-If the Varnish installation against which ``trackrdrd`` is *built* has
-a non-standard location, set these env variables before running
-``configure``:
-
-* PREFIX=/path/to/varnish/install/prefix
-* export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig
-* export ACLOCAL_PATH=$PREFIX/share/aclocal
-* export PATH=$PREFIX/bin:$PREFIX/sbin:$PATH
-
-``PKG_CONFIG_PATH`` might also have to include pkg-config directories
-for other requirements, such as the Kafka client library, if they have
-been installed into non-default locations.
-
-If the Varnish installation against which ``trackrdrd`` is *run* has a
-non-standard location, it is necessary to specify runtime paths to the
-Varnish libraries by setting ``LDFLAGS=-Wl,-rpath=$LIB_PATHS`` for the
-configure step::
-
-        $ export VARNISH_PREFIX=/path/to/varnish_install
-	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
-          LDFLAGS=-Wl,-rpath=$VARNISH_PREFIX/lib/varnish:$VARNISH_PREFIX/lib
-
-Developers can add a number of options as an aid to compiling and
-debugging::
-
-	$ CFLAGS=-m64 CXXFLAGS=-m64 ./configure \\
-          --enable-debugging-symbols --enable-developer-warnings
-
-``--enable-debugging-symbols`` ensures that symbols and source code
-file names are saved in the executable, and thus are available in core
-dumps, in stack traces on assertion failures, for debuggers and so
-forth.
-
-``--enable-developer-warnings`` activates stricter compiler switches
-for errors and warnings, such as ``-Werror`` to cause compiles to fail
-on any warning. ``trackrdrd`` should *always* build successfully with
-this option.
-
-Building and installing packaged MQ implementations
----------------------------------------------------
-
-The ``trackrdrd`` distribution includes implementations of the MQ
-interface for the Kafka message broker as well as the file output
-plugin. For details of the builds and their dependencies, see
-libtrackrdr-kafka(3) and libtrackrdr-file(3) (``README.rst`` in
-``src/mq/kafka`` and ``src/mq/file``).
-
-The global make targets for ``trackrdrd`` also build the MQ
-implementations, unless their builds are disabled in the ``configure``
-step as explained above. If they are enabled, then it is necessary to
-configure the build for them as well.
+See `INSTALL.rst <INSTALL.rst>`_ in the source repository.
 
 STARTUP AND SHUTDOWN
 ====================
@@ -810,40 +696,16 @@ SEE ALSO
 * ``libtrackrdr-kafka(3)``
 * ``ld.so(8)``
 * ``syslog(3)``
+* source repository mirrors at:
 
-COPYRIGHT AND LICENCE
-=====================
+  * https://code.uplex.de/uplex-varnish/trackrdrd
+  * https://github.com/otto-de/trackrdrd
 
-For both the software and this document are governed by a BSD 2-clause
-licence.
+* developer contact: <varnish-support@uplex.de>, and at the source
+  repository sites
 
+COPYRIGHT
+=========
 
-| Copyright (c) 2012-2015 UPLEX Nils Goroll Systemoptimierung
-| Copyright (c) 2012-2015 Otto Gmbh & Co KG
-| All rights reserved
-| Use only with permission
-
-| Authors: Geoffrey Simmons <geoffrey.simmons@uplex.de>
-|          Nils Goroll <nils.goroll@uplex.de>
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGE.
+This document is distributed under the same terms as the trackrdrd
+project, see LICENSE.
