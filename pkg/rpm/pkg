@@ -3,6 +3,9 @@
 # Build script for a trackrdrd el7 RPM
 # to be run in the rpmbuild/centos7 docker container.
 
+# Env variables VERSION and RELEASE MUST be set in the docker invocation.
+# DIST is set by the rpmbuild/centos7 container.
+
 # The directory mounted to /srv MUST contain these files:
 # - this script (named pkg)
 # - trackrdrd tarball (trackrdrd-$VERSION.tar.gz)
@@ -15,6 +18,16 @@
 # At the end of the run, binary, source and debuginfo RPMs are in the
 # directory mounted to /srv.
 
+if [ -z $VERSION ]; then
+   echo "Env variable VERSION MUST be set"
+   exit 1
+fi
+
+if [ -z $RELEASE ]; then
+   echo "Env variable RELEASE MUST be set"
+   exit 1
+fi
+
 # delete the peculiar macros from the rpmbuild/centos7 image
 rm /home/builder/.rpmmacros
 
@@ -22,7 +35,7 @@ rm /home/builder/.rpmmacros
 cd /home/builder
 mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 cp /srv/trackrdrd.spec rpmbuild/SPECS
-cp /srv/trackrdrd-*.tar.gz rpmbuild/SOURCES
+cp /srv/trackrdrd-${VERSION}.tar.gz rpmbuild/SOURCES
 cp /srv/trackrdrd.service rpmbuild/SOURCES
 cp /srv/trackrdr-kafka.logrotate rpmbuild/SOURCES
 
@@ -43,7 +56,10 @@ sudo yum install -y -q varnish-devel pkgconfig make gcc librdkafka-devel \
 	zookeeper-native pcre-devel zlib-devel python-docutils
 
 # build RPMs
-rpmbuild -ba -D "dist .${DIST}" rpmbuild/SPECS/trackrdrd.spec
+rpmbuild -ba -D "dist .${DIST}" \
+         -D "_version ${VERSION}" \
+         -D "_release ${RELEASE}" \
+         rpmbuild/SPECS/trackrdrd.spec
 
 sudo cp rpmbuild/RPMS/*/* /srv
 sudo cp rpmbuild/SRPMS/* /srv
