@@ -1,6 +1,100 @@
 INSTALLATION
 ============
 
+RPMs
+~~~~
+
+Binary, debuginfo and source RPMs for the Tracking Reader are
+available at packagecloud:
+
+	https://packagecloud.io/uplex/varnish
+
+The packages are built for Enterprise Linux 7 (el7), and hence will
+run on compatible distros (such as RHEL7, Fedora and CentOS 7).
+
+To set up your YUM repository for the RPMs, follow these instructions:
+
+	https://packagecloud.io/uplex/varnish/install#manual-rpm
+
+You will also need these additional repositories:
+
+* EPEL7
+
+  * ``rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm``
+
+* Official Varnish packages from packagecloud (since version 5.2.0)
+
+  * Follow the instructions at: https://packagecloud.io/varnishcache/varnish52/install#manual-rpm
+
+* Cloudera CDH5 repository for the zookeeper-native package:
+
+  * ``yum install https://archive.cloudera.com/cdh5/one-click-install/redhat/7/x86_64/cloudera-cdh-5-0.x86_64.rpm``
+
+In addition to installing the binary, libraries, man pages and
+documentation, the RPM install does the following:
+
+* Creates a user ``trackrdrd`` and adds it to the group ``varnish``
+
+  * The ``varnish`` group is created by the varnish package.
+
+* Installs a default configuration at ``/etc/trackrdrd.conf``, which
+  sets up the following:
+
+  * The child process runs as ``trackrdrd``.
+
+  * The Kafka MQ plugin is used.
+
+  * A PID file is saved at ``/var/run/trackrdrd.pid``.
+
+* Installs a default configuration for the Kafka plugin at
+  ``/etc/trackrdr-kafka.conf``:
+
+  * Defines a broker listening at the default port on the loopback
+    address: ``127.0.0.1:9092``.
+
+  * Sends messages to the topic ``tracking``.
+
+  * Logs to the file ``/var/log/trackrdrd/libtrackrdr-kafka.log``
+
+* Installs a logrotate configuration for the Kafka plugin's log file
+  at: ``/etc/logrotate.d/trackrdr-kafka``.
+
+* Installs a systemd unit file for the Tracking Reader. The
+  ``trackrdrd`` service requires that the ``varnish`` service is
+  running.
+
+If you change the config files in ``/etc``, they are not overwritten
+by RPM updates. Changed config files from the package are saved with
+the ``.rpmnew`` extension.
+
+To change the broker address in ``/etc/trackrdr-kafka.conf``, specify
+either a comma-separated host:port list of initial Kafka brokers with
+``metadata.broker.list``, or a comma-separated host:port list of
+ZooKeeper servers with ``zookeeper.connect``. See
+`libtrackrdrd-kafka(3) <src/mq/kafka/README.rst>`_ for details.
+
+You can, of course, specify another configuration file with the ``-c``
+option (modify the systemd unit file to do this with systemd).
+
+The systemd service is *not* started or enabled automatically when the
+package is installed, and is not stopped on package update or
+removal. This will have to be done with separate ``systemctl``
+commands.  This is because the Tracking Reader using Kafka is not
+fully functional unless the configured brokers are listening, which
+cannot be detected with systemd dependencies, and because most
+deployments will change the default broker address. It is probably
+best to automate package management with a script that issues ``yum``
+and ``systemctl`` commands as needed.
+
+The RPM does not support SysV init.
+
+If you have problems or questions concerning the RPMs, post an issue
+to one of the source repository web sites, or contact
+<varnish-support@uplex.de>.
+
+BUILDING FROM SOURCE
+~~~~~~~~~~~~~~~~~~~~
+
 ``trackrdrd`` is built against an existing Varnish installation on the
 same host, which in the standard case can be found with usual settings
 for the ``PATH`` environment variable in the ``configure`` step
