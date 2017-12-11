@@ -42,6 +42,7 @@
 
 #include "trackrdrd.h"
 
+#include "vdef.h"
 #include "vas.h"
 
 static void __attribute__((__noreturn__))

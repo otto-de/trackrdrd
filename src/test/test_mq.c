@@ -35,6 +35,7 @@
 #include "minunit.h"
 
 #include "../trackrdrd.h"
+#include "vdef.h"
 #include "vas.h"
 
 #ifndef TESTDIR

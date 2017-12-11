@@ -37,6 +37,7 @@
 #include <sys/prctl.h>
 #endif
 
+#include "vdef.h"
 #include "vas.h"
 
 #include "trackrdrd.h"

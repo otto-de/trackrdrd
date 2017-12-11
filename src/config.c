@@ -45,8 +45,8 @@
 #include "trackrdrd.h"
 #include "config_common.h"
 
-#include "vas.h"
 #include "vdef.h"
+#include "vas.h"
 
 #define DEFAULT_USER "nobody"
 

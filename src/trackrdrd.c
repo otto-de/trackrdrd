@@ -53,8 +53,8 @@
 #include <sys/types.h>
 #include <pwd.h>
 
-#include "vas.h"
 #include "vdef.h"
+#include "vas.h"
 
 #include "trackrdrd.h"
 #include "config_common.h"
