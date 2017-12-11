@@ -48,8 +48,8 @@
 #include <execinfo.h>
 #endif
 
-#include "vas.h"
 #include "vdef.h"
+#include "vas.h"
 #include "vsb.h"
 
 #include "trackrdrd.h"

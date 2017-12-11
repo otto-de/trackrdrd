@@ -36,6 +36,7 @@
 
 #include "trackrdrd.h"
 
+#include "vdef.h"
 #include "vas.h"
 
 static int

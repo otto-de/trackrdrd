@@ -63,8 +63,8 @@
 #include "vapi/vsm.h"
 #include "vapi/vsl.h"
 #include "miniobj.h"
-#include "vas.h"
 #include "vdef.h"
+#include "vas.h"
 
 #define I_TAG "VSL"
 #define I_FILTER_VCL_LOG "VCL_log:^track "

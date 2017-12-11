@@ -37,6 +37,7 @@
 #include <string.h>
 
 #include "trackrdrd.h"
+#include "vdef.h"
 #include "vas.h"
 #include "vqueue.h"
 
