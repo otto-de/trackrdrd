@@ -35,6 +35,7 @@
 
 #include "minunit.h"
 
+#include "vdef.h"
 #include "vtim.h"
 
 #include "../trackrdrd.h"

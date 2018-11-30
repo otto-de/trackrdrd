@@ -58,12 +58,12 @@
 #include "trackrdrd.h"
 #include "config_common.h"
 #include "vcs_version.h"
+#include "vdef.h"
 #include "vtim.h"
 
 #include "vapi/vsm.h"
 #include "vapi/vsl.h"
 #include "miniobj.h"
-#include "vdef.h"
 #include "vas.h"
 
 #define I_TAG "VSL"
