@@ -9,7 +9,7 @@ Tracking Log Reader demon
 -------------------------
 
 :Author: Geoffrey Simmons
-:Date:   2017-11-19
+:Date:   2018-11-30
 :Version: trunk
 :Manual section: 1
 
@@ -211,8 +211,17 @@ REQUIREMENTS
 =============
 
 This version of the tracking reader is compatible with Varnish since
-version 5.2. See the source repository for versions that are
+version 6.0. See the source repository for versions that are
 compatible with other versions of Varnish.
+
+Due to a `bug
+<https://github.com/varnishcache/varnish-cache/issues/2790>`_ in
+Varnish 6.1.0, when the tracking reader is built against that version,
+it is unable to read binary log files (using the ``-f`` option) that
+were written by earlier versions of Varnish. This causes errors in
+development self-tests (``make check``), because the tests read from
+binary log files and check the results against expected outputs. The
+bug was fixed in version 6.1.1.
 
 The messaging plugin for Kafka (``libtrackrdr-kafka``) requires
 libraries for Kafka (``librdkafka``) and the multi-threaded libary for

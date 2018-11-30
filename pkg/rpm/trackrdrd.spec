@@ -11,16 +11,16 @@ Source0: %{name}-%{version}.tar.gz
 Source1: trackrdrd.service
 Source2: trackrdr-kafka.logrotate
 
-# varnish from varnish5 at packagecloud
+# varnish from varnish60 at packagecloud
 # zookeeper-native from cloudera-cdh5.repo
-Requires: varnish >= 5.2.0
+Requires: varnish >= 6.0.0, varnish < 6.1.0
 Requires: librdkafka
 Requires: zookeeper-native
 Requires: zlib
 Requires: pcre
 Requires: logrotate
 
-BuildRequires: varnish-devel >= 5.2.0
+BuildRequires: varnish-devel >= 6.0.0, varnish-devel < 6.1.0
 BuildRequires: pkgconfig
 BuildRequires: make
 BuildRequires: gcc

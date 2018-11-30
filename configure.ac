@@ -1,6 +1,6 @@
 AC_PREREQ(2.63)
 AC_COPYRIGHT([Copyright (c) 2012-2017 Otto Gmbh & Co KG])
-AC_INIT([trackrdrd], [trunk])
+AC_INIT([trackrdrd], [4.3.0])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(src/trackrdrd.c)
 AM_CONFIG_HEADER(config.h)
@@ -44,7 +44,7 @@ PKG_PROG_PKG_CONFIG
 
 PKG_CHECK_MODULES([VARNISH], [varnishapi],
                   [ac_varnish_pkgdatadir=`$PKG_CONFIG --variable=pkgdatadir varnishapi`],
-                  [AC_MSG_ERROR([Varnish trunk or 5.2 or later is required])])
+                  [AC_MSG_ERROR([Varnish trunk or 6.0 or later is required])])
 if test "x$ac_varnish_pkgdatadir" = x; then
    AC_MSG_ERROR([couldn't get Varnish data dir from pkg-config])
 fi
