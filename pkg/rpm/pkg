@@ -12,7 +12,7 @@
 # - RPM spec file (trackrdrd.spec)
 # - systemd unit file (trackrdrd.service)
 # - logrotate config for the Kafka plugin (trackrdr-kafka.logrotate)
-# - yum repo config for varnish61@packagecloud (varnishcache_varnish61.repo)
+# - yum repo config for varnish62@packagecloud (varnishcache_varnish62.repo)
 #   (see https://packagecloud.io/varnishcache/varnish5/install#manual-rpm)
 
 # At the end of the run, binary, source and debuginfo RPMs are in the
@@ -47,9 +47,9 @@ sudo rpm -Uvh \
 sudo yum install -y -q https://archive.cloudera.com/cdh5/one-click-install/redhat/7/x86_64/cloudera-cdh-5-0.x86_64.rpm
 
 # set up varnish repo
-sudo cp /srv/varnishcache_varnish61.repo /etc/yum.repos.d/
+sudo cp /srv/varnishcache_varnish62.repo /etc/yum.repos.d/
 
-sudo yum -q makecache -y --disablerepo='*' --enablerepo='varnishcache_varnish61'
+sudo yum -q makecache -y --disablerepo='*' --enablerepo='varnishcache_varnish62'
 
 # build requirements
 sudo yum install -y -q varnish-devel pkgconfig make gcc librdkafka-devel \

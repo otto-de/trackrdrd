@@ -1,6 +1,6 @@
 AC_PREREQ(2.63)
 AC_COPYRIGHT([Copyright (c) 2012-2017 Otto Gmbh & Co KG])
-AC_INIT([trackrdrd], [4.3.1])
+AC_INIT([trackrdrd], [4.4.0])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(src/trackrdrd.c)
 AM_CONFIG_HEADER(config.h)
