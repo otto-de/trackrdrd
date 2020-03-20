@@ -52,12 +52,10 @@ conf_ParseLine(char *ptr, char **lval, char **rval)
     endlval = ptr;
     while(isspace(*ptr) && *++ptr)
         ;
-    if (ptr == '\0' || *ptr != '=')
+    if (*ptr == '\0' || *ptr != '=')
         return(1);
     while(*++ptr && isspace(*ptr))
         ;
-    if (ptr == '\0')
-        return(1);
     *endlval = '\0';
     *rval = ptr;
     return(0);
