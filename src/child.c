@@ -97,12 +97,12 @@
 const char *version = PACKAGE_TARNAME "-" PACKAGE_VERSION " revision " \
     VCS_Version " branch " VCS_Branch;
 
-static unsigned len_hi = 0, debug = 0, data_exhausted = 0;
+static unsigned len_hi = 0, debug = 0, data_exhausted = 0, restart = 0;
 
 static unsigned long seen = 0, submitted = 0, len_overflows = 0, no_data = 0,
     no_free_data = 0, vcl_log_err = 0, vsl_errs = 0, closed = 0, overrun = 0,
     ioerr = 0, reacquire = 0, truncated = 0, key_hi = 0, key_overflows = 0,
-    no_free_chunk = 0, eol = 0, no_timestamp = 0;
+    no_free_chunk = 0, eol = 0, no_timestamp = 0, mgt_restart = 0;
 
 static double idle_pause = MAX_IDLE_PAUSE;
 
@@ -126,11 +126,12 @@ RDR_Stats(void)
             "idle_pause=%.09f free_rec=%u free_chunk=%u no_free_rec=%lu "
             "no_free_chunk=%lu len_hi=%u key_hi=%lu len_overflows=%lu "
             "truncated=%lu key_overflows=%lu vcl_log_err=%lu no_timestamp=%lu "
-            "vsl_err=%lu closed=%lu overrun=%lu ioerr=%lu reacquire=%lu",
+            "vsl_err=%lu closed=%lu overrun=%lu ioerr=%lu reacquire=%lu "
+            "mgt_restart=%lu",
             seen, submitted, no_data, eol, idle_pause, rdr_rec_free,
             rdr_chunk_free, no_free_data, no_free_chunk, len_hi, key_hi,
             len_overflows, truncated, key_overflows, vcl_log_err, no_timestamp,
-            vsl_errs, closed, overrun, ioerr, reacquire);
+            vsl_errs, closed, overrun, ioerr, reacquire, mgt_restart);
 }
 
 int
@@ -805,6 +806,8 @@ CHILD_Main(int readconfig)
         LOG_Log0(LOG_INFO, "Worker threads not running");
         
     /* Main loop */
+    if (vsm != NULL)
+        (void)VSM_Status(vsm);
     last_t = VTIM_mono();
     term = 0;
     while (!term) {
@@ -827,6 +830,11 @@ CHILD_Main(int readconfig)
                 if (idle_pause < 1e-6)
                     idle_pause = 1e-6;
                 last_t = t;
+            }
+            if (vsm != NULL &&
+                (VSM_Status(vsm) & (VSM_MGT_CHANGED | VSM_MGT_RESTARTED))) {
+                flush = 1;
+                restart = 1;
             }
             VTIM_sleep(idle_pause);
             break;
@@ -887,6 +895,30 @@ CHILD_Main(int readconfig)
                 continue;
             VSLQ_Delete(&vslq);
             AZ(vslq);
+            if (restart
+                || (VSM_Status(vsm) & (VSM_MGT_CHANGED | VSM_MGT_RESTARTED))) {
+                mgt_restart++;
+                LOG_Log0(LOG_ALERT,
+                         "Varnish management process status changed");
+                for (;;) {
+                    VSM_Destroy(&vsm);
+                    vsm = VSM_New();
+                    AN(vsm);
+                    if (!EMPTY(config.varnish_name))
+                        while (VSM_Arg(vsm, 'n', config.varnish_name) <= 0) {
+                            LOG_Log(LOG_CRIT, "-n %s: %s\n",
+                                    config.varnish_name, VSM_Error(vsm));
+                            VTIM_sleep(1);
+                            continue;
+                        }
+                    if (!(VSM_Status(vsm) & VSM_MGT_RUNNING))
+                        LOG_Log0(LOG_ALERT,
+                                 "Varnish management process not running");
+                    break;
+                }
+                LOG_Log0(LOG_NOTICE, "Shared memory attach re-initialized");
+                restart = 0;
+            }
             /* cf. VUT_Main() in Varnish vut.c */
             LOG_Log0(LOG_NOTICE, "Attempting to reacquire the log");
             while (vslq == NULL) {
