@@ -77,22 +77,7 @@
 #define REQEND_T_LEN (sizeof(REQEND_T_VAR "=1430176881.682097"))
 
 /*
- * from vsl.h
- *
- * VSLQ_Dispatch
- * Return values:
- *     1: Call again
- *     0: No more log records available
- *   !=0: The error code from VSL_Next() or func returned non-zero
- *
- * VSL_Next()
- * Return values:
- *      1:      Cursor points to next log record
- *      0:      End of log
- *     -1:      End of file
- *     -2:      Remote abandoned or closed
- *     -3:      Overrun
- *     -4:      I/O read error - see errno
+ * See vsl.h for return values from VSLQ_Dispatch() and VSL_Next().
  */
 
 #define DISPATCH_EOL 0
