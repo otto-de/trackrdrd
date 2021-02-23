@@ -884,14 +884,16 @@ CHILD_Main(int readconfig)
                 break;
             }
         }
+
         if (flush && !term) {
             LOG_Log0(LOG_NOTICE, "Flushing transactions");
             take_free();
             do {}
             while (VSLQ_Flush(vslq, dispatch, NULL) != DISPATCH_RETURN_OK);
             flush = 0;
-            if (EMPTY(config.varnish_bindump) && status != DISPATCH_CLOSED
-                && status != DISPATCH_OVERRUN && status != DISPATCH_IOERR)
+            if (!restart && EMPTY(config.varnish_bindump)
+                && status != DISPATCH_CLOSED && status != DISPATCH_OVERRUN
+                && status != DISPATCH_IOERR)
                 continue;
             VSLQ_Delete(&vslq);
             AZ(vslq);
@@ -900,6 +902,7 @@ CHILD_Main(int readconfig)
                 mgt_restart++;
                 LOG_Log0(LOG_ALERT,
                          "Varnish management process status changed");
+                VTIM_sleep(0.1);
                 for (;;) {
                     VSM_Destroy(&vsm);
                     vsm = VSM_New();
@@ -914,6 +917,13 @@ CHILD_Main(int readconfig)
                     if (!(VSM_Status(vsm) & VSM_MGT_RUNNING))
                         LOG_Log0(LOG_ALERT,
                                  "Varnish management process not running");
+                    if (VSM_Attach(vsm, -1) < 0) {
+                        LOG_Log(LOG_CRIT, "Log re-attach failed: %s\n",
+                                VSM_Error(vsm));
+                        VSM_ResetError(vsm);
+                        VTIM_sleep(1);
+                        continue;
+                    }
                     break;
                 }
                 LOG_Log0(LOG_NOTICE, "Shared memory attach re-initialized");
@@ -924,10 +934,6 @@ CHILD_Main(int readconfig)
             while (vslq == NULL) {
                 AN(vsm);
                 VTIM_sleep(0.1);
-                if (VSM_Attach(vsm, -1) < 0) {
-                    VSM_ResetError(vsm);
-                    continue;
-                }
                 cursor = VSL_CursorVSM(vsl, vsm,
                                        VSL_COPT_TAIL | VSL_COPT_BATCH);
                 if (cursor == NULL) {
