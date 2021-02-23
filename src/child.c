@@ -80,13 +80,13 @@
  * See vsl.h for return values from VSLQ_Dispatch() and VSL_Next().
  */
 
-#define DISPATCH_EOL 0
-#define DISPATCH_RETURN_OK 0
-#define DISPATCH_CONTINUE 1
-#define DISPATCH_EOF -1
-#define DISPATCH_CLOSED -2
-#define DISPATCH_OVERRUN -3
-#define DISPATCH_IOERR -4
+#define DISPATCH_EOL (vsl_end)
+#define DISPATCH_RETURN_OK (vsl_end)
+#define DISPATCH_CONTINUE (vsl_more)
+#define DISPATCH_EOF (vsl_e_eof)
+#define DISPATCH_CLOSED (vsl_e_abandon)
+#define DISPATCH_OVERRUN (vsl_e_overrun)
+#define DISPATCH_IOERR (vsl_e_io)
 #define DISPATCH_TERMINATE 10
 #define DISPATCH_WRK_RESTART 11
 #define DISPATCH_FLUSH 12
