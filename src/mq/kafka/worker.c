@@ -96,7 +96,7 @@ const char
     errno = 0;
     rkt = rd_kafka_topic_new(rk, topic, wrk_topic_conf);
     if (rkt == NULL) {
-        rd_kafka_resp_err_t rkerr = rd_kafka_errno2err(errno);
+        rd_kafka_resp_err_t rkerr = rd_kafka_last_error();
         snprintf(errmsg, LINE_MAX, "Failed to initialize topic: %s",
                  rd_kafka_err2str(rkerr));
         MQ_LOG_Log(LOG_ERR, errmsg);
