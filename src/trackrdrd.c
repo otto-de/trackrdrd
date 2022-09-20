@@ -275,6 +275,7 @@ main(int argc, char * const *argv)
             break;
         case 'h':
             usage(EXIT_SUCCESS);
+            break;
         default:
             usage(EXIT_FAILURE);
         }
