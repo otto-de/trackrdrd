@@ -341,6 +341,9 @@ static void
     running--;
     exited++;
     AZ(pthread_mutex_unlock(&running_lock));
+    free(wrk->sb->s_buf);
+    VSB_fini(wrk->sb);
+    free(wrk->sb);
     LOG_Log(LOG_INFO, "Worker %d: exiting", wrk->id);
     wrk->state = WRK_EXITED;
     pthread_exit((void *) wrk);
@@ -371,6 +374,8 @@ WRK_Init(void)
     
     run = 1;
     for (int i = 0; i < config.nworkers; i++) {
+        char *buf;
+
         thread_data[i].wrk_data
             = (worker_data_t *) malloc(sizeof(worker_data_t));
         if (thread_data[i].wrk_data == NULL) {
@@ -383,7 +388,8 @@ WRK_Init(void)
         wrk->magic = WORKER_DATA_MAGIC;
         wrk->sb = (struct vsb *) malloc(sizeof(struct vsb));
         AN(wrk->sb);
-        AN(VSB_new(wrk->sb, NULL, config.max_reclen + 1, VSB_FIXEDLEN));
+        buf = malloc(config.max_reclen + 1);
+        AN(VSB_init(wrk->sb, buf, config.max_reclen + 1));
         VSTAILQ_INIT(&wrk->freerec);
         wrk->nfree_rec = 0;
         VSTAILQ_INIT(&wrk->freechunk);
