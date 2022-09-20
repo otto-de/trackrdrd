@@ -50,10 +50,11 @@
 #include "miniobj.h"
 
 #define BROKER_PATH "/brokers/ids"
+#define ERRMSG_MAX (LINE_MAX + PATH_MAX + 1)
 
 static zhandle_t *zh = NULL;
 static pcre *host_regex = NULL, *port_regex = NULL;
-static char errmsg[LINE_MAX];
+static char errmsg[ERRMSG_MAX];
 static FILE *zoologf = NULL;
 
 static const char
@@ -67,7 +68,7 @@ static const char
     AN(zh);
 
     if ((result = zoo_get_children(zh, BROKER_PATH, 1, &broker_ids)) != ZOK) {
-        snprintf(errmsg, LINE_MAX, "Cannot get broker ids from zookeeper: %s",
+        snprintf(errmsg, ERRMSG_MAX, "Cannot get broker ids from zookeeper: %s",
                  zerror(result));
         return errmsg;
     }
@@ -90,7 +91,7 @@ static const char
 
         snprintf(path, PATH_MAX, "/brokers/ids/%s", broker_ids.data[i]);
         if ((result = zoo_get(zh, path, 0, broker, &len, NULL)) != ZOK) {
-            snprintf(errmsg, LINE_MAX,
+            snprintf(errmsg, ERRMSG_MAX,
                      "Cannot get config for broker id %s: %s",
                      broker_ids.data[i], zerror(result));
             return errmsg;
@@ -105,7 +106,7 @@ static const char
 
             r = pcre_exec(host_regex, NULL, broker, len, 0, 0, ovector, 6);
             if (r <= PCRE_ERROR_NOMATCH) {
-                snprintf(errmsg, LINE_MAX,
+                snprintf(errmsg, ERRMSG_MAX,
                          "Host not found in config for broker id %s [%s]",
                          broker_ids.data[i], broker);
                 return errmsg;
@@ -114,7 +115,7 @@ static const char
             AN(host);
             r = pcre_exec(port_regex, NULL, broker, len, 0, 0, ovector, 6);
             if (r <= PCRE_ERROR_NOMATCH) {
-                snprintf(errmsg, LINE_MAX,
+                snprintf(errmsg, ERRMSG_MAX,
                          "Port not found in config for broker id %s [%s]",
                          broker_ids.data[i], broker);
                 return errmsg;
@@ -123,7 +124,7 @@ static const char
             AN(port);
 
             if (strlen(brokers) + strlen(host) + strlen(port) + 2 > max) {
-                snprintf(errmsg, LINE_MAX,
+                snprintf(errmsg, ERRMSG_MAX,
                          "Broker list length exceeds max %d [%s%s:%s]",
                          max, brokers, host, port);
                 return errmsg;
@@ -175,7 +176,8 @@ const char
     errno = 0;
     zh = zookeeper_init(zookeeper, watcher, zoo_timeout, 0, 0, 0);
     if (zh == NULL) {
-        snprintf(errmsg, LINE_MAX, "init/connect failure: %s", strerror(errno));
+        snprintf(errmsg, ERRMSG_MAX, "init/connect failure: %s",
+                 strerror(errno));
         return errmsg;
     }
     return setBrokerList(brokers, max);
@@ -240,9 +242,9 @@ const char
     if ((zerr = zookeeper_close(zh)) != ZOK) {
         const char *err = zerror(zerr);
         if (zerr == ZSYSTEMERROR)
-            snprintf(errmsg, LINE_MAX, "%s (%s)", err, strerror(errno));
+            snprintf(errmsg, ERRMSG_MAX, "%s (%s)", err, strerror(errno));
         else
-            strncpy(errmsg, err, LINE_MAX);
+            strncpy(errmsg, err, ERRMSG_MAX);
         return errmsg;
     }
     if (zoologf != NULL)

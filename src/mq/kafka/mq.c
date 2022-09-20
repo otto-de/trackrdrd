@@ -49,6 +49,8 @@
 #include "config_common.h"
 #include "miniobj.h"
 
+#define ERRMSG_MAX (LINE_MAX + PATH_MAX + 1)
+
 #define xstr(X) #X
 #define str(X) xstr(X)
 
@@ -60,7 +62,7 @@
 #define SO_VERSION "unknown version"
 #endif
 
-static char errmsg[LINE_MAX];
+static char errmsg[ERRMSG_MAX];
 static char _version[LINE_MAX];
 
 static int saved_lvl = LOG_INFO;
@@ -105,7 +107,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     if (logpath[0] != '\0') {
         int err;
         if ((err = MQ_LOG_Open(logpath)) != 0) {
-            snprintf(errmsg, LINE_MAX, "Cannot open %s: %s", logpath,
+            snprintf(errmsg, ERRMSG_MAX, "Cannot open %s: %s", logpath,
                      strerror(err));
             return errmsg;
         }
@@ -119,7 +121,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     MQ_LOG_Log(LOG_INFO, "initializing (%s)", _version);
 
     if (zookeeper[0] == '\0' && brokerlist[0] == '\0') {
-        snprintf(errmsg, LINE_MAX,
+        snprintf(errmsg, ERRMSG_MAX,
                  "zookeeper.connect and metadata.broker.list not set in %s",
                  config_fname);
         MQ_LOG_Log(LOG_ERR, errmsg);
@@ -127,14 +129,14 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     }
 
     if (topic[0] == '\0') {
-        snprintf(errmsg, LINE_MAX, "topic not set in %s", config_fname);
+        snprintf(errmsg, ERRMSG_MAX, "topic not set in %s", config_fname);
         MQ_LOG_Log(LOG_ERR, errmsg);
         return errmsg;
     }
 
     workers = (kafka_wrk_t **) calloc(sizeof (kafka_wrk_t *), nworkers);
     if (workers == NULL) {
-        snprintf(errmsg, LINE_MAX, "Cannot allocate worker table: %s",
+        snprintf(errmsg, ERRMSG_MAX, "Cannot allocate worker table: %s",
                  strerror(errno));
         MQ_LOG_Log(LOG_ERR, errmsg);
         return errmsg;
@@ -144,8 +146,8 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     AZ(sigemptyset(&toggle_action.sa_mask));
     toggle_action.sa_flags |= SA_RESTART;
     if (sigaction(SIGUSR2, &toggle_action, NULL) != 0) {
-        snprintf(errmsg, LINE_MAX, "Cannot install signal handler for USR2: %s",
-                 strerror(errno));
+        snprintf(errmsg, ERRMSG_MAX,
+                 "Cannot install signal handler for USR2: %s", strerror(errno));
         MQ_LOG_Log(LOG_ERR, errmsg);
         return errmsg;
     }
@@ -153,7 +155,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     if (zoolog[0] != '\0') {
         const char *err = MQ_ZOO_OpenLog();
         if (err != NULL) {
-            snprintf(errmsg, LINE_MAX, "Cannot open zookeeper.log %s: %s",
+            snprintf(errmsg, ERRMSG_MAX, "Cannot open zookeeper.log %s: %s",
                      zoolog, err);
             MQ_LOG_Log(LOG_ERR, errmsg);
             return errmsg;
@@ -163,7 +165,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     if (stats_interval != 0) {
         int err = MQ_MON_Init();
         if (err != 0) {
-            snprintf(errmsg, LINE_MAX, "Cannot start monitoring thread: %s",
+            snprintf(errmsg, ERRMSG_MAX, "Cannot start monitoring thread: %s",
                      strerror(err));
             MQ_LOG_Log(LOG_ERR, errmsg);
             return errmsg;
@@ -214,7 +216,7 @@ MQ_InitConnections(void)
         const char *err;
 
         if ((err = MQ_ZOO_Init(zbrokerlist, LINE_MAX)) != NULL) {
-            snprintf(errmsg, LINE_MAX,
+            snprintf(errmsg, ERRMSG_MAX,
                      "Failed to init/connect to zookeeper [%s]: %s",
                      zookeeper, err);
             MQ_LOG_Log(LOG_ERR, errmsg);
@@ -222,7 +224,7 @@ MQ_InitConnections(void)
         }
         if (zbrokerlist[0] == '\0')
             if (brokerlist[0] == '\0') {
-                snprintf(errmsg, LINE_MAX,
+                snprintf(errmsg, ERRMSG_MAX,
                          "Zookeeper at %s returned no brokers, and "
                          "metadata.broker.list not configured", zookeeper);
                 MQ_LOG_Log(LOG_ERR, errmsg);
@@ -291,7 +293,7 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
     rd_kafka_poll(wrk->kafka, 0);
 
     if (key == NULL || keylen == 0) {
-        snprintf(wrk->errmsg, LINE_MAX, "%s message shard key is missing",
+        snprintf(wrk->errmsg, ERRMSG_MAX, "%s message shard key is missing",
                  rd_kafka_name(wrk->kafka));
         if (log_error_data) {
             MQ_LOG_Log(LOG_ERR, "%s: data=[%.*s] key=[]", wrk->errmsg, len,
@@ -307,7 +309,7 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         return 1;
     }
     if (data == NULL) {
-        snprintf(wrk->errmsg, LINE_MAX, "%s message payload is NULL",
+        snprintf(wrk->errmsg, ERRMSG_MAX, "%s message payload is NULL",
                  rd_kafka_name(wrk->kafka));
         if (log_error_data) {
             MQ_LOG_Log(LOG_ERR, "%s: data=[] key=[%.*s]", wrk->errmsg, keylen,
@@ -327,7 +329,7 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
         keylen = 8;
     for (int i = 0; i < keylen; i++)
         if (!isxdigit(key[i])) {
-            snprintf(wrk->errmsg, LINE_MAX, "%s message shard key is not hex",
+            snprintf(wrk->errmsg, ERRMSG_MAX, "%s message shard key is not hex",
                      rd_kafka_name(wrk->kafka));
             if (log_error_data) {
                 MQ_LOG_Log(LOG_ERR, "%s: data=[%.*s] key=[%.*s]", wrk->errmsg,
@@ -347,8 +349,8 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
     REPLACE(payload, data);
     if (rd_kafka_produce(wrk->topic, RD_KAFKA_PARTITION_UA, RD_KAFKA_MSG_F_FREE,
                          payload, len, key, keylen, NULL) == -1) {
-        snprintf(wrk->errmsg, LINE_MAX, "%s",
-                 rd_kafka_err2str(rd_kafka_errno2err(errno)));
+        snprintf(wrk->errmsg, ERRMSG_MAX, "%s",
+                 rd_kafka_err2str(rd_kafka_last_error()));
         MQ_LOG_Log(LOG_ERR, "%s message send failure (%d): %s",
                    rd_kafka_name(wrk->kafka), errno, wrk->errmsg);
         *error = wrk->errmsg;
@@ -430,7 +432,7 @@ MQ_GlobalShutdown(void)
 
     err = MQ_ZOO_Fini();
     if (err != NULL) {
-        snprintf(errmsg, LINE_MAX, "Error closing zookeeper: %s", err);
+        snprintf(errmsg, ERRMSG_MAX, "Error closing zookeeper: %s", err);
         MQ_LOG_Log(LOG_ERR, errmsg);
     }
 

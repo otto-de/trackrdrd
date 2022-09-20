@@ -40,6 +40,8 @@
 #include "config_common.h"
 #include "miniobj.h"
 
+#define ERRMSG_MAX (LINE_MAX + PATH_MAX + 1)
+
 #define xstr(X) #X
 #define str(X) xstr(X)
 
@@ -55,7 +57,7 @@ typedef struct wrk_s {
     unsigned magic;
 #define FILE_WRK_MAGIC 0x50bff5f0
     int n;
-    char errmsg[LINE_MAX];
+    char errmsg[ERRMSG_MAX];
 } wrk_t;
 
 static FILE *out;
@@ -64,7 +66,7 @@ static int append = 1;
 static unsigned nwrk;
 static wrk_t *workers;
 static char fname[PATH_MAX + 1] = "";
-static char errmsg[LINE_MAX];
+static char errmsg[ERRMSG_MAX];
 static char _version[LINE_MAX];
 
 static int
@@ -100,7 +102,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
     nwrk = nworkers;
 
     if ((errnum = CONF_ReadFile(config_fname, conf_add)) != 0) {
-        snprintf(errmsg, LINE_MAX,
+        snprintf(errmsg, ERRMSG_MAX,
                  "Error reading config file %s for the file plugin: %s",
                  config_fname, strerror(errnum));
         return errmsg;
@@ -112,7 +114,7 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
         errno = 0;
         out = fopen(fname, append ? "a" : "w");
         if (out == NULL) {
-            snprintf(errmsg, LINE_MAX, "Cannot open output file %s: %s",
+            snprintf(errmsg, ERRMSG_MAX, "Cannot open output file %s: %s",
                      fname, strerror(errno));
             return errmsg;
         }
@@ -155,7 +157,7 @@ MQ_Send(void *priv, const char *data, unsigned len, const char *key,
 
     CAST_OBJ(wrk, priv, FILE_WRK_MAGIC);
     if (fprintf(out, "key=%.*s: %.*s\n", keylen, key, len, data) < 0) {
-        snprintf(wrk->errmsg, LINE_MAX, "worker %d: error writing output",
+        snprintf(wrk->errmsg, ERRMSG_MAX, "worker %d: error writing output",
                  wrk->n);
         *error = wrk->errmsg;
         return 1;
@@ -211,7 +213,7 @@ MQ_GlobalShutdown(void)
     if (out != stdout) {
         errno = 0;
         if (fclose(out) != 0) {
-            snprintf(errmsg, LINE_MAX, "Error closing output file %s: %s",
+            snprintf(errmsg, ERRMSG_MAX, "Error closing output file %s: %s",
                      fname, strerror(errno));
             return errmsg;
         }
