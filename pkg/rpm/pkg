@@ -12,7 +12,7 @@
 # - RPM spec file (trackrdrd.spec)
 # - systemd unit file (trackrdrd.service)
 # - logrotate config for the Kafka plugin (trackrdr-kafka.logrotate)
-# - yum repo config for varnish65@packagecloud (varnishcache_varnish65.repo)
+# - yum repo config for varnish66@packagecloud (varnishcache_varnish65.repo)
 #   (see https://packagecloud.io/varnishcache/varnish5/install#manual-rpm)
 
 # At the end of the run, binary, source and debuginfo RPMs are in the
@@ -39,20 +39,26 @@ cp /srv/trackrdrd-${VERSION}.tar.gz rpmbuild/SOURCES
 cp /srv/trackrdrd.service rpmbuild/SOURCES
 cp /srv/trackrdr-kafka.logrotate rpmbuild/SOURCES
 
+# update the build env
+set +e
+sudo yum check-update -y -q
+set -e
+sudo yum upgrade -y -q
+
+# set uplex repo for varnish and VMOD re
+sudo yum-config-manager --add-repo https://pkg.uplex.de/rpm/7/uplex-varnish/x86_64/
+
+# set up varnish repo and Apache Bigtop repo for zookeeper-native
+sudo cp /srv/bigtop.repo /etc/yum.repos.d/
+
 # install epel7 repo
 sudo rpm -Uvh \
      https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 
-# set up varnish repo and Apache Bigtop repo for zookeeper-native
-sudo cp /srv/varnishcache_varnish65.repo /etc/yum.repos.d/
-sudo cp /srv/bigtop.repo /etc/yum.repos.d/
-
-sudo yum -q makecache -y --disablerepo='*' --enablerepo='varnishcache_varnish65'
-sudo yum -q makecache -y --disablerepo='*' --enablerepo='bigtop'
-
 # build requirements
-sudo yum install -y -q varnish-devel pkgconfig make gcc librdkafka-devel \
-	zookeeper-native pcre-devel zlib-devel python-docutils
+sudo yum install --nogpgcheck -y -q varnish-devel librdkafka-devel
+sudo yum install -y -q pkgconfig make gcc zookeeper-native pcre-devel \
+     zlib-devel python-docutils
 
 # build RPMs
 rpmbuild -ba -D "dist .${DIST}" \
