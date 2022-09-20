@@ -30,6 +30,9 @@
  *
  */
 
+#ifndef _TRACKRDRD_H
+#define _TRACKRDRD_H
+
 #include <stdio.h>
 #include <pthread.h>
 #include <sys/types.h>
@@ -64,7 +67,9 @@ struct mqf {
     reconnect_f		*reconnect;
     worker_shutdown_f	*worker_shutdown;
     global_shutdown_f	*global_shutdown;
-} mqf;
+};
+
+extern struct mqf mqf;
 
 /* handler.c */
 
@@ -80,7 +85,7 @@ struct mqf {
                 strerror(errno));					\
     } while(0)
 
-struct sigaction ignore_action, stacktrace_action, default_action;
+extern struct sigaction ignore_action, stacktrace_action, default_action;
 
 void HNDL_Init(const char *a0);
 void HNDL_Abort(int sig);
@@ -92,7 +97,7 @@ void PRIV_Sandbox(void);
 /* worker.c */
 
 /* stats */
-unsigned abandoned;
+extern unsigned abandoned;
 
 /**
  * Initializes resources for worker threads -- allocates memory,
@@ -113,7 +118,7 @@ void WRK_Shutdown(void);
 
 #define OCCUPIED(e) ((e)->occupied == 1)
 
-unsigned global_nfree_rec, global_nfree_chunk;
+extern unsigned global_nfree_rec, global_nfree_chunk;
 
 typedef struct chunk_t {
     unsigned magic;
@@ -161,9 +166,9 @@ unsigned SPMCQ_NeedWorker(int running);
 
 /* Consumers wait for this condition when the spmc queue is empty.
    Producer signals this condition after enqueue. */
-pthread_cond_t  spmcq_datawaiter_cond;
-pthread_mutex_t spmcq_datawaiter_lock;
-int		spmcq_datawaiter;
+extern pthread_cond_t  spmcq_datawaiter_cond;
+extern pthread_mutex_t spmcq_datawaiter_lock;
+extern int	       spmcq_datawaiter;
 
 /* child.c */
 void RDR_Stats(void);
@@ -174,7 +179,7 @@ int RDR_Exhausted(void);
 #define EMPTY(s) (s[0] == '\0')
 
 #define DEFAULT_CONFIG "/etc/trackrdrd.conf"
-char cli_config_filename[PATH_MAX + 1];
+extern char cli_config_filename[PATH_MAX + 1];
 
 struct config {
     char	pid_file[PATH_MAX];
@@ -227,7 +232,9 @@ struct config {
 #define MIN_CHUNK_SIZE 64
 
     unsigned	tx_limit;
-} config;
+};
+
+extern struct config config;
 
 void CONF_Init(void);
 int CONF_Add(const char *lval, const char *rval);
@@ -252,7 +259,9 @@ struct logconf {
     log_close_t		*close;
     FILE		*out;
     int			level;
-} logconf;
+};
+
+extern struct logconf logconf;
 
 int LOG_Open(const char *progname);
 int LOG_GetLevel(void);
@@ -293,3 +302,5 @@ int Parse_VCL_Log(const char * const ptr, int len,
                   vcl_log_t * const restrict type);
 int Parse_Timestamp(const char * const restrict ptr, int len,
                     struct timeval * const restrictt);
+
+#endif // _TRACKRDRD_H

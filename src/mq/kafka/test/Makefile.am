@@ -11,6 +11,7 @@ test_partition_SOURCES = \
 
 test_partition_LDADD = \
 	../callback.$(OBJEXT) \
+	../config.$(OBJEXT) \
 	../log.$(OBJEXT) \
 	-lrdkafka
 

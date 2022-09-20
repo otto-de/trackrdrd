@@ -41,6 +41,10 @@
 #include "vas.h"
 #include "vqueue.h"
 
+pthread_cond_t  spmcq_datawaiter_cond;
+pthread_mutex_t spmcq_datawaiter_lock;
+int		spmcq_datawaiter;
+
 static volatile unsigned long enqs = 0, deqs = 0;
 static pthread_mutex_t spmcq_lock;
 static pthread_mutex_t spmcq_deq_lock;

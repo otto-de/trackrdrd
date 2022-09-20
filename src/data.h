@@ -31,9 +31,9 @@
  */
 
 /* Heads of the global free lists */
-struct rechead_s freerechead;
-chunkhead_t freechunkhead;
+extern struct rechead_s freerechead;
+extern chunkhead_t freechunkhead;
 
 /* Tables of records and chunks */
-dataentry *entrytbl;
-chunk_t *chunktbl;
+extern dataentry *entrytbl;
+extern chunk_t *chunktbl;

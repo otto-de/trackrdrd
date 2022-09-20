@@ -55,6 +55,16 @@
         VSTAILQ_INIT((head2));                                  \
 } while (0)
 
+unsigned global_nfree_rec, global_nfree_chunk;
+
+/* Heads of the global free lists */
+struct rechead_s freerechead;
+chunkhead_t freechunkhead;
+
+/* Tables of records and chunks */
+dataentry *entrytbl;
+chunk_t *chunktbl;
+
 static pthread_mutex_t freerec_lock, freechunk_lock;
 static char *buf, *keybuf;
 

@@ -16,15 +16,31 @@ AM_TESTS_ENVIRONMENT = TESTDIR=$(srcdir)
 CLEANFILES = testing.log stderr.txt trackrdrd.pid trackrdrd_*.conf.new
 DISTCLEANFILES = mq_test.log mq_log.log
 
+OBJECTS = ../assert.$(OBJEXT)		\
+          ../child.$(OBJEXT)		\
+          ../config_common.$(OBJEXT)	\
+          ../config.$(OBJEXT)		\
+          ../data.$(OBJEXT)		\
+          ../handler.$(OBJEXT)		\
+          ../log.$(OBJEXT)		\
+          ../monitor.$(OBJEXT)		\
+          ../parse.$(OBJEXT)		\
+          ../sandbox.$(OBJEXT)		\
+          ../spmcq.$(OBJEXT)		\
+          ../vfl.$(OBJEXT)		\
+          ../vpf.$(OBJEXT)		\
+          ../worker.$(OBJEXT)
+
+LIBS = -ldl -lm
+
 test_parse_SOURCES = \
 	minunit.h \
 	test_parse.c \
 	../trackrdrd.h
 
 test_parse_LDADD = \
-	-lm \
-	../parse.$(OBJEXT) \
-	../assert.$(OBJEXT) \
+	$(LIBS) \
+	$(OBJECTS) \
 	@VARNISH_LIBS@
 
 test_data_SOURCES = \
@@ -34,8 +50,8 @@ test_data_SOURCES = \
 	../trackrdrd.h
 
 test_data_LDADD = \
-	../data.$(OBJEXT) \
-	../assert.$(OBJEXT) \
+	$(LIBS) \
+	$(OBJECTS) \
 	@VARNISH_LIBS@
 
 test_append_SOURCES = \
@@ -43,17 +59,17 @@ test_append_SOURCES = \
 	../trackrdrd.h
 
 test_append_LDADD = \
-	-ldl -lm \
-	../worker.$(OBJEXT) \
-	../log.$(OBJEXT) \
-	../spmcq.$(OBJEXT) \
-	../data.$(OBJEXT) \
-	../assert.$(OBJEXT) \
-	../monitor.$(OBJEXT) \
-	../parse.$(OBJEXT) \
-	../config.$(OBJEXT) \
-	../config_common.$(OBJEXT) \
-	../sandbox.$(OBJEXT) \
+	$(LIBS) \
+	../config_common.$(OBJEXT)	\
+	../config.$(OBJEXT)		\
+	../data.$(OBJEXT)		\
+	../handler.$(OBJEXT)		\
+	../log.$(OBJEXT)		\
+	../monitor.$(OBJEXT)		\
+	../parse.$(OBJEXT)		\
+	../sandbox.$(OBJEXT)		\
+	../spmcq.$(OBJEXT)		\
+	../worker.$(OBJEXT)		\
 	@VARNISH_LIBS@
 
 test_append_CFLAGS = -DTEST_DRIVER
@@ -65,8 +81,8 @@ test_mq_SOURCES = \
 	../methods.h
 
 test_mq_LDADD = \
-	-ldl \
-	-lm \
+	$(LIBS) \
+	$(OBJECTS) \
 	@VARNISH_LIBS@
 
 test_spmcq_SOURCES = \
@@ -75,8 +91,8 @@ test_spmcq_SOURCES = \
 	../trackrdrd.h
 
 test_spmcq_LDADD = \
-	../spmcq.$(OBJEXT) \
-	../assert.$(OBJEXT) \
+	$(LIBS) \
+	$(OBJECTS) \
 	@VARNISH_LIBS@
 
 test_config_SOURCES = \
@@ -90,8 +106,18 @@ test_config_SOURCES = \
 	../trackrdrd.h
 
 test_config_LDADD = \
-	../assert.$(OBJEXT) \
-	-lm \
+	$(LIBS) \
+	../assert.$(OBJEXT)		\
+	../child.$(OBJEXT)		\
+	../data.$(OBJEXT)		\
+	../handler.$(OBJEXT)		\
+	../monitor.$(OBJEXT)		\
+	../parse.$(OBJEXT)		\
+	../sandbox.$(OBJEXT)		\
+	../spmcq.$(OBJEXT)		\
+	../vfl.$(OBJEXT)		\
+	../vpf.$(OBJEXT)		\
+	../worker.$(OBJEXT)		\
 	@VARNISH_LIBS@
 
 test_worker_SOURCES = \
@@ -101,14 +127,8 @@ test_worker_SOURCES = \
 	../trackrdrd.h
 
 test_worker_LDADD = \
-	-ldl -lm \
-	../worker.$(OBJEXT) \
-	../log.$(OBJEXT) \
-	../spmcq.$(OBJEXT) \
-	../data.$(OBJEXT) \
-	../assert.$(OBJEXT) \
-	../config.$(OBJEXT) \
-	../config_common.$(OBJEXT) \
+	$(LIBS) \
+	$(OBJECTS) \
 	@VARNISH_LIBS@
 
 EXTRA_DIST = file_mq.conf test.conf trackrdrd_001.conf trackrdrd_002.conf \

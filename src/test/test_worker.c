@@ -57,24 +57,6 @@
 int tests_run = 0;
 static void *mqh;
 
-/* Called from worker.c, but we don't want to pull in all of monitor.c's
-   dependecies. */
-void
-MON_StatsUpdate(stats_update_t update, unsigned nchunks, unsigned nbytes)
-{
-    (void) update;
-    (void) nchunks;
-    (void) nbytes;
-}
-
-/* Called from worker.c, but we don't want to pull in all of child.c's
-   dependecies. */
-int
-RDR_Exhausted(void)
-{
-    return 0;
-}
-
 static void
 init(void)
 {

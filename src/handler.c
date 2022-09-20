@@ -54,6 +54,8 @@
 
 #include "trackrdrd.h"
 
+struct sigaction ignore_action, stacktrace_action, default_action;
+
 /* XXX: configurable? */
 #define MAX_STACK_DEPTH 100
 

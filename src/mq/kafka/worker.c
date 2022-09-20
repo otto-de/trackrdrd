@@ -40,6 +40,9 @@
 #include "mq_kafka.h"
 #include "miniobj.h"
 
+kafka_wrk_t **workers;
+unsigned nwrk;
+
 static char errmsg[LINE_MAX];
 
 static unsigned

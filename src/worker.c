@@ -45,6 +45,9 @@
 #define VERSION_LEN 80
 #define CLIENT_ID_LEN 80
 
+struct mqf mqf;
+unsigned abandoned;
+
 static int running = 0, exited = 0;
 
 typedef enum {
