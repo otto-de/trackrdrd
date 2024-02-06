@@ -25,6 +25,9 @@ test_parse_LDADD = \
 	-lm \
 	../parse.$(OBJEXT) \
 	../assert.$(OBJEXT) \
+	../log.$(OBJEXT) \
+	../config.$(OBJEXT) \
+	../config_common.$(OBJEXT) \
 	@VARNISH_LIBS@
 
 test_data_SOURCES = \
@@ -36,6 +39,9 @@ test_data_SOURCES = \
 test_data_LDADD = \
 	../data.$(OBJEXT) \
 	../assert.$(OBJEXT) \
+	../log.$(OBJEXT) \
+	../config.$(OBJEXT) \
+	../config_common.$(OBJEXT) \
 	@VARNISH_LIBS@
 
 test_append_SOURCES = \
@@ -53,6 +59,7 @@ test_append_LDADD = \
 	../parse.$(OBJEXT) \
 	../config.$(OBJEXT) \
 	../config_common.$(OBJEXT) \
+	../handler.$(OBJEXT) \
 	../sandbox.$(OBJEXT) \
 	@VARNISH_LIBS@
 
@@ -67,6 +74,12 @@ test_mq_SOURCES = \
 test_mq_LDADD = \
 	-ldl \
 	-lm \
+	../worker.$(OBJEXT) \
+	../config.$(OBJEXT) \
+	../config_common.$(OBJEXT) \
+	../log.$(OBJEXT) \
+	../spmcq.$(OBJEXT) \
+	../data.$(OBJEXT) \
 	@VARNISH_LIBS@
 
 test_spmcq_SOURCES = \
@@ -77,6 +90,9 @@ test_spmcq_SOURCES = \
 test_spmcq_LDADD = \
 	../spmcq.$(OBJEXT) \
 	../assert.$(OBJEXT) \
+	../config.$(OBJEXT) \
+	../config_common.$(OBJEXT) \
+	../log.$(OBJEXT) \
 	@VARNISH_LIBS@
 
 test_config_SOURCES = \
@@ -91,6 +107,7 @@ test_config_SOURCES = \
 
 test_config_LDADD = \
 	../assert.$(OBJEXT) \
+	../spmcq.$(OBJEXT) \
 	-lm \
 	@VARNISH_LIBS@
 
