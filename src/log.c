@@ -39,6 +39,8 @@
 
 #include "trackrdrd.h"
 
+struct logconf logconf;
+
 static const char *level2name[LOG_DEBUG+1];
 
 static void

@@ -39,6 +39,20 @@
 
 #include "mq_kafka.h"
 
+char topic[LINE_MAX];
+int loglvl;
+char logpath[PATH_MAX];
+char zookeeper[LINE_MAX];
+char brokerlist[LINE_MAX];
+char zoolog[PATH_MAX];
+unsigned zoo_timeout;
+unsigned stats_interval;
+unsigned wrk_shutdown_timeout;
+unsigned log_error_data;
+
+rd_kafka_topic_conf_t *topic_conf;
+rd_kafka_conf_t *conf;
+
 static int
 conf_getUnsignedInt(const char *rval, unsigned *i)
 {

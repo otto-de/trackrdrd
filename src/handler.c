@@ -75,6 +75,8 @@ struct symbols {
     VTAILQ_ENTRY(symbols)   list;
 };
 
+struct sigaction ignore_action, stacktrace_action, default_action;
+
 static VTAILQ_HEAD(,symbols) symbols = VTAILQ_HEAD_INITIALIZER(symbols);
 
 static int

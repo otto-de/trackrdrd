@@ -94,7 +94,9 @@
 
 #define MAX_IDLE_PAUSE 0.01
 
-const char *version = PACKAGE_TARNAME "-" PACKAGE_VERSION " revision " \
+char cli_config_filename[PATH_MAX + 1];
+
+const char *version = PACKAGE_TARNAME "-" PACKAGE_VERSION " revision "  \
     VCS_Version " branch " VCS_Branch;
 
 static unsigned len_hi = 0, debug = 0, data_exhausted = 0, restart = 0;

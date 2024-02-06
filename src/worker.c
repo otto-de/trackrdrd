@@ -99,7 +99,11 @@ typedef struct {
     pthread_t worker;
     worker_data_t *wrk_data;
 } thread_data_t;
-    
+
+unsigned abandoned;
+
+struct mqf mqf;
+
 static unsigned run, cleaned = 0, rec_thresh, chunk_thresh;
 static thread_data_t *thread_data;
 

@@ -60,6 +60,9 @@
 #define SO_VERSION "unknown version"
 #endif
 
+kafka_wrk_t **workers;
+unsigned nwrk;
+
 static char errmsg[LINE_MAX];
 static char _version[LINE_MAX];
 

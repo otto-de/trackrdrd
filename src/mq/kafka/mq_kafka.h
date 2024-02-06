@@ -55,23 +55,23 @@ typedef struct kafka_wrk {
     unsigned long	nodata;
 } kafka_wrk_t;
 
-kafka_wrk_t **workers;
-unsigned nwrk;
+extern kafka_wrk_t **workers;
+extern unsigned nwrk;
 
 /* configuration */
-char topic[LINE_MAX];
-int loglvl;
-char logpath[PATH_MAX];
-char zookeeper[LINE_MAX];
-char brokerlist[LINE_MAX];
-char zoolog[PATH_MAX];
-unsigned zoo_timeout;
-unsigned stats_interval;
-unsigned wrk_shutdown_timeout;
-unsigned log_error_data;
+extern char topic[LINE_MAX];
+extern int loglvl;
+extern char logpath[PATH_MAX];
+extern char zookeeper[LINE_MAX];
+extern char brokerlist[LINE_MAX];
+extern char zoolog[PATH_MAX];
+extern unsigned zoo_timeout;
+extern unsigned stats_interval;
+extern unsigned wrk_shutdown_timeout;
+extern unsigned log_error_data;
 
-rd_kafka_topic_conf_t *topic_conf;
-rd_kafka_conf_t *conf;
+extern rd_kafka_topic_conf_t *topic_conf;
+extern rd_kafka_conf_t *conf;
 
 /* log.c */
 int MQ_LOG_Open(const char *path);
