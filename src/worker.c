@@ -350,8 +350,10 @@ static void wrk_cleanup(void)
 {
     if (cleaned) return;
     
-    for (int i = 0; i < config.nworkers; i++)
+    for (int i = 0; i < config.nworkers; i++) {
+        VSB_fini(thread_data[i].wrk_data->sb);
         free(thread_data[i].wrk_data);
+    }
     free(thread_data);
     AZ(pthread_mutex_destroy(&spmcq_datawaiter_lock));
     AZ(pthread_cond_destroy(&spmcq_datawaiter_cond));
@@ -361,6 +363,8 @@ static void wrk_cleanup(void)
 int
 WRK_Init(void)
 {
+    char *recbuf;
+
     thread_data
         = (thread_data_t *) malloc(config.nworkers * sizeof(thread_data_t));
 
@@ -383,7 +387,9 @@ WRK_Init(void)
         wrk->magic = WORKER_DATA_MAGIC;
         wrk->sb = (struct vsb *) malloc(sizeof(struct vsb));
         AN(wrk->sb);
-        AN(VSB_new(wrk->sb, NULL, config.max_reclen + 1, VSB_FIXEDLEN));
+        recbuf = (char *) malloc(config.max_reclen + 1);
+        AN(recbuf);
+        AN(VSB_init(wrk->sb, recbuf, config.max_reclen + 1));
         VSTAILQ_INIT(&wrk->freerec);
         wrk->nfree_rec = 0;
         VSTAILQ_INIT(&wrk->freechunk);
