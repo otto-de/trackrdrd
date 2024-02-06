@@ -115,10 +115,8 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
         MQ_LOG_SetLevel(loglvl);
     }
     snprintf(_version, LINE_MAX,
-             "libtrackrdr-kafka %s, rdkafka %s, zookeeper %d.%d.%d, "
-             "pcre %s", SO_VERSION, rd_kafka_version_str(),
-             ZOO_MAJOR_VERSION, ZOO_MINOR_VERSION, ZOO_PATCH_VERSION,
-             pcre_version());
+             "libtrackrdr-kafka %s, rdkafka %s, zookeeper %s, pcre %s",
+             SO_VERSION, rd_kafka_version_str(), ZOO_VERSION, pcre_version());
     MQ_LOG_Log(LOG_INFO, "initializing (%s)", _version);
 
     if (zookeeper[0] == '\0' && brokerlist[0] == '\0') {
