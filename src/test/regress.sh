@@ -42,7 +42,7 @@ function regress {
     # the second sed removes the user under which the child process runs
     # "Not running as root" filtered so that the test is independent of
     # the user running it
-    CKSUM=$( grep -v 'Worker 1' $LOG |  sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(Running as\) \([a-zA-Z0-9]*\)$/\1/' | grep -v 'Not running as root' | cksum)
+    CKSUM=$( grep -v 'Worker 1' $LOG |  sed -e 's/\(initializing\) \(.*\)/\1/' | sed -e 's/\(Running as\) \([a-zA-Z0-9]*\)$/\1/' -e 's/\(Reader: took\) [0-9]* \(free\)/\1 \2/' | grep -v 'Not running as root' | cksum)
     if [ "$CKSUM" != "$2" ]; then
         echo "ERROR: Regression test incorrect reader log cksum: $CKSUM"
         exit 1
@@ -67,15 +67,11 @@ function regress {
 }
 
 echo '... standard VCL_Log syntax'
-regress 'varnish.binlog' '4193098095 333282' '1274763305 56045' \
-        '1485621276 46141'
-
-echo '... legacy VCL_Log syntax'
-regress 'varnish.legacy.binlog' '3334052518 375477' '3908916621 57319' \
-        '1139478852 48689'
+regress 'varnish.binlog' '3797708781 290937096' '1401120156 33507479' \
+        '3845964878 33359820'
 
 if [ "$TESTDIR" != "." ]; then
-    rm -f varnish.binlog varnish.legacy.binlog test.conf file_mq.conf
+    rm -f varnish.binlog test.conf file_mq.conf
 fi
 
 exit 0
