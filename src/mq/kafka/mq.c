@@ -37,8 +37,10 @@
 #include <ctype.h>
 #include <signal.h>
 
+#define PCRE2_CODE_UNIT_WIDTH 8
+
 #include <zookeeper/zookeeper_version.h>
-#include <pcre.h>
+#include <pcre2.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -115,8 +117,9 @@ MQ_GlobalInit(unsigned nworkers, const char *config_fname)
         MQ_LOG_SetLevel(loglvl);
     }
     snprintf(_version, LINE_MAX,
-             "libtrackrdr-kafka %s, rdkafka %s, zookeeper %s, pcre %s",
-             SO_VERSION, rd_kafka_version_str(), ZOO_VERSION, pcre_version());
+             "libtrackrdr-kafka %s, rdkafka %s, zookeeper %s, pcre2 %d.%d",
+             SO_VERSION, rd_kafka_version_str(), ZOO_VERSION, PCRE2_MAJOR,
+             PCRE2_MINOR);
     MQ_LOG_Log(LOG_INFO, "initializing (%s)", _version);
 
     if (zookeeper[0] == '\0' && brokerlist[0] == '\0') {

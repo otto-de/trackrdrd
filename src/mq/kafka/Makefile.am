@@ -23,7 +23,7 @@ libtrackrdr_kafka_la_SOURCES = \
 
 libtrackrdr_kafka_la_LIBADD = \
 	${PTHREAD_LIBS} \
-	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
+	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre2-8
 
 libtrackrdr_kafka_la_LDFLAGS = -version-info ${CURRENT}:${REVISION}:${AGE}
 

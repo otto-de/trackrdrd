@@ -91,6 +91,8 @@ AS_IF([test "x$enable_kafka" != xno],
                    AC_MSG_ERROR([libzookeeper_mt is required]))
       AC_CHECK_LIB([rdkafka], [rd_kafka_new], [true],
                    AC_MSG_ERROR([librdkafka is required]))
+      AC_CHECK_LIB([pcre2-8], [pcre2_compile_8], [true],
+                   AC_MSG_ERROR([pcre2-8 is required]))
       ], [])
 
 # From Varnish configure.ac

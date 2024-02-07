@@ -43,8 +43,10 @@
 #include <string.h>
 #include <syslog.h>
 
+#define PCRE2_CODE_UNIT_WIDTH 8
+
 #include <zookeeper/zookeeper.h>
-#include <pcre.h>
+#include <pcre2.h>
 
 #include "mq_kafka.h"
 #include "miniobj.h"
@@ -52,7 +54,9 @@
 #define BROKER_PATH "/brokers/ids"
 
 static zhandle_t *zh = NULL;
-static pcre *host_regex = NULL, *port_regex = NULL;
+static pcre2_code *host_regex = NULL, *port_regex = NULL;
+static pcre2_match_data *host_data = NULL, *port_data = NULL;
+static pcre2_match_context *mctx = NULL;
 static char errmsg[LINE_MAX];
 static FILE *zoologf = NULL;
 
@@ -61,8 +65,8 @@ static const char
 {
     struct String_vector broker_ids;
     int result;
+    PCRE2_SIZE offset;
     char *brokerptr = brokers;
-    const char *pcre_err;
 
     AN(zh);
 
@@ -73,20 +77,31 @@ static const char
     }
 
     if (host_regex == NULL) {
-        host_regex = pcre_compile("\"host\"\\s*:\\s*\"([^\"]+)\"", 0,
-                                  &pcre_err, &result, NULL);
+        host_regex = pcre2_compile("\"host\"\\s*:\\s*\"([^\"]+)\"",
+                                   PCRE2_ZERO_TERMINATED, 0, &result, &offset,
+                                   NULL);
         AN(host_regex);
+        host_data = pcre2_match_data_create_from_pattern(host_regex, NULL);
+        AN(host_data);
     }
     if (port_regex == NULL) {
-        port_regex = pcre_compile("\"port\"\\s*:\\s*(\\d+)", 0,
-                                  &pcre_err, &result, NULL);
+        port_regex = pcre2_compile("\"port\"\\s*:\\s*(\\d+)",
+                                   PCRE2_ZERO_TERMINATED, 0, &result, &offset,
+                                   NULL);
         AN(port_regex);
+        port_data = pcre2_match_data_create_from_pattern(port_regex, NULL);
+        AN(port_data);
+    }
+    if (mctx == NULL) {
+        mctx = pcre2_match_context_create(NULL);
+        AN(mctx);
     }
 
     memset(brokers, 0, max);
     for (int i = 0; i < broker_ids.count; i++) {
         char path[PATH_MAX], broker[LINE_MAX];
         int len = LINE_MAX;
+        PCRE2_SIZE ll;
 
         snprintf(path, PATH_MAX, "/brokers/ids/%s", broker_ids.data[i]);
         if ((result = zoo_get(zh, path, 0, broker, &len, NULL)) != ZOK) {
@@ -96,31 +111,33 @@ static const char
             return errmsg;
         }
         if (len > 0) {
-            int ovector[6], r;
-            const char *host = NULL, *port = NULL;
+            int r;
+            PCRE2_UCHAR *host = NULL, *port = NULL;
 
             broker[len] = '\0';
             MQ_LOG_Log(LOG_DEBUG, "Zookeeper broker id %s config: %s",
                        broker_ids.data[i], broker);
 
-            r = pcre_exec(host_regex, NULL, broker, len, 0, 0, ovector, 6);
-            if (r <= PCRE_ERROR_NOMATCH) {
+            r = pcre2_match(host_regex, broker, len, 0, 0, host_data, mctx);
+            if (r <= PCRE2_ERROR_NOMATCH) {
                 snprintf(errmsg, LINE_MAX,
                          "Host not found in config for broker id %s [%s]",
                          broker_ids.data[i], broker);
                 return errmsg;
             }
-            pcre_get_substring(broker, ovector, r, 1, &host);
+            (void)pcre2_substring_get_bynumber(host_data, 1, &host, &ll);
             AN(host);
-            r = pcre_exec(port_regex, NULL, broker, len, 0, 0, ovector, 6);
-            if (r <= PCRE_ERROR_NOMATCH) {
+            AN(ll);
+            r = pcre2_match(port_regex, broker, len, 0, 0, port_data, mctx);
+            if (r <= PCRE2_ERROR_NOMATCH) {
                 snprintf(errmsg, LINE_MAX,
                          "Port not found in config for broker id %s [%s]",
                          broker_ids.data[i], broker);
                 return errmsg;
             }
-            pcre_get_substring(broker, ovector, r, 1, &port);
+            (void)pcre2_substring_get_bynumber(port_data, 1, &port, &ll);
             AN(port);
+            AN(ll);
 
             if (strlen(brokers) + strlen(host) + strlen(port) + 2 > max) {
                 snprintf(errmsg, LINE_MAX,
@@ -129,8 +146,8 @@ static const char
                 return errmsg;
             }
             sprintf(brokerptr, "%s:%s", host, port);
-            pcre_free_substring(host);
-            pcre_free_substring(port);
+            pcre2_substring_free(host);
+            pcre2_substring_free(port);
             brokerptr += strlen(brokerptr);
             if (i < broker_ids.count - 1)
                 *brokerptr++ = ',';

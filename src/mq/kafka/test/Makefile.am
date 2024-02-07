@@ -30,7 +30,7 @@ test_kafka_LDADD = \
 	../callback.$(OBJEXT) \
 	../config.$(OBJEXT) \
 	${PTHREAD_LIBS} \
-	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
+	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre2-8
 
 test_send_SOURCES = \
 	$(top_srcdir)/src/test/minunit.h \
@@ -47,7 +47,7 @@ test_send_LDADD = \
 	../callback.$(OBJEXT) \
 	../config.$(OBJEXT) \
 	${PTHREAD_LIBS} \
-	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
+	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre2-8
 
 test_send_ssl_SOURCES = \
 	$(top_srcdir)/src/test/minunit.h \
@@ -64,7 +64,7 @@ test_send_ssl_LDADD = \
 	../callback.$(OBJEXT) \
 	../config.$(OBJEXT) \
 	${PTHREAD_LIBS} \
-	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre
+	-lrdkafka -lz -lpthread -lrt -lzookeeper_mt -lpcre2-8
 
 CLEANFILES = kafka.log zoo.log *~
 
