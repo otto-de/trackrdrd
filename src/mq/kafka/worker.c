@@ -93,10 +93,9 @@ const char
     CHECK_OBJ_NOTNULL((kafka_wrk_t *) rd_kafka_opaque(rk), KAFKA_WRK_MAGIC);
     rd_kafka_set_log_level(rk, loglvl);
 
-    errno = 0;
     rkt = rd_kafka_topic_new(rk, topic, wrk_topic_conf);
     if (rkt == NULL) {
-        rd_kafka_resp_err_t rkerr = rd_kafka_errno2err(errno);
+        rd_kafka_resp_err_t rkerr = rd_kafka_last_error();
         snprintf(errmsg, LINE_MAX, "Failed to initialize topic: %s",
                  rd_kafka_err2str(rkerr));
         MQ_LOG_Log(LOG_ERR, errmsg);
