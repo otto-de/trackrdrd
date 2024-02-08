@@ -33,6 +33,8 @@ function regress {
         cp $TESTDIR/file_mq.conf .
     fi
 
+    gunzip -k $1.gz
+
     ../trackrdrd -D -f $1 -l $LOG -d -c test.conf
 
     # Check ckums of the log with and without logs from the worker thread,

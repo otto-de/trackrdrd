@@ -13,7 +13,8 @@ dist_check_SCRIPTS = test_spmcq_loop.sh regress.sh
 
 AM_TESTS_ENVIRONMENT = TESTDIR=$(srcdir)
 
-CLEANFILES = testing.log stderr.txt trackrdrd.pid trackrdrd_*.conf.new
+CLEANFILES = testing.log stderr.txt trackrdrd.pid trackrdrd_*.conf.new \
+	varnish.binlog
 DISTCLEANFILES = mq_test.log mq_log.log
 
 test_parse_SOURCES = \
