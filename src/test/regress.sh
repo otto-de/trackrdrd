@@ -33,7 +33,7 @@ function regress {
         cp $TESTDIR/file_mq.conf .
     fi
 
-    gunzip -k $1.gz
+    gunzip -c -k $TESTDIR/$1.gz > $1
 
     ../trackrdrd -D -f $1 -l $LOG -d -c test.conf
 

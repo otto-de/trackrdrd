@@ -130,5 +130,4 @@ test_worker_LDADD = \
 	@VARNISH_LIBS@
 
 EXTRA_DIST = file_mq.conf test.conf trackrdrd_001.conf trackrdrd_002.conf \
-	trackrdrd_003.conf trackrdrd_010.conf varnish.binlog \
-	varnish.legacy.binlog
+	trackrdrd_003.conf trackrdrd_010.conf varnish.binlog.gz
