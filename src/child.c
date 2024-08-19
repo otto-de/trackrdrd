@@ -54,6 +54,7 @@
 #include <stdarg.h>
 #include <dlfcn.h>
 #include <float.h>
+#include <inttypes.h>
 
 #include "trackrdrd.h"
 #include "config_common.h"
@@ -336,7 +337,7 @@ get_chunk(dataentry *entry)
 }
 
 static unsigned
-append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, const char *data,
+append(dataentry *entry, enum VSL_tag_e tag, uint64_t xid, const char *data,
        int datalen)
 {
     chunk_t *chunk;
@@ -348,9 +349,9 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, const char *data,
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     /* Data overflow */
     if (entry->end + datalen + 1 > config.max_reclen) {
-        LOG_Log(LOG_ERR, "%s: Data too long, XID=%d, current length=%d, "
-            "DISCARDING data=[%.*s]", VSL_tags[tag], xid, entry->end,
-            datalen, data);
+        LOG_Log(LOG_ERR, "%s: Data too long, XID=%" PRIu64 ", "
+                "current length=%d, DISCARDING data=[%.*s]", VSL_tags[tag], xid,
+                entry->end, datalen, data);
         len_overflows++;
         return -1;
     }
@@ -358,8 +359,8 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, const char *data,
        log, due to exceeding shm_reclen. */
     if ((null = memchr(data, '\0', datalen)) != NULL) {
         datalen = null - data;
-        LOG_Log(LOG_ERR, "%s: Data truncated in SHM log, XID=%d, data=[%.*s]",
-                VSL_tags[tag], xid, datalen, data);
+        LOG_Log(LOG_ERR, "%s: Data truncated in SHM log, XID=%" PRIu64 ", "
+                "data=[%.*s]", VSL_tags[tag], xid, datalen, data);
         truncated++;
     }
 
@@ -400,12 +401,12 @@ append(dataentry *entry, enum VSL_tag_e tag, unsigned xid, const char *data,
 }
 
 static inline void
-addkey(dataentry *entry, enum VSL_tag_e tag, unsigned xid, const char *key,
+addkey(dataentry *entry, enum VSL_tag_e tag, uint64_t xid, const char *key,
        int keylen)
 {
     CHECK_OBJ_NOTNULL(entry, DATA_MAGIC);
     if (keylen > config.maxkeylen) {
-        LOG_Log(LOG_ERR, "%s: Key too long, XID=%d, length=%d, "
+        LOG_Log(LOG_ERR, "%s: Key too long, XID=%" PRIu64 ", length=%d, "
                 "DISCARDING key=[%.*s]", VSL_tags[tag], xid, keylen,
                 keylen, key);
         key_overflows++;
@@ -425,7 +426,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     int status = DISPATCH_RETURN_OK, hasdata = 0, chunks = 0;
     dataentry *de = NULL;
     char reqend_str[REQEND_T_LEN];
-    int32_t vxid = 0;
+    int64_t vxid = 0;
     struct timeval latest_t = { 0, 0 };
     unsigned chunks_added = 0;
     (void) priv;
@@ -444,7 +445,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 
     for (struct VSL_transaction *t = pt[0]; t != NULL; t = *++pt) {
         if (debug)
-            LOG_Log(LOG_DEBUG, "Reader read tx: [%u]", t->vxid);
+            LOG_Log(LOG_DEBUG, "Reader read tx: [%" PRId64 "]", t->vxid);
 
         if (t->type != VSL_t_req)
             continue;
@@ -452,7 +453,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
         while ((status = VSL_Next(t->c)) > 0) {
             int len, err;
             const char *payload;
-            unsigned xid;
+            uint64_t xid;
             enum VSL_tag_e tag;
 
             /* Quick filter for the tags of interest */
@@ -478,14 +479,14 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
                 if (chunk == NULL) {
                     if (debug)
                         LOG_Log(LOG_DEBUG, "Free chunks exhausted, "
-                                "DATA DISCARDED: [Tx %d]", t->vxid);
+                                "DATA DISCARDED: [Tx %" PRId64 "]", t->vxid);
                     data_free(de);
                     return status;
                 }
                 vxid = t->vxid;
                 de->curchunk = chunk;
                 /* XXX: minimum chunk size */
-                snprintf(de->curchunk->data, config.chunk_size, "XID=%u",
+                snprintf(de->curchunk->data, config.chunk_size, "XID=%" PRId64,
                          t->vxid);
                 de->curchunkidx = strlen(de->curchunk->data);
                 de->end = de->curchunkidx;
@@ -500,7 +501,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
             xid = VSL_ID(t->c->rec.ptr);
             tag = VSL_TAG(t->c->rec.ptr);
             if (debug)
-                LOG_Log(LOG_DEBUG, "Reader read record: [%u %s %.*s]",
+                LOG_Log(LOG_DEBUG, "Reader read record: [%" PRIu64 " %s %.*s]",
                         xid, VSL_tags[tag], len, payload);
 
             switch (VSL_TAG(t->c->rec.ptr)) {
@@ -523,8 +524,9 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
                 }
 
                 if (debug)
-                    LOG_Log(LOG_DEBUG, "%s: XID=%u, %s=[%.*s]", VSL_tags[tag],
-                            xid, data_type == VCL_LOG_DATA ? "data" : "key",
+                    LOG_Log(LOG_DEBUG, "%s: XID=%" PRIu64 ", %s=[%.*s]",
+                            VSL_tags[tag], xid,
+                            data_type == VCL_LOG_DATA ? "data" : "key",
                             datalen, data);
 
                 if (data_type == VCL_LOG_DATA) {
@@ -546,7 +548,7 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
             case SLT_Timestamp:
                 AZ(Parse_Timestamp(payload, len, &reqend_t));
                 if (debug)
-                    LOG_Log(LOG_DEBUG, "%s: XID=%u req_endt=%u.%06lu",
+                    LOG_Log(LOG_DEBUG, "%s: XID=%" PRIu64 " req_endt=%u.%06lu",
                             VSL_tags[tag], xid, (unsigned) reqend_t.tv_sec,
                             reqend_t.tv_usec);
 
@@ -558,8 +560,8 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
 
             case SLT_VSL:
                 vsl_errs++;
-                LOG_Log(LOG_ERR, "VSL diagnostic XID=%u: %.*s", t->vxid,
-                        len, payload);
+                LOG_Log(LOG_ERR, "VSL diagnostic XID=%" PRId64 ": %.*s",
+                        t->vxid, len, payload);
                 break;
                     
             default:
@@ -583,10 +585,12 @@ dispatch(struct VSL_data *vsl, struct VSL_transaction * const pt[], void *priv)
     snprintf(reqend_str, REQEND_T_LEN, "%s=%u.%06lu", REQEND_T_VAR,
              (unsigned) latest_t.tv_sec, latest_t.tv_usec);
     AN(vxid);
-    chunks = append(de, SLT_Timestamp, vxid, reqend_str, REQEND_T_LEN - 1);
+    chunks = append(de, SLT_Timestamp, (uint64_t)vxid, reqend_str,
+                    REQEND_T_LEN - 1);
     if (chunks < 0) {
         if (debug)
-            LOG_Log(LOG_DEBUG, "Chunks exhausted, DATA DISCARDED: Tx %u", vxid);
+            LOG_Log(LOG_DEBUG, "Chunks exhausted, DATA DISCARDED: Tx %" PRId64,
+                    vxid);
         data_free(de);
         return status;
     }
