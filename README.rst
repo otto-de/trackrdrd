@@ -4,6 +4,13 @@
  trackrdrd
 ==========
 
+------
+Status
+------
+
+.. image:: https://img.shields.io/osslifecycle?file_url=https%3A%2F%2Fraw.githubusercontent.com%2Fotto-de%2Ftrackrdrd%2Fmain%2FOSSMETADATA
+    :alt: OSS Lifecycle
+
 -------------------------
 Tracking Log Reader demon
 -------------------------
@@ -107,7 +114,7 @@ to the data displayed with this ``varnishlog`` command::
 
 Thus the VCL example shown above may result in log entries such as::
 
-  *   << Request  >> 591570    
+  *   << Request  >> 591570
   -   VCL_Log        track url=/index.html
   -   VCL_Log        track http_Host=foo.bar.org
   -   VCL_Log        track key 12345678
@@ -421,7 +428,7 @@ Parameter            CLI Option Description                                     
                                 ``syslog.facility`` are mutually exclusive.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``syslog.facility``  ``-y``     See ``syslog(3)``; legal values are ``user`` or ``local0`` through ``local7``. This       ``local0``
-                                parameter and ``log.file`` are mutually exclusive. 
+                                parameter and ``log.file`` are mutually exclusive.
 -------------------- ---------- ----------------------------------------------------------------------------------------- -------
 ``varnish.bindump``  ``-f``     A binary dump of the Varnish shared memory log obtained from ``varnishlog -w``. If a
                                 value is specified, ``trackrdrd`` reads from that file instead of a live Varnish log
