@@ -8,8 +8,8 @@
 Status
 ------
 
-.. image:: https://img.shields.io/osslifecycle?file_url=https%3A%2F%2Fraw.githubusercontent.com%2Fotto-de%2Ftrackrdrd%2Fmain%2FOSSMETADATA
-    :alt: OSS Lifecycle
+.. image:: https://img.shields.io/osslifecycle?file_url=https%3A%2F%2Fraw.githubusercontent.com%2Fotto-de%2Ftrackrdrd%2Frefs%2Fheads%2Fmaster%2FOSSMETADATA
+   :alt: OSS Lifecycle
 
 -------------------------
 Tracking Log Reader demon
