@@ -4,9 +4,25 @@
  trackrdrd
 ==========
 
+Project Archived
+================
+
+This repository has been **archived** and is no longer maintained.
+
+- No further updates will be released.
+- Issues and pull requests are no longer monitored.
+- The project is now read-only.
+
+You are welcome to fork the repository if you wish to continue development.
+
+Thank you to everyone who contributed and supported this project.
+
+
 ------
 Status
 ------
+
+
 
 .. image:: https://img.shields.io/osslifecycle?file_url=https%3A%2F%2Fraw.githubusercontent.com%2Fotto-de%2Ftrackrdrd%2Frefs%2Fheads%2Fmaster%2FOSSMETADATA
    :alt: OSS Lifecycle
